@@ -108,7 +108,7 @@ Processes a full conversation history to build a contextual profile for ad targe
 
 ---
 
-### `adInjector.insertAd({ history, assistantResponse, overrides? })`
+### `adInjector.insertAd({ history, assistantResponse, options? })`
 
 Submits a model response and context to determine whether an ad should be inserted.
 
