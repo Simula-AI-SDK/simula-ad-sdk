@@ -1,152 +1,103 @@
+# GenAI Ad SDK
 
-# GenAI Ad SDK for Node.js
+A Node.js module for injecting ads into AI assistant responses.
 
-A lightweight Node.js SDK for embedding contextual, conversation-aware advertisements into chat applications powered by any LLM API. This library enables applications to pass user interactions and AI responses to a centralized ad engine, which returns stylistically aligned, context-relevant ads when appropriate.
-
----
-
-## 🧩 Overview
-
-The GenAI Ad SDK provides a universal interface for injecting ads into LLM-driven conversational apps. It performs:
-
-- Profile enrichment and context tracking via full chat history
-- Remote ad-matching and insertion logic based on metadata and language fidelity
-- Simple drop-in integration with any LLM-compatible stack
-
-All computation and inference are performed on the backend. The SDK sends session metadata and responses to a centralized API and receives fully rendered outputs (with or without ads).
-
----
-
-## 🛠 Installation
+## Installation
 
 ```bash
 npm install genai-ad-sdk
 ```
 
----
+## Usage
 
-## 🔧 Initialization
+The SDK provides a simple interface for processing AI conversation history and injecting ads into AI responses.
 
-```ts
-import { AdInjector } from "genai-ad-sdk";
+### CommonJS
 
+```javascript
+const { AdInjector } = require('genai-ad-sdk');
+
+// Create an instance
 const adInjector = new AdInjector({
-  description: "An AI travel planner that helps users plan vacations and book hotels.",
-  frequency: 0.5,
-  fidelity: 0.7,
-  filters: ["crypto", "adult"]
-});
-```
-
-### `.constructor(options)`
-
-| Param         | Type       | Required | Description                                                                 |
-|---------------|------------|----------|-----------------------------------------------------------------------------|
-| `description` | `string`   | ✅       | A short description of your app’s function and target users                |
-| `frequency`   | `number`   | ❌       | Float from 0–1. `0` = show ads rarely, `1` = show as often as appropriate. Default: `0.5` |
-| `fidelity`    | `number`   | ❌       | Float from 0–1. Controls tone/style alignment of ad content. Default: `0.5` |
-| `filters`     | `string[]` | ❌       | List of ad categories to exclude (see below). Default: `[]`               |
-
----
-
-## 🔒 Supported Filters (Ad Categories)
-
-You can optionally block ad categories by passing one or more of the following strings in the `filters` array:
-
-```
-["finance", "healthcare", "politics", "adult", "gaming", "crypto", "fitness", "education", "travel", "shopping"]
-```
-
----
-
-## ✅ Example Usage
-
-```ts
-import { AdInjector } from "genai-ad-sdk";
-
-const adInjector = new AdInjector({
-  description: "An AI companion for photography advice and equipment recommendations.",
-  frequency: 0.8,
-  fidelity: 1.0,
-  filters: ["politics"]
+  description: 'A chat application for fitness enthusiasts',
+  frequency: 0.5,  // 50% chance of showing an ad
+  fidelity: 0.7,   // Higher quality ads
+  filters: ['inappropriate', 'irrelevant']  // Ad filters
 });
 
-// Step 1: Process full conversation history to update user profile
+// Process message history
 const messages = [
-  { role: "system", content: "You're a helpful assistant." },
-  { role: "user", content: "I'm thinking about getting a new camera." },
-  { role: "assistant", content: "Do you prefer DSLR, mirrorless, or compact?" },
-  { role: "user", content: "I want something small and lightweight for travel." }
+  { role: 'user', content: 'How can I improve my workout?' },
+  { role: 'assistant', content: 'There are several ways to improve...' }
 ];
+adInjector.process(messages);
 
-await adInjector.process(messages);
-
-// Step 2: Pass assistant response to determine if an ad should be inserted
-const finalResponse = await adInjector.insertAd({
+// Insert an ad into an assistant response
+adInjector.insertAd({
   history: messages,
-  assistantResponse: "In that case, a mirrorless camera like the Fujifilm X-S10 is a great option for travelers."
+  assistantResponse: 'Here are some workout tips...',
+  options: {
+    // Optional additional parameters
+    category: 'fitness-equipment'
+  }
+})
+.then(result => {
+  console.log(result.adResponse); // Response with ad inserted
+})
+.catch(error => {
+  console.error('Error:', error);
 });
-
-console.log("Assistant:", finalResponse);
 ```
 
----
+### ES Modules
 
-## 🧠 API Reference
+```javascript
+import { AdInjector } from 'genai-ad-sdk';
 
-### `adInjector.process(messages)`
+// Same usage as above
+```
 
-Processes a full conversation history to build a contextual profile for ad targeting.
+## API
 
-**Parameters:**
+### AdInjector
 
-| Param     | Type   | Required | Description                                      |
-|-----------|--------|----------|--------------------------------------------------|
-| `messages`| `array`| ✅       | Full array of `{ role, content }` chat messages |
+#### Constructor
 
-**Returns:** `Promise<void>`
+```javascript
+new AdInjector(options)
+```
 
----
+- **options.description** (string, required): Description of the app and its users
+- **options.frequency** (number, optional): Float between 0 and 1, default to 0.5
+- **options.fidelity** (number, optional): Float between 0 and 1, default to 0.5
+- **options.filters** (array of strings, optional): Default to empty array
 
-### `adInjector.insertAd({ history, assistantResponse, options? })`
+#### Methods
 
-Submits a model response and context to determine whether an ad should be inserted.
+##### process(messages)
 
-**Parameters:**
+Processes message history:
 
-| Param              | Type     | Required | Description                                                            |
-|--------------------|----------|----------|------------------------------------------------------------------------|
-| `history`          | `array`  | ✅       | Full array of `{ role, content }` chat messages                       |
-| `assistantResponse`| `string` | ✅       | Raw assistant message to evaluate for ad insertion                    |
-| `options`        | `object` | ❌       | Optional override of `frequency`, `fidelity`, or `filters` from init  |
+- **messages**: Array of `{ role: string, content: string }` objects
 
-**Returns:** `Promise<{ ad_placed: boolean; originalResponse: string; adResponse: string }>` — Returns whether an ad was placed, the original assistant response, and the final response (with or without an ad)
+##### insertAd({ history, assistantResponse, options })
 
----
+Inserts an ad into an assistant response:
 
-## 🧬 Behind the Scenes
+- **history**: Array of message objects
+- **assistantResponse**: Original assistant response string
+- **options**: Optional parameter overrides
 
-The SDK does not perform any on-device inference. Instead, it sends the following to a hosted API:
+Returns a Promise that resolves with:
 
-- App description
-- Session history
-- Assistant response
-- Initialization parameters
-- Optional overrides
+```javascript
+{
+  ad_placed: boolean,
+  originalResponse: string,
+  adResponse: string
+}
+```
 
-The backend:
-- Profiles user behavior and interests
-- Runs a lightweight context model
-- Matches the response with a relevant ad (if appropriate)
-- Returns a modified or unmodified assistant message
+## License
 
----
-
-
-## 🧩 Future Roadmap
-
-- Support for streaming completions (`insertAdStream`)
-- Ad impression and engagement tracking callbacks
-- Inline ad formatting utilities (e.g., badge, tooltip, expandable)
-- TypeScript native types
-- Configurable fallback if ad injection fails
+MIT

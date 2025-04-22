@@ -1,0 +1,50 @@
+{
+  "name": "genai-ad-sdk",
+  "version": "1.0.0",
+  "description": "SDK for injecting ads into AI assistant responses",
+  "main": "index.js",
+  "type": "commonjs",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "import": "./index.mjs"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "genai-ad-sdk.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test.js",
+    "prepublishOnly": "node test.js"
+  },
+  "keywords": [
+    "ai",
+    "ads",
+    "sdk",
+    "genai",
+    "llm",
+    "chatbot",
+    "monetization"
+  ],
+  "author": {
+    "name": "Your Name",
+    "email": "your.email@example.com",
+    "url": "https://your-website.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/genai-ad-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/genai-ad-sdk/issues"
+  },
+  "homepage": "https://github.com/yourusername/genai-ad-sdk#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "license": "MIT"
+} 
