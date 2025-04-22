@@ -10,7 +10,7 @@ const sampleHistory = [
   { role: 'system', content: 'You are a helpful assistant.' },
   { role: 'user', content: 'What is the weather today?' },
   { role: 'assistant', content: 'I cannot access real-time weather data.' },
-  { role: 'user', content: 'Tell me a joke instead.' }
+  { role: 'user', content: 'Dang, I really wanted to get some sun to improve my skin. Tell me a joke instead.' }
 ];
 
 // Sample assistant response
@@ -21,45 +21,50 @@ const adInjector = new AdInjector({
   description: 'A weather app used by outdoor enthusiasts',
   frequency: 0.7,
   fidelity: 0.3,
-  filters: ['inappropriate', 'competing-products']
+  filters: ['inappropriate', 'competing-products'],
+  apiBaseUrl: 'http://127.0.0.1:8000'  // Make sure this matches your API server
 });
 
-// Test the process method
-console.log('\n--- Testing process method ---');
-adInjector.process(sampleHistory);
+// Main test function
+async function runTests() {
+  try {
+    // Test the process method
+    console.log('\n--- Testing process method (user_profile endpoint) ---');
+    const userProfile = await adInjector.process(sampleHistory);
+    console.log('User Profile Response:');
+    console.log(JSON.stringify(userProfile, null, 2));
 
-// Test the insertAd method
-console.log('\n--- Testing insertAd method ---');
-adInjector.insertAd({
-  history: sampleHistory,
-  assistantResponse: sampleResponse,
-  options: {
-    priority: 'high',
-    category: 'outdoor-gear'
+    // Test the insertAd method
+    console.log('\n--- Testing insertAd method (ad_integrate/ete endpoint) ---');
+    const adResult = await adInjector.insertAd({
+      history: sampleHistory,
+      assistantResponse: sampleResponse,
+      options: {
+        priority: 'high',
+        category: 'outdoor-gear'
+      }
+    });
+    console.log('\nAd Integration Response:');
+    console.log(JSON.stringify(adResult, null, 2));
+
+    // Example with minimal options
+    console.log('\n--- Testing with minimal options ---');
+    const minimalAdInjector = new AdInjector({
+      description: 'A simple chat application',
+      apiBaseUrl: 'http://127.0.0.1:8000'
+    });
+
+    const minimalResult = await minimalAdInjector.insertAd({
+      history: sampleHistory,
+      assistantResponse: sampleResponse
+    });
+    console.log('\nMinimal Configuration Response:');
+    console.log(JSON.stringify(minimalResult, null, 2));
+
+  } catch (error) {
+    console.error('Test Error:', error);
   }
-})
-.then(result => {
-  console.log('\nResult from insertAd:');
-  console.log(result);
-})
-.catch(error => {
-  console.error('Error:', error);
-});
+}
 
-// Example with minimal options
-console.log('\n--- Testing with minimal options ---');
-const minimalAdInjector = new AdInjector({
-  description: 'A simple chat application'
-});
-
-minimalAdInjector.insertAd({
-  history: sampleHistory,
-  assistantResponse: 'Hello, how can I help you today?'
-})
-.then(result => {
-  console.log('\nResult from minimal configuration:');
-  console.log(result);
-})
-.catch(error => {
-  console.error('Error:', error);
-}); 
+// Run the tests
+runTests(); 
