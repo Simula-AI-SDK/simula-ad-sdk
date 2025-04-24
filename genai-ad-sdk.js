@@ -80,7 +80,7 @@ class AdInjector {
         `${msg.role}: ${msg.content}`
       ).join('\n');
 
-      const response = await fetch(`${this.apiBaseUrl}/ad_integrate/ete`, {
+      const response = await fetch(`${this.apiBaseUrl}/ad_integrate/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
