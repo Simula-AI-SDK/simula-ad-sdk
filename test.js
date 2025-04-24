@@ -61,7 +61,7 @@ async function runTests() {
 
     console.log('\nMinimal Configuration Response:');
     for await (
-      const chunk of adInjector.insertAd(
+      const chunk of minimalAdInjector.insertAd(
         { 
           history: sampleHistory,
           assistantResponse: sampleResponse,
