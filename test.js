@@ -36,16 +36,21 @@ async function runTests() {
 
     // Test the insertAd method
     console.log('\n--- Testing insertAd method (ad_integrate/ete endpoint) ---');
-    const adResult = await adInjector.insertAd({
-      history: sampleHistory,
-      assistantResponse: sampleResponse,
-      options: {
-        priority: 'high',
-        category: 'outdoor-gear'
-      }
-    });
     console.log('\nAd Integration Response:');
-    console.log(JSON.stringify(adResult, null, 2));
+    for await (
+      const chunk of adInjector.insertAd(
+        { 
+          history: sampleHistory,
+          assistantResponse: sampleResponse,
+          options: {
+            priority: 'high',
+            category: 'outdoor-gear'
+          }
+        }
+      )
+    ){
+      console.log(chunk);
+    }
 
     // Example with minimal options
     console.log('\n--- Testing with minimal options ---');
@@ -54,12 +59,17 @@ async function runTests() {
       apiBaseUrl: 'http://127.0.0.1:8000'
     });
 
-    const minimalResult = await minimalAdInjector.insertAd({
-      history: sampleHistory,
-      assistantResponse: sampleResponse
-    });
     console.log('\nMinimal Configuration Response:');
-    console.log(JSON.stringify(minimalResult, null, 2));
+    for await (
+      const chunk of adInjector.insertAd(
+        { 
+          history: sampleHistory,
+          assistantResponse: sampleResponse,
+        }
+      )
+    ){
+      console.log(chunk);
+    }
 
   } catch (error) {
     console.error('Test Error:', error);

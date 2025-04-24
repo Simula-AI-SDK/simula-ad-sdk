@@ -66,21 +66,21 @@ class AdInjector {
   }
 
   /**
-   * Insert ad into assistant response
+   * Insert ad from SSE stream into assistant response
    * @param {Object} params - Parameters
    * @param {Array<Object>} params.history - Message history
    * @param {string} params.assistantResponse - Original assistant response
    * @param {Object} [params.options] - Optional overrides
    * @returns {Promise<Object>} - Promise resolving to result with ad
    */
-  async insertAd({ history, assistantResponse, options = {} }) {
+  async *insertAd({ history, assistantResponse, options = {} }) { // Generator fctn
     try {
       // Convert messages to conversation history string
       const convHistory = history.map(msg => 
         `${msg.role}: ${msg.content}`
       ).join('\n');
 
-      const response = await fetch(`${this.apiBaseUrl}/ad_integrate/ete`, {
+      const response = await fetch(`${this.apiBaseUrl}/ad_integrate/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -95,8 +95,19 @@ class AdInjector {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.json();
-      return result;
+      // Handle SSE Stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) {
+          break;
+        }
+        const chunk = decoder.decode(value, { stream: true });
+        yield chunk;
+      }
+
     } catch (error) {
       console.error('Error inserting ad:', error);
       throw error;
