@@ -29,10 +29,10 @@ const adInjector = new AdInjector({
 async function runTests() {
   try {
     // Test the process method
-    // console.log('\n--- Testing process method (user_profile endpoint) ---');
-    // const userProfile = await adInjector.process(sampleHistory);
-    // console.log('User Profile Response:');
-    // console.log(JSON.stringify(userProfile, null, 2));
+    console.log('\n--- Testing process method (user_profile endpoint) ---');
+    const userProfile = await adInjector.process(sampleHistory);
+    console.log('User Profile Response:');
+    console.log(JSON.stringify(userProfile, null, 2));
 
     // Test the insertAd method
     console.log('\n--- Testing insertAd method (ad_integrate/ete endpoint) ---');
@@ -53,23 +53,23 @@ async function runTests() {
     }
 
     // Example with minimal options
-    // console.log('\n--- Testing with minimal options ---');
-    // const minimalAdInjector = new AdInjector({
-    //   description: 'A simple chat application',
-    //   apiBaseUrl: 'http://127.0.0.1:8000'
-    // });
+    console.log('\n--- Testing with minimal options ---');
+    const minimalAdInjector = new AdInjector({
+      description: 'A simple chat application',
+      apiBaseUrl: 'http://127.0.0.1:8000'
+    });
 
-    // console.log('\nMinimal Configuration Response:');
-    // for await (
-    //   const chunk of minimalAdInjector.insertAd(
-    //     { 
-    //       history: sampleHistory,
-    //       assistantResponse: sampleResponse,
-    //     }
-    //   )
-    // ){
-    //   console.log(chunk);
-    // }
+    console.log('\nMinimal Configuration Response:');
+    for await (
+      const chunk of minimalAdInjector.insertAd(
+        { 
+          history: sampleHistory,
+          assistantResponse: sampleResponse,
+        }
+      )
+    ){
+      console.log(chunk);
+    }
 
   } catch (error) {
     console.error('Test Error:', error);
