@@ -105,7 +105,8 @@ class AdInjector {
           break;
         }
         const chunk = decoder.decode(value, { stream: true });
-        yield chunk;
+        const cleanChunk = chunk.substring(6).replace(" ", "")
+        yield cleanChunk;
       }
 
     } catch (error) {
