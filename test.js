@@ -41,11 +41,7 @@ async function runTests() {
       const chunk of adInjector.insertAd(
         { 
           history: sampleHistory,
-          assistantResponse: sampleResponse,
-          options: {
-            priority: 'high',
-            category: 'outdoor-gear'
-          }
+          assistantResponse: sampleResponse
         }
       )
     ){
