@@ -3,17 +3,22 @@
   "version": "1.0.0",
   "description": "SDK for injecting ads into AI assistant responses",
   "main": "index.js",
+  "module": "index.mjs",
   "type": "commonjs",
+  "types": "index.d.ts",
   "exports": {
     ".": {
+      "import": "./index.mjs",
       "require": "./index.js",
-      "import": "./index.mjs"
+      "types": "./index.d.ts"
     }
   },
   "files": [
     "index.js",
     "index.mjs",
+    "index.d.ts",
     "genai-ad-sdk.js",
+    "genai-ad-sdk.mjs",
     "README.md",
     "LICENSE"
   ],

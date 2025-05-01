@@ -163,5 +163,5 @@ class AdInjector {
   }
 }
 
-// Use CommonJS export for compatibility with index.js
-module.exports = { AdInjector }; 
+// Use ES Module export syntax
+export { AdInjector }; 

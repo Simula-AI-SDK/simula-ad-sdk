@@ -3,7 +3,7 @@
  * @module genai-ad-sdk
  */
 
-import { AdInjector as CommonJSAdInjector } from './genai-ad-sdk.js';
+import { AdInjector } from './genai-ad-sdk.mjs';
 
-// Re-export the AdInjector class for ESM
-export const AdInjector = CommonJSAdInjector; 
+// Export the AdInjector directly
+export { AdInjector }; 
