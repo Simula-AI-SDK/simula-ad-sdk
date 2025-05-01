@@ -22,7 +22,7 @@ const adInjector = new AdInjector({
   frequency: 0.7,
   fidelity: 0.3,
   filters: ['inappropriate', 'competing-products'],
-  apiBaseUrl: 'http://127.0.0.1:8000'  // Make sure this matches your API server
+  apiBaseUrl: "https://simula-api-701226639755.us-central1.run.app/" // 'http://127.0.0.1:8000'
 });
 
 // Main test function
@@ -52,7 +52,7 @@ async function runTests() {
     console.log('\n--- Testing with minimal options ---');
     const minimalAdInjector = new AdInjector({
       description: 'A simple chat application',
-      apiBaseUrl: 'http://127.0.0.1:8000'
+      apiBaseUrl: 'https://simula-api-701226639755.us-central1.run.app'
     });
 
     console.log('\nMinimal Configuration Response:');

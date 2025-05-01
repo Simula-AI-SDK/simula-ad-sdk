@@ -20,7 +20,7 @@ class AdInjector {
     this.frequency = options.frequency !== undefined ? options.frequency : 0.5;
     this.fidelity = options.fidelity !== undefined ? options.fidelity : 0.5;
     this.filters = options.filters || [];
-    this.apiBaseUrl = options.apiBaseUrl || 'http://127.0.0.1:8000';
+    this.apiBaseUrl = options.apiBaseUrl || "https://simula-api-701226639755.us-central1.run.app/" // 'http://127.0.0.1:8000';
 
     // Instance variables for ad frequency
     this.msgCount = 0;
