@@ -1,0 +1,55 @@
+{
+  "name": "simula-ad-sdk",
+  "version": "1.0.0",
+  "description": "SDK for injecting ads into AI assistant responses",
+  "main": "index.js",
+  "module": "index.mjs",
+  "type": "commonjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "index.d.ts",
+    "simula-ad-sdk.js",
+    "simula-ad-sdk.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test.js",
+    "prepublishOnly": "node test.js"
+  },
+  "keywords": [
+    "ai",
+    "ads",
+    "sdk",
+    "genai",
+    "llm",
+    "chatbot",
+    "monetization"
+  ],
+  "author": {
+    "name": "Your Name",
+    "email": "your.email@example.com",
+    "url": "https://your-website.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Simula-AI-SDK/simula-ad-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Simula-AI-SDK/simula-ad-sdk/issues"
+  },
+  "homepage": "https://github.com/Simula-AI-SDK/simula-ad-sdk#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "license": "MIT"
+} 
