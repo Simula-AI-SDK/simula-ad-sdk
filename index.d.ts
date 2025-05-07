@@ -34,4 +34,6 @@ declare module 'genai-ad-sdk' {
       };
     }): AsyncIterable<string>;
   }
+
+  export function trackClick(id: string, url: string, text: string, clickTime: string): Promise<void>
 } 

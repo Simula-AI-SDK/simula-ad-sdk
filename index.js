@@ -3,7 +3,7 @@
  * @module genai-ad-sdk
  */
 
-const { AdInjector } = require('./genai-ad-sdk');
+const { AdInjector, trackClick } = require('./genai-ad-sdk');
 
 // Re-export the AdInjector class
-module.exports = { AdInjector }; 
+module.exports = { AdInjector, trackClick }; 

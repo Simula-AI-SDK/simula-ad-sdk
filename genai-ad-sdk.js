@@ -163,5 +163,26 @@ class AdInjector {
   }
 }
 
+async function trackClick(id, url, text, clickTime) {
+  const apiBaseUrl = "http://127.0.0.1:8000"; // todo: centralize URL setting
+  try {
+    const response = await fetch(`${apiBaseUrl}/track_click`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        id: id,
+        url: url,
+        text: text,
+        clickTime: clickTime
+      })
+    })
+    console.log("Successfully tracked click.")
+  } catch (error) {
+    throw error;
+  }
+}
+
 // Use CommonJS export for compatibility with index.js
-module.exports = { AdInjector }; 
+module.exports = { AdInjector, trackClick }; 

@@ -3,7 +3,7 @@
  * @module genai-ad-sdk
  */
 
-import { AdInjector } from './genai-ad-sdk.mjs';
+import { AdInjector, trackClick } from './genai-ad-sdk.mjs';
 
 // Export the AdInjector directly
-export { AdInjector }; 
+export { AdInjector, trackClick }; 
