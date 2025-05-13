@@ -1,7 +1,7 @@
 /**
  * AdInjector class for generating and inserting ads into assistant responses
  */
-class AdInjector {
+export class AdInjector {
   /**
    * Create a new AdInjector instance
    * @param {Object} options - Configuration options
@@ -11,10 +11,13 @@ class AdInjector {
    * @param {string[]} [options.filters=[]] - Array of filter strings
    * @param {string} [options.apiBaseUrl='http://127.0.0.1:8000'] - Base URL for the API
    */
-  constructor(options = {}) {
+  constructor(sessionId, options = {}) {
     if (!options.description) {
       throw new Error('Description is required');
     }
+
+    // Set sessionId
+    this.sessionId = sessionId
 
     this.description = options.description;
     this.frequency = options.frequency !== undefined ? options.frequency : 0.5;
@@ -35,6 +38,12 @@ class AdInjector {
     if (this.fidelity < 0 || this.fidelity > 1) {
       throw new Error('Fidelity must be between 0 and 1');
     }
+  }
+
+  static async init(options = {}) {
+    // Create session linked to this AdInjector instance
+    this.sessionId = await AdInjector.#createSession(options.apiBaseUrl || "https://simula-api-701226639755.us-central1.run.app/");
+    return new AdInjector(this.sessionId, options)
   }
 
   /**
@@ -67,7 +76,28 @@ class AdInjector {
   }
 
   /**
+   * Fetches a unique session id from the server
+   */
+  static async #createSession(apiBaseUrl) {
+    try {
+      const response = await fetch(`${apiBaseUrl}/create_session/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      return data.sessionId;
+
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Process message history and get user profile
+   * Q: do we need this as a separate endpoint?
    * @param {Array<Object>} messages - Array of message objects
    * @param {string} messages[].role - Role (system, user, assistant)
    * @param {string} messages[].content - Message content
@@ -128,6 +158,7 @@ class AdInjector {
             fidelity: options.fidelity || this.fidelity,
             description: options.description || this.description,
             filters: options.filters || this.filters,
+            session_id: this.sessionId
           })
         });
   
@@ -163,8 +194,8 @@ class AdInjector {
   }
 }
 
-async function trackClick(id, url, text, clickTime) {
-  const apiBaseUrl = "http://127.0.0.1:8000"; // todo: centralize URL setting
+export async function trackClick(id, clickTime) {
+  const apiBaseUrl = "https://simula-api-701226639755.us-central1.run.app/"; // todo: centralize URL setting
   try {
     const response = await fetch(`${apiBaseUrl}/track_click`, {
       method: 'POST',
@@ -173,9 +204,7 @@ async function trackClick(id, url, text, clickTime) {
       },
       body: JSON.stringify({
         id: id,
-        url: url,
-        text: text,
-        clickTime: clickTime
+        clickTime: clickTime,
       })
     })
     console.log("Successfully tracked click.")
@@ -184,5 +213,5 @@ async function trackClick(id, url, text, clickTime) {
   }
 }
 
-// Use ES Module export syntax
-export { AdInjector, trackClick }; 
+// Use CommonJS export for compatibility with index.js
+// module.exports = { AdInjector, trackClick }; 

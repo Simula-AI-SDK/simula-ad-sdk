@@ -12,6 +12,14 @@ declare module 'genai-ad-sdk' {
       apiBaseUrl?: string;
     });
 
+    static init(options: {
+      description: string;
+      frequency?: number;
+      fidelity?: number;
+      filters?: string[];
+      apiBaseUrl?: string;
+    }): Promise<AdInjector>;
+
     /**
      * Process message history and get user profile
      * @param messages - Array of message objects
@@ -35,5 +43,5 @@ declare module 'genai-ad-sdk' {
     }): AsyncIterable<string>;
   }
 
-  export function trackClick(id: string, url: string, text: string, clickTime: string): Promise<void>
+  export function trackClick(id: string, clickTime: string): Promise<void>
 } 
