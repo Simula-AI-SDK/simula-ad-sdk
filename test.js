@@ -4,6 +4,7 @@
 
 // Import the AdInjector class
 const { AdInjector } = require('./index');
+const config = require('./config')
 
 // Sample chat history
 const sampleHistory = [
@@ -26,7 +27,7 @@ async function runTests() {
         frequency: 0.7,
         fidelity: 0.3,
         filters: ['inappropriate', 'competing-products'],
-        apiBaseUrl: "https://simula-api-701226639755.us-central1.run.app/" // 'http://127.0.0.1:8000'
+        apiBaseUrl: config.API_URL
       }
     )
 
