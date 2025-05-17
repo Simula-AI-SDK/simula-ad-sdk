@@ -1,4 +1,4 @@
-const config = require('./config')
+import { API_URL } from './config'
 
 /**
  * AdInjector class for generating and inserting ads into assistant responses
@@ -25,7 +25,7 @@ class AdInjector {
     this.frequency = options.frequency !== undefined ? options.frequency : 0.5;
     this.fidelity = options.fidelity !== undefined ? options.fidelity : 0.5;
     this.filters = options.filters || [];
-    this.apiBaseUrl = options.apiBaseUrl || config.API_URL
+    this.apiBaseUrl = options.apiBaseUrl || API_URL
 
     // Instance variables for ad frequency
     this.msgCount = 0;
@@ -44,7 +44,7 @@ class AdInjector {
 
   static async init(options = {}) {
     // Create session linked to this AdInjector instance
-    this.sessionId = await AdInjector.#createSession(options.apiBaseUrl || config.API_URL);
+    this.sessionId = await AdInjector.#createSession(options.apiBaseUrl || API_URL);
     return new AdInjector(this.sessionId, options)
   }
 
@@ -196,19 +196,20 @@ class AdInjector {
   }
 }
 
-async function trackClick(id, clickTime) {
+async function trackClick(href, clickTime) {
   try {
-    const response = await fetch(`${config.API_URL}/track_click`, {
+    const response = await fetch(`${API_URL}/track_click`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        id: id,
+        href: href,
         clickTime: clickTime,
       })
     })
     console.log("Successfully tracked click.")
+    return response;
   } catch (error) {
     throw error;
   }
