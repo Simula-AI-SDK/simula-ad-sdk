@@ -49,6 +49,36 @@ class AdInjector {
   }
 
   /**
+   * Set fidelity dynamically
+   */
+  setFidelity(fidelity) {
+    this.fidelity = fidelity;
+  }
+
+  /**
+   * Set frequency dynamically
+   */
+  setFrequency(freq) {
+    this.frequency = freq;
+    this.numInsertionSteps = this.frequency * 100;
+    this.#populateInsertionSteps();
+  }
+
+  /**
+   * Set description dynamically
+   */
+  setDescription(description) {
+    this.description = description;
+  }
+
+  /**
+   * Set filters dynamically
+   */
+  setFilters(filters) {
+    this.filters = filters;
+  }
+
+  /**
    * Populate array of insertion steps based on frequency
    */
   #populateInsertionSteps() {
