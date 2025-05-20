@@ -1,5 +1,4 @@
-
-# GenAI Ad SDK for Node.js
+# Simula Ad SDK for Node.js
 
 A lightweight Node.js SDK for embedding contextual, conversation-aware advertisements into chat applications powered by any LLM API. This library enables applications to pass user interactions and AI responses to a centralized ad engine, which returns stylistically aligned, context-relevant ads when appropriate.
 
@@ -7,7 +6,7 @@ A lightweight Node.js SDK for embedding contextual, conversation-aware advertise
 
 ## 🧩 Overview
 
-The GenAI Ad SDK provides a universal interface for injecting ads into LLM-driven conversational apps. It performs:
+The Simula Ad SDK provides a universal interface for injecting ads into LLM-driven conversational apps. It performs:
 
 - Profile enrichment and context tracking via full chat history
 - Remote ad-matching and insertion logic based on metadata and language fidelity
@@ -20,7 +19,7 @@ All computation and inference are performed on the backend. The SDK sends sessio
 ## 🛠 Installation
 
 ```bash
-npm install genai-ad-sdk
+npm install simula-ad
 ```
 
 ---
@@ -28,7 +27,7 @@ npm install genai-ad-sdk
 ## 🔧 Initialization
 
 ```ts
-import { AdInjector } from "genai-ad-sdk";
+import { AdInjector } from "simula-ad";
 
 const adInjector = new AdInjector({
   description: "An AI travel planner that helps users plan vacations and book hotels.",
@@ -42,7 +41,7 @@ const adInjector = new AdInjector({
 
 | Param         | Type       | Required | Description                                                                 |
 |---------------|------------|----------|-----------------------------------------------------------------------------|
-| `description` | `string`   | ✅       | A short description of your app’s function and target users                |
+| `description` | `string`   | ✅       | A short description of your app's function and target users                |
 | `frequency`   | `number`   | ❌       | Float from 0–1. `0` = show ads rarely, `1` = show as often as appropriate. Default: `0.5` |
 | `fidelity`    | `number`   | ❌       | Float from 0–1. Controls tone/style alignment of ad content. Default: `0.5` |
 | `filters`     | `string[]` | ❌       | List of ad categories to exclude (see below). Default: `[]`               |
@@ -62,7 +61,7 @@ You can optionally block ad categories by passing one or more of the following s
 ## ✅ Example Usage
 
 ```ts
-import { AdInjector } from "genai-ad-sdk";
+import { AdInjector } from "simula-ad";
 
 const adInjector = new AdInjector({
   description: "An AI companion for photography advice and equipment recommendations.",

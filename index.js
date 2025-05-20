@@ -1,9 +1,9 @@
 /**
  * Simula Ad SDK - A module for injecting ads into AI assistant responses
- * @module simula-ad-sdk
+ * @module simula-ad
  */
 
-const { AdInjector } = require('./simula-ad-sdk');
+const { AdInjector, trackClick } = require('./simula-ad');
 
 // Re-export the AdInjector class
-module.exports = { AdInjector }; 
+module.exports = { AdInjector, trackClick }; 

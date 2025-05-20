@@ -1,4 +1,4 @@
-declare module 'simula-ad-sdk' {
+declare module 'simula-ad' {
   export class AdInjector {
     /**
      * Create a new AdInjector instance
@@ -11,6 +11,14 @@ declare module 'simula-ad-sdk' {
       filters?: string[];
       apiBaseUrl?: string;
     });
+
+    static init(options: {
+      description: string;
+      frequency?: number;
+      fidelity?: number;
+      filters?: string[];
+      apiBaseUrl?: string;
+    }): Promise<AdInjector>;
 
     /**
      * Process message history and get user profile
@@ -34,4 +42,6 @@ declare module 'simula-ad-sdk' {
       };
     }): AsyncIterable<string>;
   }
+
+  export function trackClick(id: string, clickTime: string): Promise<void>
 } 

@@ -5,7 +5,7 @@ A Node.js module for injecting ads into AI assistant responses.
 ## Installation
 
 ```bash
-npm install simula-ad-sdk
+npm install simula-ad
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ The SDK provides a simple interface for processing AI conversation history and i
 ### CommonJS
 
 ```javascript
-const { AdInjector } = require('simula-ad-sdk');
+const { AdInjector } = require('simula-ad');
 
 // Create an instance
 const adInjector = new AdInjector({
@@ -52,7 +52,7 @@ adInjector.insertAd({
 ### ES Modules
 
 ```javascript
-import { AdInjector } from 'simula-ad-sdk';
+import { AdInjector } from 'simula-ad';
 
 // Same usage as above
 ```

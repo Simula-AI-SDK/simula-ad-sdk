@@ -1,9 +1,9 @@
 /**
  * Simula Ad SDK - A module for injecting ads into AI assistant responses (ESM version)
- * @module simula-ad-sdk
+ * @module simula-ad
  */
 
-import { AdInjector } from './simula-ad-sdk.mjs';
+import { AdInjector, trackClick } from './simula-ad.mjs';
 
 // Export the AdInjector directly
-export { AdInjector }; 
+export { AdInjector, trackClick }; 
