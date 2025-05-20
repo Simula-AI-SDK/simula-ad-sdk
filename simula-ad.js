@@ -73,6 +73,7 @@ class AdInjector {
       this.msgCount++;
       return true;
     } else {
+      this.msgCount++;
       return false;
     }
   }
@@ -183,10 +184,7 @@ class AdInjector {
         }
       } else {
         console.log("Ad not inserted b/c of frequency.");
-        const chunkedResponse = assistantResponse.split(" ");
-        for (let chunk of chunkedResponse){ // Stream assistant response back
-          yield chunk;
-        }
+        yield assistantResponse;
       }
 
     } catch (error) {
