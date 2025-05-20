@@ -1,4 +1,4 @@
-declare module 'simula-ad' {
+declare module 'simula-ad-sdk' {
   export class AdInjector {
     /**
      * Create a new AdInjector instance
