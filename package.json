@@ -1,6 +1,6 @@
 {
   "name": "simula-ad",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "SDK for injecting ads into AI assistant responses",
   "main": "index.js",
   "module": "index.mjs",
@@ -19,6 +19,7 @@
     "index.d.ts",
     "simula-ad.js",
     "simula-ad.mjs",
+    "config/",
     "README.md",
     "LICENSE"
   ],
