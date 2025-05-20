@@ -1,6 +1,6 @@
-# Contributing to GenAI Ad SDK
+# Contributing to Simula Ad SDK
 
-Thank you for your interest in contributing to GenAI Ad SDK! This document outlines the process for contributing to this project.
+Thank you for your interest in contributing to Simula Ad SDK! This document outlines the process for contributing to this project.
 
 ## Code of Conduct
 
@@ -12,8 +12,8 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 2. **Clone the Fork**: Clone your fork to your local machine.
    ```bash
-   git clone https://github.com/your-username/genai-ad-sdk.git
-   cd genai-ad-sdk
+   git clone https://github.com/your-username/simula-ad.git
+   cd simula-ad
    ```
 
 3. **Create a Branch**: Create a new branch for your changes.
@@ -72,4 +72,4 @@ When reporting issues, please include:
 
 ## License
 
-By contributing to GenAI Ad SDK, you agree that your contributions will be licensed under the project's [MIT License](LICENSE). 
+By contributing to Simula Ad SDK, you agree that your contributions will be licensed under the project's [MIT License](LICENSE). 

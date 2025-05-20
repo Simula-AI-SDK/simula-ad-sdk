@@ -1,5 +1,5 @@
 {
-  "name": "genai-ad-sdk",
+  "name": "simula-ad",
   "version": "1.0.0",
   "description": "SDK for injecting ads into AI assistant responses",
   "main": "index.js",
@@ -17,8 +17,8 @@
     "index.js",
     "index.mjs",
     "index.d.ts",
-    "genai-ad-sdk.js",
-    "genai-ad-sdk.mjs",
+    "simula-ad.js",
+    "simula-ad.mjs",
     "README.md",
     "LICENSE"
   ],
@@ -42,12 +42,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/genai-ad-sdk.git"
+    "url": "git+https://github.com/yourusername/simula-ad.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/genai-ad-sdk/issues"
+    "url": "https://github.com/yourusername/simula-ad/issues"
   },
-  "homepage": "https://github.com/yourusername/genai-ad-sdk#readme",
+  "homepage": "https://github.com/yourusername/simula-ad#readme",
   "engines": {
     "node": ">=14.0.0"
   },

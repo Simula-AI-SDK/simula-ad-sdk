@@ -1,4 +1,4 @@
-declare module 'genai-ad-sdk' {
+declare module 'simula-ad' {
   export class AdInjector {
     /**
      * Create a new AdInjector instance

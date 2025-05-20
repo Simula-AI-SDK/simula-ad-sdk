@@ -1,9 +1,9 @@
-import { API_URL } from './config'
+import { API_URL } from './config/index.mjs'
 
 /**
  * AdInjector class for generating and inserting ads into assistant responses
  */
-class AdInjector {
+export class AdInjector {
   /**
    * Create a new AdInjector instance
    * @param {Object} options - Configuration options
@@ -196,7 +196,7 @@ class AdInjector {
   }
 }
 
-async function trackClick(href, clickTime) {
+export async function trackClick(href, clickTime) {
   try {
     const response = await fetch(`${API_URL}/track_click`, {
       method: 'POST',
@@ -216,4 +216,4 @@ async function trackClick(href, clickTime) {
 }
 
 // Use CommonJS export for compatibility with index.js
-module.exports = { AdInjector, trackClick }; 
+// module.exports = { AdInjector, trackClick }; 

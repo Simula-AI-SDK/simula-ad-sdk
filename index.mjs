@@ -1,9 +1,9 @@
 /**
- * GenAI Ad SDK - A module for injecting ads into AI assistant responses (ESM version)
- * @module genai-ad-sdk
+ * Simula Ad SDK - A module for injecting ads into AI assistant responses (ESM version)
+ * @module simula-ad
  */
 
-import { AdInjector, trackClick } from './genai-ad-sdk.mjs';
+import { AdInjector, trackClick } from './simula-ad.mjs';
 
 // Export the AdInjector directly
 export { AdInjector, trackClick }; 
