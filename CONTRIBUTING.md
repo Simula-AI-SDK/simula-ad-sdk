@@ -12,8 +12,8 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 2. **Clone the Fork**: Clone your fork to your local machine.
    ```bash
-   git clone https://github.com/your-username/simula-ad.git
-   cd simula-ad
+   git clone https://github.com/your-username/simula-ad-sdk.git
+   cd simula-ad-sdk
    ```
 
 3. **Create a Branch**: Create a new branch for your changes.

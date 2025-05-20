@@ -19,7 +19,7 @@ All computation and inference are performed on the backend. The SDK sends sessio
 ## 🛠 Installation
 
 ```bash
-npm install simula-ad
+npm install simula-ad-sdk
 ```
 
 ---
@@ -27,7 +27,7 @@ npm install simula-ad
 ## 🔧 Initialization
 
 ```ts
-import { AdInjector } from "simula-ad";
+import { AdInjector } from "simula-ad-sdk";
 
 const adInjector = new AdInjector({
   description: "An AI travel planner that helps users plan vacations and book hotels.",
@@ -61,7 +61,7 @@ You can optionally block ad categories by passing one or more of the following s
 ## ✅ Example Usage
 
 ```ts
-import { AdInjector } from "simula-ad";
+import { AdInjector } from "simula-ad-sdk";
 
 const adInjector = new AdInjector({
   description: "An AI companion for photography advice and equipment recommendations.",
