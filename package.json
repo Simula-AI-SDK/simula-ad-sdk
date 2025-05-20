@@ -42,12 +42,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/simula-ad.git"
+    "url": "git+https://github.com/Simula-AI-SDK/simula-ad-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/simula-ad/issues"
+    "url": "https://github.com/Simula-AI-SDK/simula-ad-sdk/issues"
   },
-  "homepage": "https://github.com/yourusername/simula-ad#readme",
+  "homepage": "https://simula.ad/",
   "engines": {
     "node": ">=14.0.0"
   },

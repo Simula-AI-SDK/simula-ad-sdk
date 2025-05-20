@@ -1,6 +1,6 @@
 /**
  * Simula Ad SDK - A module for injecting ads into AI assistant responses
- * @module simula-ad
+ * @module simula-ad-sdk
  */
 
 const { AdInjector, trackClick } = require('./simula-ad');
