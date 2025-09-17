@@ -60,6 +60,10 @@ jspm_packages/
 *.swp
 *.swo
 
+# Build outputs
+dist/
+build/
+
 # OS specific files
 .DS_Store
 Thumbs.db 
