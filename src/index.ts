@@ -1,6 +1,8 @@
 export { SimulaProvider, useSimula } from './SimulaProvider';
 export { AdSlot } from './AdSlot';
 export { useBotDetection } from './hooks/useBotDetection';
+export { useViewability } from './hooks/useViewability';
+export { useOMIDViewability } from './hooks/useOMIDViewability';
 export type {
   SimulaTheme,
   Message,
@@ -8,5 +10,9 @@ export type {
   AdSlotProps,
   SimulaProviderProps,
   SimulaContextValue,
-  BotDetectionResult
+  BotDetectionResult,
+  ViewabilityOptions,
+  ViewabilityResult,
+  OMIDViewabilityOptions,
+  OMIDViewabilityResult
 } from './types';

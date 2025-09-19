@@ -11,7 +11,7 @@ export const useBotDetection = (): BotDetectionResult => {
   useEffect(() => {
     const detectBot = async () => {
       try {
-        // Load and use FingerprintJS BotD
+        // Load and initialize BotD
         const botd = await load();
         const detectionResult = await botd.detect();
         
@@ -33,9 +33,7 @@ export const useBotDetection = (): BotDetectionResult => {
       }
     };
 
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(detectBot, 100);
-    return () => clearTimeout(timer);
+    detectBot();
   }, []);
 
   return result;

@@ -166,7 +166,7 @@ export default function ChatWithAds() {
 
 ---
 
-## 🤖 Bot Detection & Fraud Prevention
+## 🛡️ Bot Detection & Fraud Prevention
 
 Simula includes **professional-grade bot detection** powered by **FingerprintJS BotD** to prevent ad fraud and protect advertisers from fake impressions.
 
@@ -180,32 +180,79 @@ The SDK automatically:
 
 ### Detection Technology
 
-Powered by **[@fingerprintjs/botd](https://github.com/fingerprintjs/BotD)** - the professional bot detection library from the FingerprintJS team:
+Powered by **[@fingerprintjs/botd](https://github.com/fingerprintjs/BotD)** - the professional bot detection library:
 
 - **Advanced automation detection**: Selenium, Puppeteer, Playwright, PhantomJS
 - **Behavioral analysis**: Mouse movements, timing attacks, automation patterns  
 - **Browser tampering detection**: Modified properties, injected scripts
 - **Machine learning**: Continuously improving detection accuracy
 
-### Manual Bot Detection
+---
 
-You can also use the bot detection independently:
+## 📊 Simple Viewability & Professional Measurement
+
+Simula provides clean, efficient viewability measurement with both simple and industry-standard options.
+
+### Simple Viewability (Default)
+
+The SDK automatically provides:
+- ✅ **Clean Intersection Observer-based measurement** 
+- ✅ **Professional impression tracking** for advertiser reporting  
+- ✅ **Efficient viewability detection** with customizable thresholds
+- ✅ **Sequential tracking flow** preventing duplicate impressions
+
+### Available Options
+
+- **`useViewability`**: Simple, efficient intersection observer (recommended for most use cases)
+- **`useOMIDViewability`**: Full OMID integration (for enterprise/verification requirements)
+
+---
+
+## 🔧 Combined Usage
+
+Both systems work together seamlessly for maximum protection and accuracy:
 
 ```tsx
-import { useBotDetection } from "@simula/sdk-react";
+import { useBotDetection, useViewability } from "@simula/sdk-react";
 
-function MyComponent() {
+function MyAdComponent({ adId }: { adId: string }) {
   const { isBot, reasons } = useBotDetection();
+  const { 
+    elementRef, 
+    isViewable, 
+    hasBeenViewed, 
+    trackImpression 
+  } = useViewability({
+    threshold: 0.5,
+    onImpressionTracked: (adId) => {
+      // Called after impression tracking
+      console.log(`Backend tracking for ad: ${adId}`);
+      // Your custom backend tracking logic here
+    }
+  });
   
   if (isBot) {
-    return <div>Automated traffic detected</div>;
+    return <div>Bot detected - no ads served</div>;
   }
   
-  return <div>Human user verified</div>;
+  return (
+    <div ref={elementRef}>
+      {isViewable ? "Ad is viewable ✓" : "Ad not in view"}
+      {hasBeenViewed && <span>Previously viewed</span>}
+      <button onClick={() => trackImpression(adId)}>
+        Track Impression
+      </button>
+    </div>
+  );
 }
 ```
 
-**Bot Detection Response:**
+**The Perfect Flow:**
+1. **BotD**: Prevents fraud before it happens
+2. **Viewability**: Tracks impression when actually viewable  
+3. **Backend**: Gets pinged after viewability confirmation
+4. **Callbacks**: All user callbacks triggered after successful tracking
+5. **Result**: Single source of truth with sequential execution
 - `isBot`: Boolean indicating if bot is detected by FingerprintJS BotD
 - `reasons`: Array indicating detection status
 

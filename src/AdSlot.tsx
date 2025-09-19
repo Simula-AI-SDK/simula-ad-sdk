@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSimula } from './SimulaProvider';
-import { useIntersectionObserver } from './hooks/useIntersectionObserver';
 import { useDebounce } from './hooks/useDebounce';
 import { useBotDetection } from './hooks/useBotDetection';
+import { useViewability } from './hooks/useViewability';
 import { fetchAd, trackImpression } from './utils/api';
 import { createAdSlotCSS } from './utils/styling';
 import { AdSlotProps, AdData } from './types';
@@ -25,19 +25,25 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shouldFetch, setShouldFetch] = useState(false);
-  const [hasTrackedImpression, setHasTrackedImpression] = useState(false);
 
   const lastFetchTimeRef = useRef<number>(0);
   const triggerPromiseRef = useRef<Promise<any> | null>(null);
   const styleElementRef = useRef<HTMLStyleElement | null>(null);
 
-  const { elementRef, isIntersecting, hasIntersected } = useIntersectionObserver({
+  const { elementRef, isViewable, hasBeenViewed, impressionTracked, trackImpression: viewabilityTrackImpression } = useViewability({
     threshold: 0.5,
+    onImpressionTracked: (adId: string) => {
+      // This gets called after impression tracking
+      trackImpression(adId, apiKey);
+      if (ad) {
+        onImpression?.(ad);
+      }
+    }
   });
 
   const { isBot, reasons } = useBotDetection();
 
-  const canFetch = !onlyWhenVisible || hasIntersected;
+  const canFetch = !onlyWhenVisible || hasBeenViewed;
 
   const fetchAdData = useCallback(async () => {
     if (!canFetch || loading) return;
@@ -70,7 +76,6 @@ export const AdSlot: React.FC<AdSlotProps> = ({
         onError?.(new Error(result.error));
       } else if (result.ad) {
         setAd(result.ad);
-        setHasTrackedImpression(false);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch ad';
@@ -107,12 +112,10 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   }, [trigger]);
 
   useEffect(() => {
-    if (ad && isIntersecting && !hasTrackedImpression && !isBot) {
-      setHasTrackedImpression(true);
-      trackImpression(ad.id, apiKey);
-      onImpression?.(ad);
+    if (ad && isViewable && !isBot) {
+      viewabilityTrackImpression(ad.id); // Track impression when viewable
     }
-  }, [ad, isIntersecting, hasTrackedImpression, apiKey, onImpression, isBot]);
+  }, [ad, isViewable, isBot, viewabilityTrackImpression]);
 
   useEffect(() => {
     const css = createAdSlotCSS(theme);
@@ -160,21 +163,17 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     return (
       <div className="simula-ad-slot">
         <span className="simula-ad-label">Sponsored</span>
-        <iframe
-          src={ad.iframeUrl}
-          className="simula-ad-iframe"
-          frameBorder="0"
-          scrolling="no"
-          allowTransparency={true}
-          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-          title={`Ad: ${ad.id}`}
-          onLoad={() => {
-            // Track impression when iframe loads
-            if (!hasTrackedImpression && isIntersecting && !isBot) {
-              setHasTrackedImpression(true);
-              trackImpression(ad.id, apiKey);
-              onImpression?.(ad);
-            }
+          <iframe
+            src={ad.iframeUrl}
+            className="simula-ad-iframe"
+            frameBorder="0"
+            scrolling="no"
+            allowTransparency={true}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            title={`Ad: ${ad.id}`}
+            onLoad={() => {
+            // Iframe loaded - no impression tracking here
+            // Impression tracking is handled by viewability detection
           }}
         />
       </div>

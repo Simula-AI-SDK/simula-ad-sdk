@@ -49,3 +49,27 @@ export interface BotDetectionResult {
   isBot: boolean;
   reasons: string[];
 }
+
+export interface OMIDViewabilityOptions {
+  threshold?: number;
+  partnerName?: string;
+  partnerVersion?: string;
+  onImpressionTracked?: (adId: string) => void;
+}
+
+export interface OMIDViewabilityResult {
+  isViewable: boolean;
+  hasBeenViewed: boolean;
+  impressionTracked: boolean;
+}
+
+export interface ViewabilityOptions {
+  threshold?: number;
+  onImpressionTracked?: (adId: string) => void;
+}
+
+export interface ViewabilityResult {
+  isViewable: boolean;
+  hasBeenViewed: boolean;
+  impressionTracked: boolean;
+}
