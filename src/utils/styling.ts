@@ -54,17 +54,6 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
 
 
 
-    .simula-ad-content {
-      cursor: pointer;
-      text-decoration: none;
-      color: inherit;
-      display: block;
-    }
-
-    .simula-ad-content:hover {
-      text-decoration: none;
-    }
-
     .simula-ad-iframe {
       width: 100%;
       height: 250px;
@@ -73,38 +62,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       background: transparent;
     }
 
-    .simula-ad-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: ${primary};
-      margin-bottom: 8px;
-      line-height: 1.4;
-    }
 
-    .simula-ad-description {
-      font-size: 14px;
-      color: #374151;
-      margin-bottom: 12px;
-      line-height: 1.5;
-    }
-
-    .simula-ad-cta {
-      display: inline-block;
-      background: ${primary};
-      color: white;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      text-decoration: none;
-      transition: background-color 0.2s ease;
-    }
-
-    .simula-ad-cta:hover {
-      background: ${secondary};
-      color: white;
-      text-decoration: none;
-    }
 
     .simula-ad-label {
       font-size: 10px;
@@ -125,18 +83,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
         padding: 12px;
       }
 
-      .simula-ad-title {
-        font-size: 15px;
-      }
 
-      .simula-ad-description {
-        font-size: 13px;
-      }
-
-      .simula-ad-cta {
-        font-size: 13px;
-        padding: 6px 12px;
-      }
     }
 
     @media (max-width: 480px) {

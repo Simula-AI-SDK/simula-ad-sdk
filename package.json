@@ -49,6 +49,9 @@
   },
   "homepage": "https://simula.ad/",
   "license": "MIT",
+  "dependencies": {
+    "@fingerprintjs/botd": "^1.9.1"
+  },
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"

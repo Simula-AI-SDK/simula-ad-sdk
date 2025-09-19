@@ -44,3 +44,8 @@ export interface SimulaProviderProps {
 export interface SimulaContextValue {
   apiKey: string;
 }
+
+export interface BotDetectionResult {
+  isBot: boolean;
+  reasons: string[];
+}

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSimula } from './SimulaProvider';
 import { useIntersectionObserver } from './hooks/useIntersectionObserver';
 import { useDebounce } from './hooks/useDebounce';
-import { fetchAd, trackImpression, trackClick } from './utils/api';
+import { useBotDetection } from './hooks/useBotDetection';
+import { fetchAd, trackImpression } from './utils/api';
 import { createAdSlotCSS } from './utils/styling';
 import { AdSlotProps, AdData } from './types';
 
@@ -34,10 +35,18 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     threshold: 0.5,
   });
 
+  const { isBot, reasons } = useBotDetection();
+
   const canFetch = !onlyWhenVisible || hasIntersected;
 
   const fetchAdData = useCallback(async () => {
     if (!canFetch || loading) return;
+
+    // Block ad requests from detected bots
+    if (isBot) {
+      console.warn('Bot detected, blocking ad request:', { reasons });
+      return;
+    }
 
     const now = Date.now();
     if (now - lastFetchTimeRef.current < minIntervalMs) {
@@ -70,7 +79,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [canFetch, loading, minIntervalMs, messages, formats, apiKey, slotId, onError]);
+  }, [canFetch, loading, minIntervalMs, messages, formats, apiKey, slotId, onError, isBot, reasons]);
 
   useDebounce(
     () => {
@@ -98,12 +107,12 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   }, [trigger]);
 
   useEffect(() => {
-    if (ad && isIntersecting && !hasTrackedImpression) {
+    if (ad && isIntersecting && !hasTrackedImpression && !isBot) {
       setHasTrackedImpression(true);
       trackImpression(ad.id, apiKey);
       onImpression?.(ad);
     }
-  }, [ad, isIntersecting, hasTrackedImpression, apiKey, onImpression]);
+  }, [ad, isIntersecting, hasTrackedImpression, apiKey, onImpression, isBot]);
 
   useEffect(() => {
     const css = createAdSlotCSS(theme);
@@ -126,7 +135,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
   const handleAdClick = useCallback(() => {
     if (ad) {
-      trackClick(ad.id, apiKey);
+      // trackClick(ad.id, apiKey);
       onClick?.(ad);
 
       if (ad.clickUrl) {
@@ -144,55 +153,30 @@ export const AdSlot: React.FC<AdSlotProps> = ({
       return null;
     }
 
-    if (!ad) {
+    if (!ad || !ad.iframeUrl) {
       return null;
     }
 
     return (
       <div className="simula-ad-slot">
         <span className="simula-ad-label">Sponsored</span>
-        {ad.iframeUrl ? (
-          <iframe
-            src={ad.iframeUrl}
-            className="simula-ad-iframe"
-            frameBorder="0"
-            scrolling="no"
-            allowTransparency={true}
-            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-            title={`Ad: ${ad.id}`}
-            onLoad={() => {
-              // Track impression when iframe loads
-              if (!hasTrackedImpression && isIntersecting) {
-                setHasTrackedImpression(true);
-                trackImpression(ad.id, apiKey);
-                onImpression?.(ad);
-              }
-            }}
-          />
-        ) : (
-          <div className="simula-ad-content" onClick={handleAdClick}>
-            {ad.format === 'text' && (
-              <>
-                <div className="simula-ad-title">Recommended for you</div>
-                <div className="simula-ad-description">{ad.content}</div>
-                <span className="simula-ad-cta">Learn More</span>
-              </>
-            )}
-            {ad.format === 'prompt' && (
-              <>
-                <div className="simula-ad-title">Try this:</div>
-                <div className="simula-ad-description">{ad.content}</div>
-              </>
-            )}
-            {(ad.format === 'all' || !['text', 'prompt'].includes(ad.format)) && (
-              <>
-                <div className="simula-ad-title">Sponsored Content</div>
-                <div className="simula-ad-description">{ad.content}</div>
-                <span className="simula-ad-cta">Learn More</span>
-              </>
-            )}
-          </div>
-        )}
+        <iframe
+          src={ad.iframeUrl}
+          className="simula-ad-iframe"
+          frameBorder="0"
+          scrolling="no"
+          allowTransparency={true}
+          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          title={`Ad: ${ad.id}`}
+          onLoad={() => {
+            // Track impression when iframe loads
+            if (!hasTrackedImpression && isIntersecting && !isBot) {
+              setHasTrackedImpression(true);
+              trackImpression(ad.id, apiKey);
+              onImpression?.(ad);
+            }
+          }}
+        />
       </div>
     );
   };

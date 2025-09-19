@@ -164,4 +164,51 @@ export default function ChatWithAds() {
 - Wrap your app with `SimulaProvider`
 - Add `<AdSlot />` with `messages` + `trigger`
 
-Simula automatically fetches, renders, sizes, and tracks ads for you.
+---
+
+## 🤖 Bot Detection & Fraud Prevention
+
+Simula includes **professional-grade bot detection** powered by **FingerprintJS BotD** to prevent ad fraud and protect advertisers from fake impressions.
+
+### Automatic Protection
+
+The SDK automatically:
+- ✅ **Blocks ad requests** from detected bots
+- ✅ **Prevents impression tracking** from automated traffic  
+- ✅ **Uses industry-leading detection** from FingerprintJS team
+- ✅ **Fails open gracefully** if detection library unavailable
+
+### Detection Technology
+
+Powered by **[@fingerprintjs/botd](https://github.com/fingerprintjs/BotD)** - the professional bot detection library from the FingerprintJS team:
+
+- **Advanced automation detection**: Selenium, Puppeteer, Playwright, PhantomJS
+- **Behavioral analysis**: Mouse movements, timing attacks, automation patterns  
+- **Browser tampering detection**: Modified properties, injected scripts
+- **Machine learning**: Continuously improving detection accuracy
+
+### Manual Bot Detection
+
+You can also use the bot detection independently:
+
+```tsx
+import { useBotDetection } from "@simula/sdk-react";
+
+function MyComponent() {
+  const { isBot, reasons } = useBotDetection();
+  
+  if (isBot) {
+    return <div>Automated traffic detected</div>;
+  }
+  
+  return <div>Human user verified</div>;
+}
+```
+
+**Bot Detection Response:**
+- `isBot`: Boolean indicating if bot is detected by FingerprintJS BotD
+- `reasons`: Array indicating detection status
+
+---
+
+Simula automatically fetches, renders, sizes, tracks ads, and prevents bot fraud for you.
