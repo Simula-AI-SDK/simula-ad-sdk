@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 export const useDebounce = (callback: () => void, delay: number, deps: any[]) => {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (timeoutRef.current) {

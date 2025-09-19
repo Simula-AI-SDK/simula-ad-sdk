@@ -1,5 +1,8 @@
-import { Message, AdData } from '../types';
+import { Message, AdData, SimulaTheme } from '../types';
 
+import { mockFetchAd, mockTrackImpression } from '../test-data/mockAds';
+
+// Production API URL
 const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 
 export interface FetchAdRequest {
@@ -7,6 +10,8 @@ export interface FetchAdRequest {
   formats: string[];
   apiKey: string;
   slotId?: string;
+  theme?: SimulaTheme;
+  devMode?: boolean;
 }
 
 export interface FetchAdResponse {
@@ -15,6 +20,16 @@ export interface FetchAdResponse {
 }
 
 export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse> => {
+  // Use mock data if in dev mode
+  if (request.devMode) {
+    try {
+      const mockResponse = await mockFetchAd(request);
+      return { ad: mockResponse.ad };
+    } catch (error) {
+      return { error: 'Mock fetch failed' };
+    }
+  }
+
   try {
     const conversationHistory = request.messages;
 
@@ -28,6 +43,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
         conversation_history: conversationHistory,
         formats: request.formats,
         slot_id: request.slotId,
+        theme: request.theme,
       }),
     });
 
@@ -49,7 +65,13 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
   }
 };
 
-export const trackImpression = async (adId: string, apiKey: string): Promise<void> => {
+export const trackImpression = async (adId: string, apiKey: string, devMode?: boolean): Promise<void> => {
+  // Use mock tracking if in dev mode
+  if (devMode) {
+    await mockTrackImpression(adId);
+    return;
+  }
+
   try {
     await fetch(`${API_BASE_URL}/track_impression`, {
       method: 'POST',

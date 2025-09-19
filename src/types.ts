@@ -37,12 +37,14 @@ export interface AdSlotProps {
 }
 
 export interface SimulaProviderProps {
-  apiKey: string;
+  apiKey?: string;
   children: React.ReactNode;
+  devMode?: boolean;
 }
 
 export interface SimulaContextValue {
   apiKey: string;
+  devMode: boolean;
 }
 
 export interface BotDetectionResult {

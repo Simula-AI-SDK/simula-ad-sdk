@@ -20,7 +20,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   onClick,
   onError,
 }) => {
-  const { apiKey } = useSimula();
+  const { apiKey, devMode } = useSimula();
   const [ad, setAd] = useState<AdData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     threshold: 0.5,
     onImpressionTracked: (adId: string) => {
       // This gets called after impression tracking
-      trackImpression(adId, apiKey);
+      trackImpression(adId, apiKey, devMode);
       if (ad) {
         onImpression?.(ad);
       }
@@ -69,6 +69,8 @@ export const AdSlot: React.FC<AdSlotProps> = ({
         formats,
         apiKey,
         slotId,
+        theme,
+        devMode,
       });
 
       if (result.error) {
@@ -84,7 +86,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [canFetch, loading, minIntervalMs, messages, formats, apiKey, slotId, onError, isBot, reasons]);
+  }, [canFetch, loading, minIntervalMs, messages, formats, apiKey, slotId, theme, devMode, onError, isBot, reasons]);
 
   useDebounce(
     () => {

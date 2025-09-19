@@ -11,13 +11,18 @@ export const useSimula = (): SimulaContextValue => {
   return context;
 };
 
-export const SimulaProvider: React.FC<SimulaProviderProps> = ({ apiKey, children }) => {
-  if (!apiKey) {
-    throw new Error('SimulaProvider requires an apiKey prop');
+export const SimulaProvider: React.FC<SimulaProviderProps> = ({ 
+  apiKey, 
+  children, 
+  devMode = false 
+}) => {
+  if (!apiKey && !devMode) {
+    throw new Error('SimulaProvider requires an apiKey prop (or set devMode=true for testing)');
   }
 
   const value: SimulaContextValue = {
-    apiKey,
+    apiKey: apiKey || 'dev-mode-key',
+    devMode,
   };
 
   return (
