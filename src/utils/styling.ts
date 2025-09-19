@@ -52,21 +52,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
-    .simula-ad-slot.loading {
-      background: #f8fafc;
-      border-style: dashed;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 80px;
-      color: #64748b;
-    }
 
-    .simula-ad-slot.error {
-      background: #fef2f2;
-      border-color: #fecaca;
-      color: #dc2626;
-    }
 
     .simula-ad-content {
       cursor: pointer;
@@ -129,20 +115,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       display: block;
     }
 
-    .simula-loading-spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid #e5e7eb;
-      border-top: 2px solid ${primary};
-      border-radius: 50%;
-      animation: simula-spin 1s linear infinite;
-      margin-right: 8px;
-    }
 
-    @keyframes simula-spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
 
     @media (max-width: ${mobileBreakpoint}px) {
       .simula-ad-slot {

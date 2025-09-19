@@ -16,9 +16,7 @@ export interface FetchAdResponse {
 
 export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse> => {
   try {
-    const conversationHistory = request.messages
-      .map(msg => `${msg.role}: ${msg.content}`)
-      .join('\n');
+    const conversationHistory = request.messages;
 
     const response = await fetch(`${API_BASE_URL}/ad_fetch`, {
       method: 'POST',
@@ -69,6 +67,7 @@ export const trackImpression = async (adId: string, apiKey: string): Promise<voi
   }
 };
 
+/* Not used for now, used when we are also mediation layer
 export const trackClick = async (adId: string, apiKey: string): Promise<void> => {
   try {
     await fetch(`${API_BASE_URL}/track_click`, {
@@ -86,3 +85,4 @@ export const trackClick = async (adId: string, apiKey: string): Promise<void> =>
     console.error('Failed to track click:', error);
   }
 };
+*/

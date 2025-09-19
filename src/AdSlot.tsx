@@ -137,20 +137,11 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
   const renderContent = () => {
     if (loading) {
-      return (
-        <div className="simula-ad-slot loading">
-          <div className="simula-loading-spinner"></div>
-          Loading ad...
-        </div>
-      );
+      return null;
     }
 
     if (error) {
-      return (
-        <div className="simula-ad-slot error">
-          <span>Failed to load ad</span>
-        </div>
-      );
+      return null;
     }
 
     if (!ad) {
