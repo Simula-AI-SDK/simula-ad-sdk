@@ -25,6 +25,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shouldFetch, setShouldFetch] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   const lastFetchTimeRef = useRef<number>(0);
   const triggerPromiseRef = useRef<Promise<any> | null>(null);
@@ -164,7 +165,6 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
     return (
       <div className="simula-ad-slot">
-        <span className="simula-ad-label">Sponsored</span>
           <iframe
             src={ad.iframeUrl}
             className="simula-ad-iframe"
@@ -178,6 +178,41 @@ export const AdSlot: React.FC<AdSlotProps> = ({
             // Impression tracking is handled by viewability detection
           }}
         />
+        <button 
+          className="simula-info-icon"
+          onClick={() => setShowInfoModal(true)}
+          aria-label="Ad information"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1" fill="none"/>
+            <text x="8" y="12" textAnchor="middle" fontSize="10" fontFamily="serif">i</text>
+          </svg>
+        </button>
+        {showInfoModal && (
+          <div className="simula-modal-overlay" onClick={() => setShowInfoModal(false)}>
+            <div className="simula-modal-content" onClick={(e) => e.stopPropagation()}>
+              <button 
+                className="simula-modal-close"
+                onClick={() => setShowInfoModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              <p>
+                Ad powered by{' '}
+                <a 
+                  href="https://simula.ad" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="simula-modal-link"
+                >
+                  Simula
+                </a>
+                's AI-native ad platform.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

@@ -37,19 +37,10 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
     .simula-ad-slot {
       width: ${typeof width === 'number' ? `${width}px` : width};
       min-width: ${minWidth}px;
-      border: 1px solid ${border};
-      border-radius: 8px;
-      padding: 16px;
       margin: 16px 0;
-      background: #ffffff;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.5;
-      transition: all 0.2s ease;
-    }
-
-    .simula-ad-slot:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      position: relative;
     }
 
 
@@ -62,7 +53,80 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       background: transparent;
     }
 
+    .simula-info-icon {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      color: #666;
+      opacity: 0.5;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 50%;
+      transition: opacity 0.2s ease;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
+    .simula-info-icon:hover {
+      opacity: 0.8;
+    }
+
+    .simula-modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .simula-modal-content {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 16px;
+      max-width: 280px;
+      margin: 16px;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.5;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .simula-modal-close {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      padding: 4px;
+      line-height: 1;
+    }
+
+    .simula-modal-close:hover {
+      color: #000;
+    }
+
+    .simula-modal-link {
+      color: inherit;
+      text-decoration: underline;
+    }
+
+    .simula-modal-link:hover {
+      text-decoration: underline;
+    }
 
     .simula-ad-label {
       font-size: 10px;
@@ -80,10 +144,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
         width: ${mobileWidth}px;
         max-width: calc(100vw - 32px);
         margin: 12px 0;
-        padding: 12px;
       }
-
-
     }
 
     @media (max-width: 480px) {
@@ -91,7 +152,6 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
         width: 100%;
         max-width: calc(100vw - 24px);
         margin: 8px 0;
-        padding: 10px;
       }
     }
   `;

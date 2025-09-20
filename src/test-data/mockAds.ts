@@ -1,6 +1,11 @@
 import { AdData, SimulaTheme } from '../types';
 import type { FetchAdRequest } from '../utils/api';
 
+// Build a UTF-8 safe data URI for HTML without using btoa
+const dataUriEncodeHtml = (html: string): string => {
+  return 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+};
+
 // Function to generate themed HTML for mock ads
 const generateThemedHTML = (theme: SimulaTheme = {}): string => {
   const {
@@ -103,7 +108,7 @@ export const mockAds: AdData[] = [
     format: 'iframe',
     clickUrl: 'https://grammarly.com',
     impressionUrl: 'https://example.com/impression',
-    iframeUrl: 'data:text/html;base64,' + btoa(generateThemedHTML())
+    iframeUrl: dataUriEncodeHtml(generateThemedHTML())
   }
 ];
 
@@ -131,7 +136,7 @@ export const mockFetchAd = async (request?: FetchAdRequest): Promise<{ ad: AdDat
         format: 'iframe',
         clickUrl: 'https://grammarly.com',
         impressionUrl: 'https://example.com/impression',
-        iframeUrl: 'data:text/html;base64,' + btoa(themedHTML)
+        iframeUrl: dataUriEncodeHtml(themedHTML)
       }
     };
   }
