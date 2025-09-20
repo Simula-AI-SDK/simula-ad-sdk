@@ -2,6 +2,7 @@ export interface SimulaTheme {
   primary?: string;
   secondary?: string;
   border?: string;
+  background?: string;
   width?: number | "auto";
   mobileWidth?: number;
   minWidth?: number;

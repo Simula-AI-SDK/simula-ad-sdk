@@ -12,13 +12,14 @@ const generateThemedHTML = (theme: SimulaTheme = {}): string => {
     primary = '#7c3aed',
     secondary = '#4f46e5',
     border = 'rgba(255, 255, 255, 0.2)',
+    background = '#1a1b2e',
     width = 'auto',
     mobileWidth = 350,
     minWidth = 300,
     mobileBreakpoint = 768
   } = theme;
 
-  const accent = '#a855f7';
+  const accent = primary;
 
   return `
     <!DOCTYPE html>
@@ -27,61 +28,60 @@ const generateThemedHTML = (theme: SimulaTheme = {}): string => {
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: linear-gradient(135deg, ${primary} 0%, ${secondary} 100%);
+        background: ${background};
         color: #ffffff; padding: 20px; min-height: 100vh;
-        display: flex; align-items: center; justify-content: center;
+        display: flex; flex-direction: column; justify-content: center;
+        margin: 0; box-sizing: border-box;
       }
-      .ad-container {
-        max-width: ${typeof width === 'number' ? width + 'px' : width === 'auto' ? '500px' : width};
-        min-width: ${minWidth}px; width: 100%;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px); border: 1px solid ${border};
-        border-radius: 12px; padding: 24px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      .headline { 
+        font-size: 15px; line-height: 1.4; margin-bottom: 18px; 
+        font-weight: 400; color: #e2e8f0;
       }
-      .headline { font-size: 16px; line-height: 1.5; margin-bottom: 20px; font-weight: 500; }
-      .cta-buttons { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+      .cta-buttons { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
       .cta-primary {
-        background: ${accent}; color: #ffffff; border: none;
-        padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 14px;
-        cursor: pointer; transition: all 0.2s ease; flex: 1; min-width: 160px;
+        background: ${primary}; color: #ffffff; border: none;
+        padding: 10px 16px; border-radius: 6px; font-weight: 500; font-size: 13px;
+        cursor: pointer; transition: all 0.2s ease; flex: 1; min-width: 140px;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
       }
-      .cta-primary:hover { background: #9333ea; transform: translateY(-1px); }
+              .cta-primary:hover { background: ${secondary}; }
       .cta-secondary {
         background: rgba(255, 255, 255, 0.1); color: #e5e7eb;
-        border: 1px solid ${border}; padding: 12px 20px;
-        border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer;
-        transition: all 0.2s ease; flex: 1; min-width: 160px;
+        border: 1px solid ${border}; padding: 10px 16px;
+        border-radius: 6px; font-weight: 500; font-size: 13px; cursor: pointer;
+        transition: all 0.2s ease; flex: 1; min-width: 140px;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
       }
+      .cta-secondary:hover { background: rgba(255, 255, 255, 0.15); }
       .footer {
         display: flex; justify-content: space-between; align-items: center;
-        font-size: 12px; color: #e5e7eb;
+        font-size: 11px; color: #9ca3af;
       }
-      .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+      .brand { display: flex; align-items: center; gap: 6px; font-weight: 600; }
       .brand-icon {
-        width: 20px; height: 20px; background: ${accent}; border-radius: 4px;
-        display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px;
+        width: 16px; height: 16px; background: #10b981; border-radius: 2px;
+        display: flex; align-items: center; justify-content: center; 
+        font-weight: bold; font-size: 8px; color: white;
       }
+      .sponsored { font-size: 11px; color: #6b7280; }
       @media (max-width: ${mobileBreakpoint}px) {
-        .ad-container { 
-          max-width: ${mobileWidth}px; padding: 20px; 
+        body { 
+          padding: 16px; 
         }
         .cta-buttons { flex-direction: column; }
         .cta-primary, .cta-secondary { width: 100%; min-width: auto; }
-        .headline { font-size: 15px; }
+        .headline { font-size: 14px; }
       }
     </style></head>
     <body>
-      <div class="ad-container">
-        <div class="headline">Speaking of polished communication, would you like to make your future emails even more impactful?</div>
-        <div class="cta-buttons">
-          <button class="cta-primary" onclick="handleClick('primary')">✨ Enhance My Writing</button>
-          <button class="cta-secondary" onclick="handleClick('secondary')">📧 See Email Templates</button>
-        </div>
-        <div class="footer">
-          <div class="brand"><div class="brand-icon">G</div><span>GRAMMARLY</span></div>
-          <div>Sponsored Content</div>
-        </div>
+      <div class="headline">Speaking of polished communication, would you like to make your future emails even more impactful?</div>
+      <div class="cta-buttons">
+        <button class="cta-primary" onclick="handleClick('primary')">✨ Enhance My Writing</button>
+        <button class="cta-secondary" onclick="handleClick('secondary')">📧 See Email Templates</button>
+      </div>
+      <div class="footer">
+        <div class="brand"><div class="brand-icon">G</div><span>GRAMMARLY</span></div>
+        <div class="sponsored">Sponsored Content</div>
       </div>
       <script>
         function handleClick(type) {

@@ -27,6 +27,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
     primary = '#0EA5E9',
     secondary = '#0369A1',
     border = '#E2E8F0',
+    background = '#ffffff',
     width = 'auto',
     mobileWidth = 320,
     minWidth = 280,
@@ -36,6 +37,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
   return `
     .simula-ad-slot {
       width: ${typeof width === 'number' ? `${width}px` : width};
+      max-width: 862px;
       min-width: ${minWidth}px;
       margin: 16px 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -47,7 +49,8 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
 
     .simula-ad-iframe {
       width: 100%;
-      height: 250px;
+      max-width: 862px;
+      height: 300px;
       border: none;
       border-radius: 6px;
       background: transparent;
@@ -89,10 +92,12 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
     }
 
     .simula-modal-content {
-      background: #ffffff;
+      background: ${background};
       border-radius: 8px;
       padding: 16px;
-      max-width: 280px;
+      width: 50%;
+      min-width: 200px;
+      max-width: 431px;
       margin: 16px;
       position: relative;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -145,6 +150,10 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
         max-width: calc(100vw - 32px);
         margin: 12px 0;
       }
+      
+      .simula-ad-iframe {
+        height: 280px;
+      }
     }
 
     @media (max-width: 480px) {
@@ -152,6 +161,10 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
         width: 100%;
         max-width: calc(100vw - 24px);
         margin: 8px 0;
+      }
+      
+      .simula-ad-iframe {
+        height: 250px;
       }
     }
   `;

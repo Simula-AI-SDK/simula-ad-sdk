@@ -110,6 +110,7 @@ type SimulaTheme = {
   primary?: string;          // hex color
   secondary?: string;        // hex color
   border?: string;           // hex color
+  background?: string;       // hex color
   width?: number | "auto";   // container width
   mobileWidth?: number;      // width under breakpoint
   minWidth?: number;         // minimum width
@@ -120,7 +121,7 @@ type SimulaTheme = {
 
 ---
 
-## Quick Chat Example with OpenAI
+## Chat App Example with OpenAI
 
 ```tsx
 import { useState } from "react";
@@ -129,42 +130,88 @@ import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export default function ChatWithAds() {
+export default function ChatApp() {
   const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
   const [latestPromise, setLatestPromise] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  async function sendMessage(prompt) {
-    // add user message
-    setMessages((prev) => [...prev, { role: "user", content: prompt }]);
+  async function sendMessage() {
+    if (!input.trim() || loading) return;
+    
+    const userMessage = { role: "user", content: input.trim() };
+    const newMessages = [...messages, userMessage];
+    
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
 
-    // call OpenAI
-    const llmPromise = client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [...messages, { role: "user", content: prompt }],
-    });
+    try {
+      // call OpenAI
+      const llmPromise = client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: newMessages,
+      });
 
-    // store promise for AdSlot trigger
-    setLatestPromise(llmPromise);
+      // store promise for AdSlot trigger
+      setLatestPromise(llmPromise);
 
-    // wait for response
-    const res = await llmPromise;
-    const reply = res.choices[0].message;
+      // wait for response
+      const res = await llmPromise;
+      const reply = res.choices[0].message;
 
-    // add assistant message
-    setMessages((prev) => [...prev, reply]);
+      // add assistant message
+      setMessages((prev) => [...prev, reply]);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div>
-      <button onClick={() => sendMessage("What's the best note-taking app?")}>
-        Ask
-      </button>
+    <div className="chat-container">
+      {/* Chat Messages */}
+      <div className="messages">
+        {messages.map((msg, i) => (
+          <div key={i}>
+            <div className={`message ${msg.role}`}>
+              <strong>{msg.role === "user" ? "You" : "AI"}:</strong>
+              <p>{msg.content}</p>
+            </div>
+            
+            {/* Ad Slot - appears after each AI message */}
+            {msg.role === "assistant" && (
+              <AdSlot
+                trigger={latestPromise}
+                messages={messages.slice(0, i + 1).slice(-6)}  // context up to this message
+                theme={{ 
+                  primary: "#0EA5E9", 
+                  secondary: "#0369A1",
+                  background: "#ffffff",
+                  width: "auto", 
+                  mobileWidth: 320 
+                }}
+              />
+            )}
+          </div>
+        ))}
+        {loading && <div className="message assistant">AI is thinking...</div>}
+      </div>
 
-      <AdSlot
-        trigger={latestPromise}
-        messages={messages.slice(-6)}
-        theme={{ primary: "#0EA5E9", width: "auto", mobileWidth: 320 }}
-      />
+      {/* Input */}
+      <div className="input-area">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+          placeholder="Ask me anything..."
+          disabled={loading}
+        />
+        <button onClick={sendMessage} disabled={loading || !input.trim()}>
+          Send
+        </button>
+      </div>
     </div>
   );
 }
