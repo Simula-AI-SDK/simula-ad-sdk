@@ -16,9 +16,9 @@ function App() {
         messages={[{ role: "user", content: "Hello!" }]}
         trigger={Promise.resolve()}
         theme={{
-          primary: '#ff6b6b',
-          secondary: '#4ecdc4', 
-          border: '#95e1d3',
+          theme: 'dark',
+          accent: 'purple',
+          font: 'san-serif',
           width: 400,
           mobileWidth: 320
         }}

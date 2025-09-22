@@ -1,7 +1,14 @@
 import { AdData, SimulaTheme } from '../types';
-import type { FetchAdRequest } from '../utils/api';
+import { 
+  getColorTheme, 
+  getFontStyles, 
+  getBackgroundGradient, 
+  getSolidBackground,
+  getTextSecondary,
+  getTextMuted
+} from '../utils/colorThemes';
 
-// Build a UTF-8 safe data URI for HTML without using btoa
+// Function to encode HTML as data URI
 const dataUriEncodeHtml = (html: string): string => {
   return 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
 };
@@ -9,17 +16,17 @@ const dataUriEncodeHtml = (html: string): string => {
 // Function to generate themed HTML for mock ads
 const generateThemedHTML = (theme: SimulaTheme = {}): string => {
   const {
-    primary = '#7c3aed',
-    secondary = '#4f46e5',
-    border = 'rgba(255, 255, 255, 0.2)',
-    background = '#1a1b2e',
+    theme: themeMode = 'light',
+    accent = 'blue',
+    font = 'san-serif',
     width = 'auto',
     mobileWidth = 350,
     minWidth = 300,
     mobileBreakpoint = 768
   } = theme;
 
-  const accent = primary;
+  const colors = getColorTheme(themeMode, accent);
+  const fonts = getFontStyles(font);
 
   return `
     <!DOCTYPE html>
@@ -27,76 +34,79 @@ const generateThemedHTML = (theme: SimulaTheme = {}): string => {
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: ${background};
-        color: #ffffff; padding: 20px; min-height: 100vh;
+        font-family: ${fonts.primary};
+        background: ${getBackgroundGradient(colors)};
+        color: ${colors.text}; padding: 20px; min-height: 100vh;
         display: flex; flex-direction: column; justify-content: center;
         margin: 0; box-sizing: border-box;
       }
       .headline { 
         font-size: 15px; line-height: 1.4; margin-bottom: 18px; 
-        font-weight: 400; color: #e2e8f0;
+        font-weight: 400; color: ${getTextSecondary(colors)};
       }
       .cta-buttons { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
       .cta-primary {
-        background: ${primary}; color: #ffffff; border: none;
+        background: ${colors.primary}; color: ${colors.buttonText}; border: none;
         padding: 10px 16px; border-radius: 6px; font-weight: 500; font-size: 13px;
         cursor: pointer; transition: all 0.2s ease; flex: 1; min-width: 140px;
         display: flex; align-items: center; justify-content: center; gap: 6px;
+        font-family: ${fonts.primary};
       }
-              .cta-primary:hover { background: ${secondary}; }
+      .cta-primary:hover { background: ${colors.primaryHover}; }
       .cta-secondary {
-        background: rgba(255, 255, 255, 0.1); color: #e5e7eb;
-        border: 1px solid ${border}; padding: 10px 16px;
+        background: ${getSolidBackground(colors)}; color: ${getTextSecondary(colors)};
+        border: 1px solid ${colors.border}; padding: 10px 16px;
         border-radius: 6px; font-weight: 500; font-size: 13px; cursor: pointer;
         transition: all 0.2s ease; flex: 1; min-width: 140px;
         display: flex; align-items: center; justify-content: center; gap: 6px;
+        font-family: ${fonts.primary};
       }
-      .cta-secondary:hover { background: rgba(255, 255, 255, 0.15); }
+      .cta-secondary:hover { 
+        background: ${colors.secondary}20; 
+        color: ${colors.text};
+      }
       .footer {
         display: flex; justify-content: space-between; align-items: center;
-        font-size: 11px; color: #9ca3af;
+        font-size: 11px; color: ${getTextMuted(colors)};
       }
       .brand { display: flex; align-items: center; gap: 6px; font-weight: 600; }
       .brand-icon {
-        width: 16px; height: 16px; background: #10b981; border-radius: 2px;
+        width: 16px; height: 16px; background: ${colors.primary}; border-radius: 2px;
         display: flex; align-items: center; justify-content: center; 
-        font-weight: bold; font-size: 8px; color: white;
+        font-weight: bold; font-size: 8px; color: ${colors.buttonText};
       }
-      .sponsored { font-size: 11px; color: #6b7280; }
+      .sponsored { font-size: 11px; color: ${getTextMuted(colors)}; }
       @media (max-width: ${mobileBreakpoint}px) {
-        body { 
-          padding: 16px; 
+        body { padding: 16px; }
+        .headline { font-size: 14px; margin-bottom: 16px; }
+        .cta-buttons { gap: 8px; }
+        .cta-primary, .cta-secondary { 
+          padding: 8px 12px; font-size: 12px; min-width: 120px; 
         }
-        .cta-buttons { flex-direction: column; }
-        .cta-primary, .cta-secondary { width: 100%; min-width: auto; }
-        .headline { font-size: 14px; }
+        .footer { font-size: 10px; }
+        .brand-icon { width: 14px; height: 14px; font-size: 7px; }
       }
-    </style></head>
+    </style>
+    </head>
     <body>
-      <div class="headline">Speaking of polished communication, would you like to make your future emails even more impactful?</div>
+      <div class="headline">
+        Boost your writing confidence with AI-powered grammar suggestions and style improvements
+      </div>
       <div class="cta-buttons">
-        <button class="cta-primary" onclick="handleClick('primary')">✨ Enhance My Writing</button>
-        <button class="cta-secondary" onclick="handleClick('secondary')">📧 See Email Templates</button>
+        <button class="cta-primary" onclick="window.parent.postMessage({type: 'ad-click', url: 'https://grammarly.com'}, '*')">
+          ✨ Try Free
+        </button>
+        <button class="cta-secondary" onclick="window.parent.postMessage({type: 'ad-click', url: 'https://grammarly.com/premium'}, '*')">
+          📈 Go Premium
+        </button>
       </div>
       <div class="footer">
-        <div class="brand"><div class="brand-icon">G</div><span>GRAMMARLY</span></div>
-        <div class="sponsored">Sponsored Content</div>
+        <div class="brand">
+          <div class="brand-icon">G</div>
+          <span>Grammarly</span>
+        </div>
+        <div class="sponsored">Sponsored</div>
       </div>
-      <script>
-        function handleClick(type) {
-          console.log('Mock ad clicked:', type);
-          if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({ type: 'ad-click', data: { buttonType: type } }, '*');
-          }
-          window.open(type === 'primary' ? 'https://grammarly.com' : 'https://grammarly.com/templates', '_blank');
-        }
-        window.addEventListener('load', () => {
-          if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({ type: 'ad-loaded', data: { adId: 'mock-ad' } }, '*');
-          }
-        });
-      </script>
     </body></html>
   `;
 };
@@ -121,13 +131,13 @@ export const getMockAd = (): AdData => {
 export const getRandomMockAd = getMockAd;
 
 // Mock API functions for testing
-export const mockFetchAd = async (request?: FetchAdRequest): Promise<{ ad: AdData }> => {
+export const mockFetchAd = async (request?: SimulaTheme): Promise<{ ad: AdData }> => {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 300));
   
   // Generate themed ad based on request
-  if (request?.theme) {
-    const themedHTML = generateThemedHTML(request.theme);
+  if (request) {
+    const themedHTML = generateThemedHTML(request);
     
     return {
       ad: {

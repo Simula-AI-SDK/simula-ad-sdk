@@ -4,6 +4,19 @@ export { useBotDetection } from './hooks/useBotDetection';
 export { useViewability } from './hooks/useViewability';
 export { useOMIDViewability } from './hooks/useOMIDViewability';
 
+// Theme utilities
+export { 
+  getColorTheme, 
+  getFontStyles, 
+  fonts,
+  getBackgroundGradient,
+  getSolidBackground,
+  getTextMuted,
+  getTextSecondary,
+  getBorderLight,
+  getShadow
+} from './utils/colorThemes';
+
 // Test utilities
 export { mockAds, getMockAd, getRandomMockAd, mockFetchAd, mockTrackImpression } from './test-data/mockAds';
 export type {
@@ -17,5 +30,7 @@ export type {
   ViewabilityOptions,
   ViewabilityResult,
   OMIDViewabilityOptions,
-  OMIDViewabilityResult
+  OMIDViewabilityResult,
+  ColorPalette,
+  FontPalette
 } from './types';

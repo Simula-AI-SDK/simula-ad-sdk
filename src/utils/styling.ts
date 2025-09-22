@@ -1,20 +1,36 @@
 import { SimulaTheme } from '../types';
+import { 
+  getColorTheme, 
+  getFontStyles, 
+  getBackgroundGradient, 
+  getSolidBackground,
+  getTextMuted,
+  getTextSecondary,
+  getBorderLight,
+  getShadow
+} from './colorThemes';
 
 export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSProperties => {
   const {
-    primary = '#0EA5E9',
-    secondary = '#0369A1',
-    border = '#E2E8F0',
+    theme: themeMode = 'light',
+    accent = 'blue',
+    font = 'san-serif',
     width = 'auto',
     mobileWidth = 320,
     minWidth = 280,
     mobileBreakpoint = 768,
   } = theme;
 
+  const colors = getColorTheme(themeMode, accent);
+  const fonts = getFontStyles(font);
+
   return {
-    '--simula-primary': primary,
-    '--simula-secondary': secondary,
-    '--simula-border': border,
+    '--simula-primary': colors.primary,
+    '--simula-secondary': colors.secondary,
+    '--simula-border': colors.border,
+    '--simula-background': getSolidBackground(colors),
+    '--simula-text': colors.text,
+    '--simula-font-primary': fonts.primary,
     '--simula-width': typeof width === 'number' ? `${width}px` : width,
     '--simula-mobile-width': `${mobileWidth}px`,
     '--simula-min-width': `${minWidth}px`,
@@ -24,15 +40,17 @@ export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSPropertie
 
 export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
   const {
-    primary = '#0EA5E9',
-    secondary = '#0369A1',
-    border = '#E2E8F0',
-    background = '#ffffff',
+    theme: themeMode = 'light',
+    accent = 'blue',
+    font = 'san-serif',
     width = 'auto',
     mobileWidth = 320,
     minWidth = 280,
     mobileBreakpoint = 768,
   } = theme;
+
+  const colors = getColorTheme(themeMode, accent);
+  const fonts = getFontStyles(font);
 
   return `
     .simula-ad-slot {
@@ -40,12 +58,10 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       max-width: 862px;
       min-width: ${minWidth}px;
       margin: 16px 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: ${fonts.primary};
       line-height: 1.5;
       position: relative;
     }
-
-
 
     .simula-ad-iframe {
       width: 100%;
@@ -62,7 +78,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       right: 8px;
       background: none;
       border: none;
-      color: #666;
+      color: ${getTextMuted(colors)};
       opacity: 0.5;
       cursor: pointer;
       padding: 4px;
@@ -92,7 +108,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
     }
 
     .simula-modal-content {
-      background: ${background};
+      background: ${getSolidBackground(colors)};
       border-radius: 8px;
       padding: 16px;
       width: 50%;
@@ -100,11 +116,12 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       max-width: 431px;
       margin: 16px;
       position: relative;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      box-shadow: 0 4px 12px ${getShadow(colors)};
+      font-family: ${fonts.primary};
       line-height: 1.5;
-      color: #333;
+      color: ${colors.text};
       font-size: 14px;
+      border: 1px solid ${colors.border};
     }
 
     .simula-modal-close {
@@ -115,56 +132,46 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       border: none;
       font-size: 24px;
       cursor: pointer;
-      color: #666;
+      color: ${getTextMuted(colors)};
       padding: 4px;
       line-height: 1;
     }
 
     .simula-modal-close:hover {
-      color: #000;
+      color: ${colors.text};
     }
 
     .simula-modal-link {
-      color: inherit;
+      color: ${colors.primary};
       text-decoration: underline;
     }
 
     .simula-modal-link:hover {
+      color: ${colors.primaryHover};
       text-decoration: underline;
     }
 
     .simula-ad-label {
       font-size: 10px;
-      color: #9ca3af;
+      color: ${getTextMuted(colors)};
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-bottom: 8px;
       display: block;
     }
 
-
-
     @media (max-width: ${mobileBreakpoint}px) {
       .simula-ad-slot {
         width: ${mobileWidth}px;
-        max-width: calc(100vw - 32px);
+        min-width: ${Math.min(minWidth, mobileWidth)}px;
         margin: 12px 0;
       }
-      
-      .simula-ad-iframe {
-        height: 280px;
-      }
-    }
 
-    @media (max-width: 480px) {
-      .simula-ad-slot {
-        width: 100%;
-        max-width: calc(100vw - 24px);
-        margin: 8px 0;
-      }
-      
-      .simula-ad-iframe {
-        height: 250px;
+      .simula-modal-content {
+        width: 90%;
+        max-width: none;
+        margin: 12px;
+        padding: 12px;
       }
     }
   `;

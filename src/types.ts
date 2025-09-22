@@ -1,12 +1,34 @@
 export interface SimulaTheme {
-  primary?: string;
-  secondary?: string;
-  border?: string;
-  background?: string;
+  theme?: 'light' | 'dark' | 'auto';
+  accent?: 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan';
+  font?: 'san-serif' | 'serif' | 'monospace';
   width?: number | "auto";
   mobileWidth?: number;
   minWidth?: number;
   mobileBreakpoint?: number;
+}
+
+export interface ColorPalette {
+  // Background gradient colors
+  backgroundGradient1: string;  // Start color of gradient
+  backgroundGradient2: string;  // End color of gradient
+  
+  // Main colors
+  primary: string;
+  primaryHover: string;
+  secondary: string;
+  
+  // Text and borders
+  text: string;
+  border: string;
+  
+  // Button text (usually white, but black for yellow)
+  buttonText: string;
+}
+
+export interface FontPalette {
+  primary: string;
+  secondary: string;
 }
 
 export interface Message {

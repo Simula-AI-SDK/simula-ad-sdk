@@ -107,17 +107,64 @@ You must provide the latest conversation messages and a trigger for when to fetc
 
 ```tsx
 type SimulaTheme = {
-  primary?: string;          // hex color
-  secondary?: string;        // hex color
-  border?: string;           // hex color
-  background?: string;       // hex color
-  width?: number | "auto";   // container width
-  mobileWidth?: number;      // width under breakpoint
-  minWidth?: number;         // minimum width
-  mobileBreakpoint?: number; // breakpoint in px
+  theme?: 'light' | 'dark' | 'auto';           // Theme mode
+  accent?: 'blue' | 'red' | 'green' | 'yellow' // Accent color
+         | 'purple' | 'pink' | 'orange' | 'neutral'
+         | 'gray' | 'tan';
+  font?: 'san-serif' | 'serif' | 'monospace';  // Font family
+  width?: number | "auto";                     // container width
+  mobileWidth?: number;                        // width under breakpoint
+  minWidth?: number;                           // minimum width
+  mobileBreakpoint?: number;                   // breakpoint in px
 };
-
 ```
+
+### Theme Examples
+
+```tsx
+// Light blue theme
+<AdSlot 
+  theme={{ 
+    theme: 'light', 
+    accent: 'blue', 
+    font: 'san-serif' 
+  }} 
+/>
+
+// Dark purple theme
+<AdSlot 
+  theme={{ 
+    theme: 'dark', 
+    accent: 'purple', 
+    font: 'serif' 
+  }} 
+/>
+
+// Auto theme (follows system preference)
+<AdSlot 
+  theme={{ 
+    theme: 'auto', 
+    accent: 'green', 
+    font: 'monospace' 
+  }} 
+/>
+```
+
+### Available Color Combinations
+
+The theme system automatically generates beautiful color palettes for all combinations:
+
+- **Theme modes**: `light`, `dark`, `auto`
+- **Accent colors**: `blue`, `red`, `green`, `yellow`, `purple`, `pink`, `orange`, `neutral`, `gray`, `tan`
+- **Fonts**: `san-serif`, `serif`, `monospace`
+
+Each combination provides:
+- Background gradients
+- Primary/secondary button colors
+- Border and text colors
+- Hover states
+- Shadows and surfaces
+
 
 ---
 

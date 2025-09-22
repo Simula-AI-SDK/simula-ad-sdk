@@ -23,7 +23,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
   // Use mock data if in dev mode
   if (request.devMode) {
     try {
-      const mockResponse = await mockFetchAd(request);
+      const mockResponse = await mockFetchAd(request.theme);
       return { ad: mockResponse.ad };
     } catch (error) {
       return { error: 'Mock fetch failed' };
