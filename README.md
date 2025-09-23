@@ -54,27 +54,42 @@ For testing and development, use `devMode` to get beautiful mock ads without an 
 
 Use `<AdSlot />` anywhere in your UI.
 
+Each `<AdSlot />` fetches an ad **once** when triggered and then stays static forever. This makes it perfect for chat apps where each AI response gets its own permanent ad.
+
 You must provide the latest conversation messages and a trigger for when to fetch.
 
-### Example: Promise trigger (recommended)
+### Example: Chat App Integration (recommended)
 
 ```tsx
-<AdSlot
-  trigger={latestLLMPromise}         // fetches after your LLM call finishes
-  messages={messages.slice(-6)}      // last few messages as context
-  formats={["all"]}
-  theme={{
-    primary: "#0EA5E9",
-    secondary: "#0369A1",
-    border: "#E2E8F0",
-    width: "auto",
-    mobileWidth: 320,
-    minWidth: 280,
-    mobileBreakpoint: 768,
-  }}
-/>
-
+// Perfect for chat apps - each AI response gets its own permanent ad
+{messages.map((msg, i) => (
+  <div key={i}>
+    <div className={`message ${msg.role}`}>
+      {msg.content}
+    </div>
+    
+    {/* Ad appears after each AI response and stays forever */}
+    {msg.role === "assistant" && (
+      <AdSlot
+        trigger={msg.promise}              // Promise from this AI response
+        messages={messages.slice(0, i+1)}  // Context up to this message
+        theme={{
+          theme: 'light',
+          accent: 'blue',
+          font: 'san-serif'
+        }}
+      />
+    )}
+  </div>
+))}
 ```
+
+### Key Behavior: "Fetch Once and Stay Static"
+
+- ✅ Each `<AdSlot />` fetches **once** when its trigger resolves
+- ✅ The ad then **stays static forever** - perfect for chat history
+- ✅ Changing the `trigger` prop after first fetch is **ignored**
+- ✅ Each AI response can have its own permanent, contextual ad
 
 ---
 
@@ -100,6 +115,46 @@ You must provide the latest conversation messages and a trigger for when to fetc
 | `onImpression` | function | Fires when ad is visible. |
 | `onClick` | function | Fires when user clicks the ad. |
 | `onError` | function | Fires on error or no-fill. |
+
+---
+
+## 🔒 **Static Ad Behavior**
+
+### How AdSlot Works
+
+Each `<AdSlot />` component follows a **"fetch once and stay static"** pattern:
+
+1. **Waits** for the `trigger` promise to resolve
+2. **Fetches** an ad using the provided `messages` as context  
+3. **Displays** the ad permanently
+4. **Ignores** any future changes to props - the ad never changes
+
+### Perfect for Chat Apps
+
+```tsx
+// Each AI response gets its own permanent ad
+function ChatMessage({ message, messagePromise, allMessages, index }) {
+  return (
+    <div>
+      <div className="ai-response">{message.content}</div>
+      
+      {/* This ad will never change once loaded */}
+      <AdSlot 
+        trigger={messagePromise}                    // Promise from this specific AI call
+        messages={allMessages.slice(0, index+1)}   // Context up to this point
+        theme={{ theme: 'light', accent: 'blue' }}
+      />
+    </div>
+  );
+}
+```
+
+### Why Static Ads?
+
+- ✅ **Conversation Integrity**: Each ad belongs to a specific exchange
+- ✅ **Contextual Relevance**: Ad reflects the conversation state when generated
+- ✅ **Stable History**: Users see consistent chat history when scrolling
+- ✅ **Performance**: No unnecessary re-fetches as conversation grows
 
 ---
 
@@ -227,15 +282,15 @@ export default function ChatApp() {
               <p>{msg.content}</p>
             </div>
             
-            {/* Ad Slot - appears after each AI message */}
+            {/* Ad Slot - each AI response gets its own permanent ad */}
             {msg.role === "assistant" && (
               <AdSlot
-                trigger={latestPromise}
+                trigger={msg.aiPromise}  // Each message has its own promise
                 messages={messages.slice(0, i + 1).slice(-6)}  // context up to this message
                 theme={{ 
-                  primary: "#0EA5E9", 
-                  secondary: "#0369A1",
-                  background: "#ffffff",
+                  theme: "light",
+                  accent: "blue", 
+                  font: "san-serif",
                   width: "auto", 
                   mobileWidth: 320 
                 }}

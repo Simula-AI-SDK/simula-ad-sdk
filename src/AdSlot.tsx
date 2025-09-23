@@ -27,8 +27,11 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const [shouldFetch, setShouldFetch] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
+  // Track if this AdSlot has already been triggered
+  const [hasTriggered, setHasTriggered] = useState(false);
+  const [triggerUsed, setTriggerUsed] = useState<Promise<any> | null>(null);
+
   const lastFetchTimeRef = useRef<number>(0);
-  const triggerPromiseRef = useRef<Promise<any> | null>(null);
   const styleElementRef = useRef<HTMLStyleElement | null>(null);
 
   const { elementRef, isViewable, hasBeenViewed, impressionTracked, trackImpression: viewabilityTrackImpression } = useViewability({
@@ -47,7 +50,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const canFetch = !onlyWhenVisible || hasBeenViewed;
 
   const fetchAdData = useCallback(async () => {
-    if (!canFetch || loading) return;
+    if (!canFetch || loading || hasTriggered) return;
 
     // Block ad requests from detected bots
     if (isBot) {
@@ -79,6 +82,8 @@ export const AdSlot: React.FC<AdSlotProps> = ({
         onError?.(new Error(result.error));
       } else if (result.ad) {
         setAd(result.ad);
+        // Mark as triggered - this AdSlot will never fetch again
+        setHasTriggered(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch ad';
@@ -87,7 +92,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [canFetch, loading, minIntervalMs, messages, formats, apiKey, slotId, theme, devMode, onError, isBot, reasons]);
+  }, [canFetch, loading, hasTriggered, minIntervalMs, messages, formats, apiKey, slotId, theme, devMode, onError, isBot, reasons]);
 
   useDebounce(
     () => {
@@ -101,18 +106,25 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   );
 
   useEffect(() => {
-    if (trigger && trigger !== triggerPromiseRef.current) {
-      triggerPromiseRef.current = trigger;
+    // Only trigger if we haven't triggered before and this is a new/different trigger
+    if (trigger && trigger !== triggerUsed && !hasTriggered) {
+      setTriggerUsed(trigger);
 
       trigger
         .then(() => {
-          setShouldFetch(true);
+          // Only proceed if we still haven't triggered (avoid race conditions)
+          if (!hasTriggered) {
+            setShouldFetch(true);
+          }
         })
         .catch(() => {
-          setShouldFetch(true);
+          // Even on error, attempt to fetch (some ads might still be relevant)
+          if (!hasTriggered) {
+            setShouldFetch(true);
+          }
         });
     }
-  }, [trigger]);
+  }, [trigger, triggerUsed, hasTriggered]);
 
   useEffect(() => {
     if (ad && isViewable && !isBot) {

@@ -111,7 +111,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       background: ${getSolidBackground(colors)};
       border-radius: 8px;
       padding: 16px;
-      width: 50%;
+      width: 75%;
       min-width: 200px;
       max-width: 431px;
       margin: 16px;
