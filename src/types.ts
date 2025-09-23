@@ -38,10 +38,7 @@ export interface Message {
 
 export interface AdData {
   id: string;
-  content: string;
   format: string;
-  clickUrl?: string;
-  impressionUrl?: string;
   iframeUrl?: string;
 }
 
@@ -68,6 +65,7 @@ export interface SimulaProviderProps {
 export interface SimulaContextValue {
   apiKey: string;
   devMode: boolean;
+  sessionId?: string;
 }
 
 export interface BotDetectionResult {

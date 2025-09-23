@@ -114,10 +114,7 @@ const generateThemedHTML = (theme: SimulaTheme = {}): string => {
 export const mockAds: AdData[] = [
   {
     id: 'mock-ad-001',
-    content: 'Enhance your writing with AI-powered suggestions',
     format: 'iframe',
-    clickUrl: 'https://grammarly.com',
-    impressionUrl: 'https://example.com/impression',
     iframeUrl: dataUriEncodeHtml(generateThemedHTML())
   }
 ];
@@ -142,10 +139,7 @@ export const mockFetchAd = async (request?: SimulaTheme): Promise<{ ad: AdData }
     return {
       ad: {
         id: `themed-ad-${Date.now()}`,
-        content: 'Enhance your writing with AI-powered suggestions',
         format: 'iframe',
-        clickUrl: 'https://grammarly.com',
-        impressionUrl: 'https://example.com/impression',
         iframeUrl: dataUriEncodeHtml(themedHTML)
       }
     };

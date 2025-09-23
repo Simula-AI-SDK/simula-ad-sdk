@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useSimula } from './SimulaProvider';
 import { useDebounce } from './hooks/useDebounce';
 import { useBotDetection } from './hooks/useBotDetection';
@@ -20,7 +21,11 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   onClick,
   onError,
 }) => {
-  const { apiKey, devMode } = useSimula();
+  const { apiKey, devMode, sessionId } = useSimula();
+  
+  // Generate a stable slotId for this component instance if not provided
+  const resolvedSlotId = useMemo(() => slotId || `slot-${uuidv4()}`, [slotId]);
+  
   const [ad, setAd] = useState<AdData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,9 +77,10 @@ export const AdSlot: React.FC<AdSlotProps> = ({
         messages,
         formats,
         apiKey,
-        slotId,
+        slotId: resolvedSlotId,
         theme,
         devMode,
+        sessionId,
       });
 
       if (result.error) {
@@ -92,7 +98,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [canFetch, loading, hasTriggered, minIntervalMs, messages, formats, apiKey, slotId, theme, devMode, onError, isBot, reasons]);
+  }, [canFetch, loading, hasTriggered, minIntervalMs, messages, formats, apiKey, resolvedSlotId, theme, devMode, onError, isBot, reasons, sessionId]);
 
   useDebounce(
     () => {
@@ -155,10 +161,6 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     if (ad) {
       // trackClick(ad.id, apiKey);
       onClick?.(ad);
-
-      if (ad.clickUrl) {
-        window.open(ad.clickUrl, '_blank', 'noopener,noreferrer');
-      }
     }
   }, [ad, apiKey, onClick]);
 
