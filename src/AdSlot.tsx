@@ -30,6 +30,11 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shouldFetch, setShouldFetch] = useState(false);
+  
+  // Log shouldFetch changes
+  useEffect(() => {
+    console.log('🎯 shouldFetch changed to:', shouldFetch);
+  }, [shouldFetch]);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [isWidthValid, setIsWidthValid] = useState(true);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -42,8 +47,16 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const lastFetchTimeRef = useRef<number>(0);
   const styleElementRef = useRef<HTMLStyleElement | null>(null);
 
-  const { elementRef, isViewable, hasBeenViewed, impressionTracked, trackImpression: viewabilityTrackImpression } = useViewability({
+  const { 
+    elementRef, 
+    hasBeenViewed, 
+    isViewable,           // MRC-compliant (1 second duration) 
+    isInstantViewable,    // Instant viewability for fetching
+    impressionTracked, 
+    trackImpression: viewabilityTrackImpression 
+  } = useViewability({
     threshold: 0.5,
+    durationMs: 1000, // 1 second for MRC compliance
     onImpressionTracked: (adId: string) => {
       // This gets called after impression tracking
       trackImpression(adId, apiKey);
@@ -55,7 +68,26 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
   const { isBot, reasons } = useBotDetection();
 
+  // Allow fetching if onlyWhenVisible is false, OR if the AdSlot container has been viewed
+  // Now that we fixed the 0x0 container issue, viewability detection should work properly
   const canFetch = !onlyWhenVisible || hasBeenViewed;
+  
+  // Log viewability states
+  useEffect(() => {
+    console.log('👁️ Viewability states:', {
+      onlyWhenVisible,
+      isInstantViewable,     // Instant (no duration)
+      isViewable,           // MRC-compliant (1 second duration)
+      hasBeenViewed,
+      canFetch: !onlyWhenVisible || hasBeenViewed,
+      elementAttached: !!elementRef.current,
+      elementDimensions: elementRef.current ? {
+        width: elementRef.current.offsetWidth,
+        height: elementRef.current.offsetHeight,
+        visible: elementRef.current.offsetParent !== null
+      } : null
+    });
+  }, [onlyWhenVisible, isInstantViewable, isViewable, hasBeenViewed, elementRef]);
 
   // Validate width from theme, default to 800px if not specified
   useEffect(() => {
@@ -101,8 +133,31 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   }, [theme.width, theme.mobileWidth, elementRef]);
 
   const fetchAdData = useCallback(async () => {
-    if (!canFetch || loading || hasTriggered) return;
-    if (!isWidthValid) return;
+    console.log('🚀 fetchAdData called', {
+      canFetch,
+      loading,
+      hasTriggered,
+      isWidthValid,
+      messagesLength: messages.length
+    });
+    
+    if (!canFetch || loading || hasTriggered) {
+      console.log('❌ fetchAdData blocked:', {
+        canFetch,
+        loading,
+        hasTriggered,
+        blocked_by: {
+          canFetch: !canFetch,
+          loading: loading,
+          hasTriggered: hasTriggered
+        }
+      });
+      return;
+    }
+    if (!isWidthValid) {
+      console.log('❌ fetchAdData blocked by isWidthValid');
+      return;
+    }
 
     // Wait for width measurement when using string values (auto, percentages, etc.)
     if ((typeof theme.width === "string" || typeof theme.mobileWidth === "string") && measuredWidth === null) {
@@ -164,7 +219,9 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
   useDebounce(
     () => {
+      console.log('⏰ Debounce callback triggered', { shouldFetch });
       if (shouldFetch) {
+        console.log('🎯 Calling fetchAdData and resetting shouldFetch');
         fetchAdData();
         setShouldFetch(false);
       }
@@ -174,35 +231,70 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   );
 
   useEffect(() => {
-    if (hasTriggered) return;
+    console.log('🚀 Trigger useEffect called', {
+      hasTriggered,
+      trigger: trigger ? 'provided' : 'undefined',
+      triggerUsed: triggerUsed ? 'set' : 'null',
+      messagesLength: messages.length,
+      triggerEquality: trigger === triggerUsed,
+      slotId: resolvedSlotId
+    });
+
+    if (hasTriggered) {
+      console.log('❌ Already triggered, skipping');
+      return;
+    }
 
     // If no trigger provided, fetch immediately when messages exist
     if (!trigger) {
+      console.log('⚡ No trigger provided, checking messages');
       if (messages.length > 0) {
+        console.log('✅ Messages exist, setting shouldFetch=true');
         setShouldFetch(true);
+      } else {
+        console.log('❌ No messages, waiting');
       }
       return;
     }
 
     // Only trigger if we haven't triggered before and this is a new/different trigger
     if (trigger !== triggerUsed) {
+      console.log('🔄 New trigger detected, setting up promise handlers');
       setTriggerUsed(trigger);
 
       trigger
         .then(() => {
+          console.log('✅ Trigger promise resolved');
           // Only proceed if we still haven't triggered (avoid race conditions)
           if (!hasTriggered) {
+            console.log('✅ Setting shouldFetch=true after trigger resolve');
             setShouldFetch(true);
+          } else {
+            console.log('❌ Already triggered, ignoring resolve');
           }
         })
-        .catch(() => {
+        .catch((error) => {
+          console.log('❌ Trigger promise rejected:', error);
           // Even on error, attempt to fetch (some ads might still be relevant)
           if (!hasTriggered) {
+            console.log('✅ Setting shouldFetch=true after trigger error');
             setShouldFetch(true);
+          } else {
+            console.log('❌ Already triggered, ignoring error');
           }
         });
+    } else {
+      console.log('🔄 Same trigger as before, ignoring');
     }
   }, [trigger, triggerUsed, hasTriggered, messages.length]);
+
+  // Trigger fetch when viewability is detected (for onlyWhenVisible=true case)
+  useEffect(() => {
+    if (onlyWhenVisible && hasBeenViewed && !hasTriggered && (triggerUsed || !trigger)) {
+      console.log('👁️ Viewability detected, triggering fetch...');
+      setShouldFetch(true);
+    }
+  }, [onlyWhenVisible, hasBeenViewed, hasTriggered, triggerUsed, trigger]);
 
   // Trigger fetch when width measurement becomes available
   useEffect(() => {
@@ -312,5 +404,19 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     );
   };
 
-  return <div ref={elementRef}>{renderContent()}</div>;
+  return (
+    <div 
+      ref={elementRef}
+      style={{
+        minWidth: '1px',
+        minHeight: '1px',
+        // Apply the actual expected dimensions so viewability works properly
+        width: theme.width || 'auto',
+        maxWidth: '896px', // 880px + 16px margin
+        height: theme.width === 'auto' ? 'clamp(163px, 35.104vw, 241px)' : undefined
+      }}
+    >
+      {renderContent()}
+    </div>
+  );
 };

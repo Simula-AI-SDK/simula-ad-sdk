@@ -95,6 +95,7 @@ export interface ViewabilityOptions {
 
 export interface ViewabilityResult {
   isViewable: boolean;
+  isInstantViewable: boolean;
   hasBeenViewed: boolean;
   impressionTracked: boolean;
 }

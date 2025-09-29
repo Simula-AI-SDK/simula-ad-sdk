@@ -76,7 +76,8 @@ export const useViewability = (options: ViewabilityOptions = {}): ViewabilityRes
 
   return {
     elementRef,
-    isViewable: isViewable && hasMetDuration, // Only considered viewable after meeting duration
+    isViewable: isViewable && hasMetDuration, // MRC-compliant viewability (with duration)
+    isInstantViewable: isViewable, // Instant viewability (no duration requirement)
     hasBeenViewed,
     impressionTracked,
     trackImpression
