@@ -67,7 +67,6 @@ export const useViewability = (options: ViewabilityOptions = {}): ViewabilityRes
     if (impressionTracked) return;
     
     setImpressionTracked(true);
-    console.log('Impression tracked for ad:', adId);
     
     if (onImpressionTracked && adId) {
       onImpressionTracked(adId);
