@@ -1,6 +1,6 @@
 {
   "name": "@simula/ads",
-  "version": "1.0.14",
+  "version": "1.0.40",
   "description": "React SDK for integrating contextual AI ads with Simula",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -49,13 +49,13 @@
   },
   "homepage": "https://simula.ad/",
   "license": "MIT",
-  "dependencies": {
-    "@fingerprintjs/botd": "^1.9.1",
-    "uuid": "^13.0.0"
-  },
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"
+  },
+  "dependencies": {
+    "@fingerprintjs/botd": "^1.9.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
@@ -64,8 +64,6 @@
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@types/uuid": "^10.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "rollup": "^4.9.1",
     "rollup-plugin-dts": "^6.1.0",
     "rollup-plugin-peer-deps-external": "^2.2.4",

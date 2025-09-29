@@ -32,21 +32,6 @@ export default function App() {
 | Prop | Type | Required | Description |
 | --- | --- | --- | --- |
 | `apiKey` | string | ✅ Yes | Your Simula API key from the dashboard. |
-| `devMode` | boolean | ❌ No | Enable testing mode with mock ads (no API needed). |
-
-### 🧪 **Development Mode**
-
-For testing and development, use `devMode` to get beautiful mock ads without an API:
-
-```tsx
-<SimulaProvider devMode={true}>
-  <AdSlot
-    messages={[{ role: "user", content: "Hello!" }]}
-    trigger={Promise.resolve()}
-    theme={{ primary: '#your-brand-color' }}
-  />
-</SimulaProvider>
-```
 
 ---
 
@@ -100,12 +85,12 @@ You must provide the latest conversation messages and a trigger for when to fetc
 | Prop | Type | Description |
 | --- | --- | --- |
 | `messages` | Array | Recent chat messages (`{ role, content }[]`). Recommended: last 6 turns. |
-| `trigger` | Promise | Trigger | When to fetch an ad. Usually the promise returned by your LLM API call. |
 
 ### Optional
 
 | Prop | Type | Description |
 | --- | --- | --- |
+| `trigger` | Promise | When to fetch an ad. Usually the promise returned by your LLM API call. If not provided, fetches immediately when mounted (as long as messages exist). |
 | `formats` | Array | Ad types (`["all"]`, `["text"]`, `["prompt"]`, etc.). |
 | `theme` | Object | Colors and sizing (see below). |
 | `slotId` | string | Custom ID for this ad placement (analytics). |
@@ -167,8 +152,8 @@ type SimulaTheme = {
          | 'purple' | 'pink' | 'orange' | 'neutral'
          | 'gray' | 'tan';
   font?: 'san-serif' | 'serif' | 'monospace';  // Font family
-  width?: number | "auto";                     // container width
-  mobileWidth?: number;                        // width under breakpoint
+  width?: number | string;                     // container width (px, %, auto, etc.)
+  mobileWidth?: number | string;               // width under breakpoint (px, %, auto, etc.)
   minWidth?: number;                           // minimum width
   mobileBreakpoint?: number;                   // breakpoint in px
 };
@@ -201,6 +186,38 @@ type SimulaTheme = {
     theme: 'auto', 
     accent: 'green', 
     font: 'monospace' 
+  }} 
+/>
+
+// Responsive auto width (full width of container)
+<AdSlot 
+  theme={{ 
+    width: "auto",        // responsive width - measures actual pixels
+    mobileWidth: "auto"   // responsive on mobile too
+  }} 
+/>
+
+// Fixed width with auto mobile width
+<AdSlot 
+  theme={{ 
+    width: 600,           // 600px on desktop
+    mobileWidth: "auto"   // responsive on mobile - measures actual pixels
+  }} 
+/>
+
+// Percentage-based widths (also measures actual pixels for backend)
+<AdSlot 
+  theme={{ 
+    width: "100%",        // full width - measures actual pixels
+    mobileWidth: "90%"    // 90% width on mobile - measures actual pixels
+  }} 
+/>
+
+// Mix of fixed and percentage
+<AdSlot 
+  theme={{ 
+    width: "75%",         // 75% width - measures actual pixels
+    mobileWidth: 320      // fixed 320px on mobile
   }} 
 />
 ```

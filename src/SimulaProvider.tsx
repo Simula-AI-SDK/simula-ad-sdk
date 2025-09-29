@@ -17,18 +17,13 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = ({
   children, 
   devMode = false
 }) => {
-  if (!apiKey && !devMode) {
-    throw new Error('SimulaProvider requires an apiKey prop (or set devMode=true for testing)');
-  }
-
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
 
     async function ensureSession() {
-      if (devMode) return;
-      const id = await createSession(apiKey);
+      const id = await createSession(apiKey, devMode);
       if (!cancelled && id) setSessionId(id);
     }
 
@@ -37,7 +32,7 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = ({
   }, [apiKey, devMode]);
 
   const value: SimulaContextValue = {
-    apiKey: apiKey || 'dev-mode-key',
+    apiKey,
     devMode,
     sessionId,
   };

@@ -1,10 +1,9 @@
 import { Message, AdData, SimulaTheme } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-import { mockFetchAd, mockTrackImpression } from '../test-data/mockAds';
-
 // Production API URL
 const API_BASE_URL = 'http://127.0.0.1:8000';
+// const API_BASE_URL = 'https://b789dc72b1d1.ngrok-free.app';
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -12,7 +11,6 @@ export interface FetchAdRequest {
   apiKey: string;
   slotId?: string;
   theme?: SimulaTheme;
-  devMode?: boolean;
   sessionId?: string;
 }
 
@@ -22,15 +20,17 @@ export interface FetchAdResponse {
 }
 
 // Create a server session and return its id
-export async function createSession(apiKey?: string): Promise<string | undefined> {
+export async function createSession(apiKey: string, devMode?: boolean): Promise<string | undefined> {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    };
+
     const response = await fetch(`${API_BASE_URL}/session/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({}),
+      headers,
+      body: JSON.stringify({ devMode: devMode }),
     });
 
     if (!response.ok) {
@@ -66,17 +66,6 @@ function getOrCreateSimulaUserId(): string | undefined {
 }
 
 export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse> => {
-  // Use mock data if in dev mode
-  if (request.devMode) {
-    try {
-      console.log('🧪 Dev Mode: Using mock data with theme:', request.theme);
-      const mockResponse = await mockFetchAd(request.theme);
-      return { ad: mockResponse.ad };
-    } catch (error) {
-      return { error: 'Mock fetch failed' };
-    }
-  }
-
   try {
     const conversationHistory = request.messages;
     const userId = getOrCreateSimulaUserId();
@@ -90,22 +79,26 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
       session_id: request.sessionId,
     } as const;
 
+    const logHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${request.apiKey?.substring(0, 10)}...`,
+    };
+
     console.log('🚀 Sending to Simula API:', {
       url: `${API_BASE_URL}/render_ad/ssp/block`,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${request.apiKey?.substring(0, 10)}...`, // Only show first 10 chars of API key
-      },
+      headers: logHeaders,
       body: requestBody
     });
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${request.apiKey}`,
+    };
+
     const response = await fetch(`${API_BASE_URL}/render_ad/ssp/block`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${request.apiKey}`,
-      },
+      headers,
       body: JSON.stringify(requestBody),
     });
 
@@ -161,20 +154,16 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
   }
 };
 
-export const trackImpression = async (adId: string, apiKey: string, devMode?: boolean): Promise<void> => {
-  // Use mock tracking if in dev mode
-  if (devMode) {
-    await mockTrackImpression(adId);
-    return;
-  }
-
+export const trackImpression = async (adId: string, apiKey: string): Promise<void> => {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    };
+
     await fetch(`${API_BASE_URL}/track/impression/${adId}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify({}),
     });
   } catch (error) {

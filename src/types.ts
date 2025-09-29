@@ -2,8 +2,8 @@ export interface SimulaTheme {
   theme?: 'light' | 'dark' | 'auto';
   accent?: 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan';
   font?: 'san-serif' | 'serif' | 'monospace';
-  width?: number | "auto";
-  mobileWidth?: number;
+  width?: number | string;
+  mobileWidth?: number | string;
   minWidth?: number;
   mobileBreakpoint?: number;
 }
@@ -44,7 +44,7 @@ export interface AdData {
 
 export interface AdSlotProps {
   messages: Message[];
-  trigger: Promise<any>;
+  trigger?: Promise<any>;
   formats?: string[];
   theme?: SimulaTheme;
   slotId?: string;
@@ -57,7 +57,7 @@ export interface AdSlotProps {
 }
 
 export interface SimulaProviderProps {
-  apiKey?: string;
+  apiKey: string;
   children: React.ReactNode;
   devMode?: boolean;
 }
@@ -75,6 +75,7 @@ export interface BotDetectionResult {
 
 export interface OMIDViewabilityOptions {
   threshold?: number;
+  durationMs?: number;
   partnerName?: string;
   partnerVersion?: string;
   onImpressionTracked?: (adId: string) => void;
@@ -88,6 +89,7 @@ export interface OMIDViewabilityResult {
 
 export interface ViewabilityOptions {
   threshold?: number;
+  durationMs?: number;
   onImpressionTracked?: (adId: string) => void;
 }
 

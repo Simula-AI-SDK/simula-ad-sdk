@@ -17,8 +17,8 @@ export {
   getShadow
 } from './utils/colorThemes';
 
-// Test utilities
-export { mockAds, getMockAd, getRandomMockAd, mockFetchAd, mockTrackImpression } from './test-data/mockAds';
+// Test utilities (removed)
+
 export type {
   SimulaTheme,
   Message,

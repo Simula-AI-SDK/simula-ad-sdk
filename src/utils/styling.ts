@@ -16,8 +16,7 @@ export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSPropertie
     accent = 'blue',
     font = 'san-serif',
     width = 'auto',
-    mobileWidth = 320,
-    minWidth = 280,
+    mobileWidth = 'auto',
     mobileBreakpoint = 768,
   } = theme;
 
@@ -32,8 +31,7 @@ export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSPropertie
     '--simula-text': colors.text,
     '--simula-font-primary': fonts.primary,
     '--simula-width': typeof width === 'number' ? `${width}px` : width,
-    '--simula-mobile-width': `${mobileWidth}px`,
-    '--simula-min-width': `${minWidth}px`,
+    '--simula-mobile-width': typeof mobileWidth === 'number' ? `${mobileWidth}px` : '100%',
     '--simula-mobile-breakpoint': `${mobileBreakpoint}px`,
   } as React.CSSProperties;
 };
@@ -44,38 +42,109 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
     accent = 'blue',
     font = 'san-serif',
     width = 'auto',
-    mobileWidth = 320,
-    minWidth = 280,
+    mobileWidth = 'auto',
     mobileBreakpoint = 768,
   } = theme;
 
   const colors = getColorTheme(themeMode, accent);
   const fonts = getFontStyles(font);
 
+  // Aspect ratio based on max size
+  const maxWidth = 880;
+  const minWidth = 420;
+  const maxHeight = 225;
+  const aspectRatio = 225 / 864; // ~0.35104
+  const minHeight = minWidth * aspectRatio;
+
+  const marginAdjustment = 16;
+
+  // Handle width calculation
+  const getWidthCSS = () => {
+    if (width === 'auto') {
+      return '100%';
+    }
+    if (typeof width === 'string') {
+      // For percentage values and other CSS units, use as-is
+      return width;
+    }
+    return `${width + marginAdjustment}px`;
+  };
+
+  // Handle height calculation
+  const getHeightCSS = () => {
+    if (width === 'auto') {
+      return `clamp(${minHeight + marginAdjustment}px, ${aspectRatio * 100}vw, ${maxHeight + marginAdjustment}px)`;
+    }
+    if (typeof width === 'string') {
+      // For percentage values and other CSS units, calculate height proportionally
+      return `calc((${width}) * ${aspectRatio} + ${marginAdjustment}px)`;
+    }
+    return `${width * aspectRatio + marginAdjustment}px`;
+  };
+
+  // Handle mobile width calculation
+  const getMobileWidthCSS = () => {
+    if (mobileWidth === 'auto') {
+      return '100%';
+    }
+    if (typeof mobileWidth === 'string') {
+      // For percentage values and other CSS units, use as-is
+      return mobileWidth;
+    }
+    return `${mobileWidth}px`;
+  };
+
+  const getMobileMinWidthCSS = () => {
+    if (mobileWidth === 'auto') {
+      return `${Math.min(320, minWidth)}px`;
+    }
+    return typeof mobileWidth === 'number' ? `${Math.min(400, mobileWidth)}px` : `${Math.min(400, 320)}px`;
+  };
+
   return `
     .simula-ad-slot {
-      width: ${typeof width === 'number' ? `${width}px` : width};
-      max-width: 862px;
-      min-width: ${minWidth}px;
+      width: ${getWidthCSS()};
+      max-width: ${maxWidth  + marginAdjustment}px;
+      min-width: ${minWidth + marginAdjustment}px;
       margin: 16px 0;
       font-family: ${fonts.primary};
       line-height: 1.5;
       position: relative;
+      overflow: hidden;
+      max-height: ${maxHeight + marginAdjustment}px;
+      min-height: ${minHeight + marginAdjustment}px;
+      height: ${getHeightCSS()};
+    }
+
+    .simula-ad-slot * {
+      margin: 0;
+      padding: 0;
     }
 
     .simula-ad-iframe {
       width: 100%;
-      max-width: 862px;
-      height: 300px;
+      height: 100%;
       border: none;
-      border-radius: 6px;
+      outline: none;
+      box-shadow: none;
+      border-radius: 0;
       background: transparent;
+      display: block;
+      margin: 0;
+      padding: 0;
+      position: relative;
+      vertical-align: top;
+    }
+
+    /* Optional: visual error state if width < ${minWidth}px (toggle this class at runtime) */
+    .simula-ad-slot.too-narrow .simula-ad-iframe {
+      display: none;
     }
 
     .simula-info-icon {
       position: absolute;
-      bottom: 8px;
-      right: 8px;
+      top: 16px;
+      right: 16px;
       background: none;
       border: none;
       color: ${getTextMuted(colors)};
@@ -162,8 +231,8 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
 
     @media (max-width: ${mobileBreakpoint}px) {
       .simula-ad-slot {
-        width: ${mobileWidth}px;
-        min-width: ${Math.min(minWidth, mobileWidth)}px;
+        width: ${getMobileWidthCSS()};
+        min-width: ${getMobileMinWidthCSS()};
         margin: 12px 0;
       }
 

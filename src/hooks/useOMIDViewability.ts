@@ -8,6 +8,7 @@ interface OMIDViewabilityResult {
 
 interface OMIDOptions {
   threshold?: number;
+  durationMs?: number;
   partnerName?: string;
   partnerVersion?: string;
   onImpressionTracked?: (adId: string) => void;
@@ -27,6 +28,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
 } => {
   const {
     threshold = 0.5,
+    durationMs = 1000,
     partnerName = 'Simula-Ad-SDK',
     partnerVersion = '1.0.0',
     onImpressionTracked
@@ -36,6 +38,8 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
   const [isViewable, setIsViewable] = useState(false);
   const [hasBeenViewed, setHasBeenViewed] = useState(false);
   const [impressionTracked, setImpressionTracked] = useState(false);
+  const [viewableStartTime, setViewableStartTime] = useState<number | null>(null);
+  const [hasMetDuration, setHasMetDuration] = useState(false);
   
   const omidSessionRef = useRef<any>(null);
   const adEventsRef = useRef<any>(null);
@@ -138,10 +142,21 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
       const viewablePercentage = totalArea > 0 ? viewableArea / totalArea : 0;
 
       const newIsViewable = viewablePercentage >= threshold;
-      setIsViewable(newIsViewable);
-
-      if (newIsViewable && !hasBeenViewed) {
-        setHasBeenViewed(true);
+      const now = Date.now();
+      
+      if (newIsViewable) {
+        if (viewableStartTime === null) {
+          setViewableStartTime(now);
+        }
+        setIsViewable(true);
+        
+        if (!hasBeenViewed) {
+          setHasBeenViewed(true);
+        }
+      } else {
+        setViewableStartTime(null);
+        setIsViewable(false);
+        setHasMetDuration(false);
       }
     };
 
@@ -163,10 +178,21 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
         (entries) => {
           entries.forEach((entry) => {
             const newIsViewable = entry.intersectionRatio >= threshold;
-            setIsViewable(newIsViewable);
+            const now = Date.now();
             
-            if (newIsViewable && !hasBeenViewed) {
-              setHasBeenViewed(true);
+            if (newIsViewable) {
+              if (viewableStartTime === null) {
+                setViewableStartTime(now);
+              }
+              setIsViewable(true);
+              
+              if (!hasBeenViewed) {
+                setHasBeenViewed(true);
+              }
+            } else {
+              setViewableStartTime(null);
+              setIsViewable(false);
+              setHasMetDuration(false);
             }
           });
         },
@@ -197,7 +223,23 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
         }
       }
     };
-  }, [threshold, partnerName, partnerVersion, hasBeenViewed]);
+  }, [threshold, partnerName, partnerVersion, hasBeenViewed, viewableStartTime]);
+
+  // Duration tracking effect
+  useEffect(() => {
+    if (!isViewable || viewableStartTime === null || hasMetDuration) return;
+
+    const timeoutId = setTimeout(() => {
+      if (isViewable && viewableStartTime !== null) {
+        const elapsed = Date.now() - viewableStartTime;
+        if (elapsed >= durationMs) {
+          setHasMetDuration(true);
+        }
+      }
+    }, durationMs);
+
+    return () => clearTimeout(timeoutId);
+  }, [isViewable, viewableStartTime, durationMs, hasMetDuration]);
 
   const trackImpression = (adId?: string) => {
     if (impressionTracked) return;
@@ -231,7 +273,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
 
   return {
     elementRef,
-    isViewable,
+    isViewable: isViewable && hasMetDuration, // Only considered viewable after meeting duration
     hasBeenViewed,
     impressionTracked,
     trackImpression
