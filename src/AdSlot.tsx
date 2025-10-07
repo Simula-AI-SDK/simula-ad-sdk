@@ -79,14 +79,23 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     // If no width is configured at all, skip measurement
     if (currentWidth === undefined) return;
 
-    // Only measure if it's 'auto' or a percentage value
-    const needsMeasurement = needsWidthMeasurement(currentWidth);
-
-    // If it's a string but not auto, percentage, or valid px format, it's invalid
-    if (typeof currentWidth === 'string' && !isAutoWidth(currentWidth) && !isPercentageWidth(currentWidth) && !isPixelWidth(currentWidth)) {
-      setError(`Invalid width format: "${currentWidth}". Must be 'auto', a percentage (e.g., '50%'), a pixel value (e.g., '500px'), or a number.`);
+    // Validate width format
+    if (typeof currentWidth !== 'number' && typeof currentWidth !== 'string') {
+      const errorMsg = `Invalid width type "${typeof currentWidth}". Must be number, "auto", "%", or "px"`;
+      console.error(errorMsg);
+      setError(errorMsg);
       return;
     }
+
+    if (typeof currentWidth === 'string' && !isAutoWidth(currentWidth) && !isPercentageWidth(currentWidth) && !isPixelWidth(currentWidth)) {
+      const errorMsg = `Invalid width "${currentWidth}". Must be an integer, "auto", or a string like "100%", "500px"`;
+      console.error(errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
+    // Only measure if it's 'auto' or a percentage value
+    const needsMeasurement = needsWidthMeasurement(currentWidth);
 
     if (!needsMeasurement) return;
     if (!elementRef.current) return;
@@ -116,7 +125,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   }, [theme.width, elementRef]);
 
   const fetchAdData = useCallback(async () => {
-    if (!hasBeenViewed || loading || hasTriggered) {
+    if (!hasBeenViewed || loading || hasTriggered || error) {
       return;
     }
 
@@ -214,7 +223,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [hasBeenViewed, loading, hasTriggered, messages, formats, apiKey, slotId, theme, onError, isBot, reasons, sessionId, measuredWidth]);
+  }, [hasBeenViewed, loading, hasTriggered, error, messages, formats, apiKey, slotId, theme, onError, isBot, reasons, sessionId, measuredWidth]);
 
   useDebounce(
     () => {
