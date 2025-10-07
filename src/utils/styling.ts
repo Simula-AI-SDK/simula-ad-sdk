@@ -50,13 +50,12 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
   const fonts = getFontStyles(font);
 
   // Aspect ratio based on max size
-  const maxWidth = 880;
+  const maxWidth = 862;
   const minWidth = 420;
+  const minWidthMobile = 320;
   const maxHeight = 225;
-  const aspectRatio = 225 / 864; // ~0.35104
+  const aspectRatio = 225 / 862; // ~0.35104
   const minHeight = minWidth * aspectRatio;
-
-  const marginAdjustment = 16;
 
   // Handle width calculation
   const getWidthCSS = () => {
@@ -67,19 +66,19 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       // For percentage values and other CSS units, use as-is
       return width;
     }
-    return `${width + marginAdjustment}px`;
+    return `${width}px`;
   };
 
   // Handle height calculation
   const getHeightCSS = () => {
     if (width === 'auto') {
-      return `clamp(${minHeight + marginAdjustment}px, ${aspectRatio * 100}vw, ${maxHeight + marginAdjustment}px)`;
+      return `clamp(${minHeight}px, ${aspectRatio * 100}vw, ${maxHeight}px)`;
     }
     if (typeof width === 'string') {
       // For percentage values and other CSS units, calculate height proportionally
-      return `calc((${width}) * ${aspectRatio} + ${marginAdjustment}px)`;
+      return `calc((${width}) * ${aspectRatio})`;
     }
-    return `${width * aspectRatio + marginAdjustment}px`;
+    return `${width * aspectRatio}px`;
   };
 
   // Handle mobile width calculation
@@ -104,15 +103,15 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
   return `
     .simula-ad-slot {
       width: ${getWidthCSS()};
-      max-width: ${maxWidth  + marginAdjustment}px;
-      min-width: ${minWidth + marginAdjustment}px;
+      max-width: ${maxWidth}px;
+      min-width: ${minWidth}px;
       margin: 16px 0;
       font-family: ${fonts.primary};
       line-height: 1.5;
       position: relative;
       overflow: hidden;
-      max-height: ${maxHeight + marginAdjustment}px;
-      min-height: ${minHeight + marginAdjustment}px;
+      max-height: ${maxHeight}px;
+      min-height: ${minHeight}px;
       height: ${getHeightCSS()};
     }
 

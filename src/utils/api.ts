@@ -2,8 +2,9 @@ import { Message, AdData, SimulaTheme } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 // Production API URL
-const API_BASE_URL = 'http://127.0.0.1:8000';
-// const API_BASE_URL = 'https://b789dc72b1d1.ngrok-free.app';
+// const API_BASE_URL = 'http://127.0.0.1:8000';
+// const API_BASE_URL = 'https://b789dc72b1d1.ngrok-free.app'; 
+const API_BASE_URL = 'https://fa0265f3e198.ngrok-free.app';
 
 export interface FetchAdRequest {
   messages: Message[];
