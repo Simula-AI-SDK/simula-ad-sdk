@@ -8,23 +8,34 @@ import { fetchAd, trackImpression } from './utils/api';
 import { createAdSlotCSS } from './utils/styling';
 import { AdSlotProps, AdData } from './types';
 
+// Internal constant to prevent API abuse
+const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
+
+// Helper functions for width validation
+const isAutoWidth = (width: any): boolean => width === 'auto';
+const isPercentageWidth = (width: any): boolean => typeof width === 'string' && /^\d+(?:\.\d+)?%$/.test(width);
+const isPixelWidth = (width: any): boolean => typeof width === 'string' && /^\d+(?:\.\d+)?px$/.test(width);
+const needsWidthMeasurement = (width: any): boolean => isAutoWidth(width) || isPercentageWidth(width);
+
+// Validate messages array has actual content
+const hasValidMessages = (messages: any[]): boolean => {
+  return messages.length > 0 && messages.some(msg => msg && msg.content && msg.content.trim().length > 0);
+};
+
 export const AdSlot: React.FC<AdSlotProps> = ({
   messages,
   trigger,
   formats = ['all'],
   theme = {},
-  slotId,
   debounceMs = 0,
-  minIntervalMs = 1000,
-  onlyWhenVisible = true,
   onImpression,
   onClick,
   onError,
 }) => {
   const { apiKey, sessionId } = useSimula();
-  
-  // Generate a stable slotId for this component instance if not provided
-  const resolvedSlotId = useMemo(() => slotId || `slot-${uuidv4()}`, [slotId]);
+
+  // Generate a stable slotId for this component instance
+  const slotId = useMemo(() => `slot-${uuidv4()}`, []);
   
   const [ad, setAd] = useState<AdData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,7 +43,6 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const [shouldFetch, setShouldFetch] = useState(false);
   
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [isWidthValid, setIsWidthValid] = useState(true);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
 
@@ -43,13 +53,11 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   const lastFetchTimeRef = useRef<number>(0);
   const styleElementRef = useRef<HTMLStyleElement | null>(null);
 
-  const { 
-    elementRef, 
-    hasBeenViewed, 
-    isViewable,           // MRC-compliant (1 second duration) 
-    isInstantViewable,    // Instant viewability for fetching
-    impressionTracked, 
-    trackImpression: viewabilityTrackImpression 
+  const {
+    elementRef,
+    hasBeenViewed,
+    isViewable,           // MRC-compliant (1 second duration)
+    trackImpression: viewabilityTrackImpression
   } = useViewability({
     threshold: 0.5,
     durationMs: 1000, // 1 second for MRC compliance
@@ -64,44 +72,39 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
   const { isBot, reasons } = useBotDetection();
 
-  // Allow fetching if onlyWhenVisible is false, OR if the AdSlot container has been viewed
-  // Now that we fixed the 0x0 container issue, viewability detection should work properly
-  const canFetch = !onlyWhenVisible || hasBeenViewed;
-  
-
-  // Validate width from theme, default to 800px if not specified
+  // Measure actual width once when element is ready
   useEffect(() => {
-    // Skip validation for string widths (auto, percentages, etc.) - they're responsive and will be handled by CSS
-    if (typeof theme.width === "string") {
-      setIsWidthValid(true);
+    const currentWidth = theme.width;
+
+    // If no width is configured at all, skip measurement
+    if (currentWidth === undefined) return;
+
+    // Only measure if it's 'auto' or a percentage value
+    const needsMeasurement = needsWidthMeasurement(currentWidth);
+
+    // If it's a string but not auto, percentage, or valid px format, it's invalid
+    if (typeof currentWidth === 'string' && !isAutoWidth(currentWidth) && !isPercentageWidth(currentWidth) && !isPixelWidth(currentWidth)) {
+      setError(`Invalid width format: "${currentWidth}". Must be 'auto', a percentage (e.g., '50%'), a pixel value (e.g., '500px'), or a number.`);
       return;
     }
-    
-    const minWidth = 400;
-    const maxWidth = 862;
-    const effectiveWidth = typeof theme.width === 'number' ? theme.width : 800;
-    
-    if (effectiveWidth < minWidth) {
-      setIsWidthValid(false);
-      console.error(`AdSlot width ${effectiveWidth}px is below minimum ${minWidth}px. Skipping ad request.`);
-    } else if (effectiveWidth > maxWidth) {
-      setIsWidthValid(false);
-      console.error(`AdSlot width ${effectiveWidth}px exceeds maximum ${maxWidth}px. Skipping ad request.`);
-    } else {
-      setIsWidthValid(true);
-    }
-  }, [theme.width]);
 
-  // Measure actual width when using string values (auto, percentages, etc.)
-  useEffect(() => {
-    if ((typeof theme.width !== "string" && typeof theme.mobileWidth !== "string") || !elementRef.current) return;
+    if (!needsMeasurement) return;
+    if (!elementRef.current) return;
 
+    // Track if already measured to prevent re-observation
+    let hasMeasured = false;
+
+    // Use ResizeObserver to get the initial size
     const resizeObserver = new ResizeObserver(entries => {
       const entry = entries[0];
-      if (entry) {
+      if (entry && !hasMeasured) {
+        hasMeasured = true;
         const width = Math.round(entry.contentRect.width);
         setMeasuredWidth(width);
-        console.log(`📏 AdSlot measured width: ${width}px (theme.width: ${theme.width}, theme.mobileWidth: ${theme.mobileWidth})`);
+        console.log(`📏 AdSlot measured width: ${width}px (configured: ${currentWidth})`);
+
+        // Disconnect after first measurement
+        resizeObserver.disconnect();
       }
     });
 
@@ -110,18 +113,18 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [theme.width, theme.mobileWidth, elementRef]);
+  }, [theme.width, elementRef]);
 
   const fetchAdData = useCallback(async () => {
-    if (!canFetch || loading || hasTriggered) {
-      return;
-    }
-    if (!isWidthValid) {
+    if (!hasBeenViewed || loading || hasTriggered) {
       return;
     }
 
-    // Wait for width measurement when using string values (auto, percentages, etc.)
-    if ((typeof theme.width === "string" || typeof theme.mobileWidth === "string") && measuredWidth === null) {
+    // Wait for width measurement when using auto or percentage values
+    const currentWidth = theme.width;
+    const needsMeasurement = needsWidthMeasurement(currentWidth);
+
+    if (needsMeasurement && measuredWidth === null) {
       return;
     }
 
@@ -132,7 +135,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     }
 
     const now = Date.now();
-    if (now - lastFetchTimeRef.current < minIntervalMs) {
+    if (now - lastFetchTimeRef.current < MIN_FETCH_INTERVAL_MS) {
       return;
     }
 
@@ -141,23 +144,60 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     lastFetchTimeRef.current = now;
 
     try {
+      // Validate width before making API call
+      const currentConfiguredWidth = theme.width;
+      const minWidth = 320;
+
+      // Check width bounds (numeric or px string)
+      let widthValue: number | null = null;
+      if (typeof currentConfiguredWidth === 'number') {
+        widthValue = currentConfiguredWidth;
+      } else if (typeof currentConfiguredWidth === 'string') {
+        const pxMatch = currentConfiguredWidth.match(/^(\d+(?:\.\d+)?)px$/);
+        if (pxMatch) {
+          widthValue = parseFloat(pxMatch[1]);
+        }
+      }
+
+      // Validate minimum width if we have a concrete value
+      if (widthValue !== null && widthValue < minWidth) {
+        console.error(`AdSlot width ${widthValue}px is below minimum ${minWidth}px. Skipping ad request.`);
+        setError(`Invalid width: ${widthValue}px (minimum: ${minWidth}px)`);
+        setLoading(false);
+        return;
+      }
+
       // Create theme with measured width for backend
       const themeForBackend = { ...theme };
-      if (typeof theme.width === "string" && measuredWidth !== null) {
-        themeForBackend.width = measuredWidth;
-        console.log(`🎯 Sending measured width to backend: ${measuredWidth}px (was: ${theme.width})`);
-      }
-      if (typeof theme.mobileWidth === "string" && measuredWidth !== null) {
-        themeForBackend.mobileWidth = measuredWidth;
+
+      // Convert the current width to pixels for backend - always send as 'width'
+      if (typeof currentConfiguredWidth === "string") {
+        // Check if it's a px string like "400px"
+        const pxMatch = currentConfiguredWidth.match(/^(\d+(?:\.\d+)?)px$/);
+        if (pxMatch) {
+          // Convert "400px" to 400
+          themeForBackend.width = parseFloat(pxMatch[1]);
+          console.log(`🎯 Converting ${currentConfiguredWidth} to ${themeForBackend.width}px for backend`);
+        } else if (measuredWidth !== null) {
+          // For 'auto' and percentages, use measured width
+          // If measured width is below minimum, use minimum
+          const finalWidth = measuredWidth < minWidth ? minWidth : measuredWidth;
+          themeForBackend.width = finalWidth;
+          console.log(`🎯 Sending width to backend: ${finalWidth}px (measured: ${measuredWidth}px, configured: ${currentConfiguredWidth})`);
+        }
+      } else if (typeof currentConfiguredWidth === "number") {
+        // Already a number, just use it
+        themeForBackend.width = currentConfiguredWidth;
       }
 
       const result = await fetchAd({
         messages,
         formats,
         apiKey,
-        slotId: resolvedSlotId,
+        slotId,
         theme: themeForBackend,
         sessionId,
+        cornerRadius: theme.cornerRadius,
       });
 
       if (result.error) {
@@ -175,7 +215,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [canFetch, loading, hasTriggered, isWidthValid, minIntervalMs, messages, formats, apiKey, resolvedSlotId, theme, onError, isBot, reasons, sessionId, measuredWidth]);
+  }, [hasBeenViewed, loading, hasTriggered, messages, formats, apiKey, slotId, theme, onError, isBot, reasons, sessionId, measuredWidth]);
 
   useDebounce(
     () => {
@@ -188,52 +228,48 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     [shouldFetch, fetchAdData]
   );
 
+  // Handle trigger promise resolution/rejection
   useEffect(() => {
-    if (hasTriggered) {
-      return;
-    }
+    if (hasTriggered) return;
+    if (!trigger) return;
+    if (trigger === triggerUsed) return;
 
-    // If no trigger provided, fetch immediately when messages exist
-    if (!trigger) {
-      if (messages.length > 0) {
-        setShouldFetch(true);
-      }
-      return;
-    }
+    setTriggerUsed(trigger);
 
-    // Only trigger if we haven't triggered before and this is a new/different trigger
-    if (trigger !== triggerUsed) {
-      setTriggerUsed(trigger);
+    trigger
+      .then(() => {
+        if (!hasTriggered) {
+          setShouldFetch(true);
+        }
+      })
+      .catch(() => {
+        if (!hasTriggered) {
+          setShouldFetch(true);
+        }
+      });
+  }, [trigger, triggerUsed, hasTriggered]);
 
-      trigger
-        .then(() => {
-          // Only proceed if we still haven't triggered (avoid race conditions)
-          if (!hasTriggered) {
-            setShouldFetch(true);
-          }
-        })
-        .catch(() => {
-          // Even on error, attempt to fetch (some ads might still be relevant)
-          if (!hasTriggered) {
-            setShouldFetch(true);
-          }
-        });
-    }
-  }, [trigger, triggerUsed, hasTriggered, messages.length]);
-
-  // Trigger fetch when viewability is detected (for onlyWhenVisible=true case)
+  // Consolidated trigger logic - checks all conditions before fetching
   useEffect(() => {
-    if (onlyWhenVisible && hasBeenViewed && !hasTriggered && (triggerUsed || !trigger)) {
-      setShouldFetch(true);
-    }
-  }, [onlyWhenVisible, hasBeenViewed, hasTriggered, triggerUsed, trigger]);
+    // Don't trigger if already triggered
+    if (hasTriggered) return;
 
-  // Trigger fetch when width measurement becomes available
-  useEffect(() => {
-    if ((typeof theme.width === "string" || typeof theme.mobileWidth === "string") && measuredWidth !== null && !hasTriggered && (triggerUsed || !trigger)) {
-      setShouldFetch(true);
-    }
-  }, [measuredWidth, theme.width, theme.mobileWidth, hasTriggered, triggerUsed, trigger]);
+    // Don't trigger if no valid messages
+    if (!hasValidMessages(messages)) return;
+
+    // Don't trigger if waiting for trigger promise
+    if (trigger && !triggerUsed) return;
+
+    // Don't trigger if not viewed yet
+    if (!hasBeenViewed) return;
+
+    // Don't trigger if waiting for width measurement
+    const needsMeasurement = typeof theme.width === "string" && needsWidthMeasurement(theme.width);
+    if (needsMeasurement && measuredWidth === null) return;
+
+    // All conditions met, trigger fetch
+    setShouldFetch(true);
+  }, [hasBeenViewed, hasTriggered, triggerUsed, trigger, measuredWidth, theme.width, messages]);
 
   useEffect(() => {
     if (ad && isViewable && !isBot && iframeLoaded) {
@@ -242,16 +278,18 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   }, [ad, isViewable, isBot, iframeLoaded, viewabilityTrackImpression]);
 
   useEffect(() => {
-    const css = createAdSlotCSS(theme);
-
+    // Create style element once on mount
     if (!styleElementRef.current) {
       styleElementRef.current = document.createElement('style');
       styleElementRef.current.setAttribute('data-simula-styles', 'true');
       document.head.appendChild(styleElementRef.current);
     }
 
+    // Update CSS content whenever theme changes
+    const css = createAdSlotCSS(theme);
     styleElementRef.current.textContent = css;
 
+    // Cleanup only on unmount
     return () => {
       if (styleElementRef.current && document.head.contains(styleElementRef.current)) {
         document.head.removeChild(styleElementRef.current);
@@ -260,12 +298,6 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     };
   }, [theme]);
 
-  const handleAdClick = useCallback(() => {
-    if (ad) {
-      // trackClick(ad.id, apiKey);
-      onClick?.(ad);
-    }
-  }, [ad, apiKey, onClick]);
 
   const renderContent = () => {
     if (loading) {
@@ -281,11 +313,15 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     }
 
     return (
-      <div className="simula-ad-slot">
+      <div
+        className="simula-ad-slot"
+        onClick={() => onClick?.(ad)}
+        style={{ cursor: onClick ? 'pointer' : 'default' }}
+      >
           <iframe
             src={ad.iframeUrl}
             className="simula-ad-iframe"
-            style={{ display: 'block', verticalAlign: 'top', border: 0, margin: 0, padding: 0, width: '100%' }}
+            style={{ display: 'block', verticalAlign: 'top', border: 0, margin: 0, padding: 0, width: '100%', pointerEvents: 'none' }}
             frameBorder="0"
             scrolling="no"
             allowTransparency={true}
@@ -296,9 +332,12 @@ export const AdSlot: React.FC<AdSlotProps> = ({
               setIframeLoaded(true);
             }}
         />
-        <button 
+        <button
           className="simula-info-icon"
-          onClick={() => setShowInfoModal(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowInfoModal(true);
+          }}
           aria-label="Ad information"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -336,15 +375,12 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   };
 
   return (
-    <div 
+    <div
       ref={elementRef}
       style={{
-        minWidth: '1px',
-        minHeight: '1px',
-        // Apply the actual expected dimensions so viewability works properly
+        minWidth: '320px',
         width: theme.width || 'auto',
-        maxWidth: '896px', // 880px + 16px margin
-        height: theme.width === 'auto' ? 'clamp(163px, 35.104vw, 241px)' : undefined
+        height: '265px'
       }}
     >
       {renderContent()}

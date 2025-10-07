@@ -1,11 +1,12 @@
+export type AccentOption = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan' | 'transparent' | 'image';
+export type FontOption = 'san-serif' | 'serif' | 'monospace';
+
 export interface SimulaTheme {
   theme?: 'light' | 'dark' | 'auto';
-  accent?: 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan';
-  font?: 'san-serif' | 'serif' | 'monospace';
+  accent?: AccentOption | AccentOption[];
+  font?: FontOption | FontOption[];
   width?: number | string;
-  mobileWidth?: number | string;
-  minWidth?: number;
-  mobileBreakpoint?: number;
+  cornerRadius?: number;
 }
 
 export interface ColorPalette {
@@ -47,10 +48,7 @@ export interface AdSlotProps {
   trigger?: Promise<any>;
   formats?: string[];
   theme?: SimulaTheme;
-  slotId?: string;
   debounceMs?: number;
-  minIntervalMs?: number;
-  onlyWhenVisible?: boolean;
   onImpression?: (ad: AdData) => void;
   onClick?: (ad: AdData) => void;
   onError?: (error: Error) => void;

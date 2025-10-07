@@ -13,6 +13,7 @@ export interface FetchAdRequest {
   slotId?: string;
   theme?: SimulaTheme;
   sessionId?: string;
+  cornerRadius?: number;
 }
 
 export interface FetchAdResponse {
@@ -48,36 +49,17 @@ export async function createSession(apiKey: string, devMode?: boolean): Promise<
   }
 }
 
-// Get or create a stable anonymous user id stored in localStorage
-function getOrCreateSimulaUserId(): string | undefined {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) return undefined;
-
-    const STORAGE_KEY = 'simula_user_id';
-    let existing = window.localStorage.getItem(STORAGE_KEY);
-    if (existing && existing.length > 0) return existing;
-
-    const newId = uuidv4();
-    window.localStorage.setItem(STORAGE_KEY, newId);
-    return newId;
-  } catch {
-    // Storage may be unavailable (privacy mode/SSR). Return undefined gracefully.
-    return undefined;
-  }
-}
-
 export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse> => {
   try {
     const conversationHistory = request.messages;
-    const userId = getOrCreateSimulaUserId();
-    
+
     const requestBody = {
       messages: conversationHistory,
       types: request.formats,
       slot_id: request.slotId,
       theme: request.theme,
-      // user_id: userId,
       session_id: request.sessionId,
+      corner_radius: request.cornerRadius,
     } as const;
 
     const logHeaders: Record<string, string> = {
