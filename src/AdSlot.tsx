@@ -386,9 +386,10 @@ export const AdSlot: React.FC<AdSlotProps> = ({
     <div
       ref={elementRef}
       style={{
-        minWidth: '320px',
-        width: theme.width || 'auto',
-        height: '265px'
+        minWidth: error ? '0px' : '320px',
+        width: error ? '0px' : (!theme.width || theme.width === 'auto' ? '100%' : theme.width),
+        height: error ? '0px' : '265px',
+        overflow: 'hidden'
       }}
     >
       {renderContent()}
