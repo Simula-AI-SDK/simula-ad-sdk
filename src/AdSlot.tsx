@@ -197,7 +197,6 @@ export const AdSlot: React.FC<AdSlotProps> = ({
         slotId,
         theme: themeForBackend,
         sessionId,
-        cornerRadius: theme.cornerRadius,
       });
 
       if (result.error) {

@@ -60,7 +60,7 @@ You must provide the latest conversation messages and a trigger for when to fetc
         messages={messages.slice(0, i+1)}  // Context up to this message
         theme={{
           theme: 'light',
-          accent: 'blue',
+          accent: ['blue', 'transparent'],
           font: 'san-serif'
         }}
       />
@@ -90,14 +90,11 @@ You must provide the latest conversation messages and a trigger for when to fetc
 
 | Prop | Type | Description |
 | --- | --- | --- |
-| `trigger` | Promise | When to fetch an ad. Usually the promise returned by your LLM API call. If not provided, fetches immediately when mounted (as long as messages exist). |
+| `trigger` | Promise | When to fetch an ad. Usually the promise returned by your LLM API call. If not provided, fetches immediately when the ad becomes visible (as long as messages exist). |
 | `formats` | Array | Ad types (`["all"]`, `["text"]`, `["prompt"]`, etc.). |
 | `theme` | Object | Colors and sizing (see below). |
-| `slotId` | string | Custom ID for this ad placement (analytics). |
 | `debounceMs` | number | Delay before sending request, in ms. Default: **0**. |
-| `minIntervalMs` | number | Minimum gap between requests, in ms. Default: **1000**. |
-| `onlyWhenVisible` | boolean | If true (default), waits until the ad is **actually visible in the viewport** before fetching. Saves bandwidth and ensures ads count as viewable impressions. Set `false` to preload off-screen. |
-| `onImpression` | function | Fires when ad is visible. |
+| `onImpression` | function | Fires when ad becomes viewable (50% visible for 1 second). |
 | `onClick` | function | Fires when user clicks the ad. |
 | `onError` | function | Fires on error or no-fill. |
 
@@ -111,8 +108,7 @@ Each `<AdSlot />` component follows a **"fetch once and stay static"** pattern:
 
 1. **Waits** for the `trigger` promise to resolve
 2. **Fetches** an ad using the provided `messages` as context  
-3. **Displays** the ad permanently
-4. **Ignores** any future changes to props - the ad never changes
+3. **Displays** the ad
 
 ### Perfect for Chat Apps
 
@@ -134,30 +130,31 @@ function ChatMessage({ message, messagePromise, allMessages, index }) {
 }
 ```
 
-### Why Static Ads?
-
-- ✅ **Conversation Integrity**: Each ad belongs to a specific exchange
-- ✅ **Contextual Relevance**: Ad reflects the conversation state when generated
-- ✅ **Stable History**: Users see consistent chat history when scrolling
-- ✅ **Performance**: No unnecessary re-fetches as conversation grows
-
----
-
 ## `theme` Object
 
 ```tsx
+type AccentOption = 'blue' | 'red' | 'green' | 'yellow'
+                  | 'purple' | 'pink' | 'orange' | 'neutral'
+                  | 'gray' | 'tan' | 'transparent' | 'image';
+
+type FontOption = 'san-serif' | 'serif' | 'monospace';
+
 type SimulaTheme = {
-  theme?: 'light' | 'dark' | 'auto';           // Theme mode
-  accent?: 'blue' | 'red' | 'green' | 'yellow' // Accent color
-         | 'purple' | 'pink' | 'orange' | 'neutral'
-         | 'gray' | 'tan';
-  font?: 'san-serif' | 'serif' | 'monospace';  // Font family
-  width?: number | string;                     // container width (px, %, auto, etc.)
-  mobileWidth?: number | string;               // width under breakpoint (px, %, auto, etc.)
-  minWidth?: number;                           // minimum width
-  mobileBreakpoint?: number;                   // breakpoint in px
+  theme?: 'light' | 'dark' | 'auto';                    // Theme mode
+  accent?: AccentOption | AccentOption[];               // Accent color(s) - array for A/B testing
+  font?: FontOption | FontOption[];                     // Font family - array for A/B testing
+  width?: number | string;                              // Width in px, %, 'auto', or '500px' format (min: 320px)
+  cornerRadius?: number;                                // Corner radius in pixels
 };
 ```
+
+### Ad Dimensions
+
+- **Height**: Fixed at **265px** (cannot be changed)
+- **Width**: Configurable via `theme.width` with a **minimum of 320px**
+  - Accepts: `number` (e.g., `500`), percentage (e.g., `'100%'`), `'auto'`, or px string (e.g., `'500px'`)
+  - For `'auto'` and percentage values, the SDK measures the actual pixel width of the container
+  - Always enforces 320px minimum
 
 ### Theme Examples
 
@@ -181,64 +178,73 @@ type SimulaTheme = {
 />
 
 // Auto theme (follows system preference)
-<AdSlot 
-  theme={{ 
-    theme: 'auto', 
-    accent: 'green', 
-    font: 'monospace' 
-  }} 
+<AdSlot
+  theme={{
+    theme: 'auto',
+    accent: 'green',
+    font: 'monospace'
+  }}
 />
 
 // Responsive auto width (full width of container)
-<AdSlot 
-  theme={{ 
-    width: "auto",        // responsive width - measures actual pixels
-    mobileWidth: "auto"   // responsive on mobile too
-  }} 
+<AdSlot
+  theme={{
+    width: "auto"  // Measures actual container width
+  }}
 />
 
-// Fixed width with auto mobile width
-<AdSlot 
-  theme={{ 
-    width: 600,           // 600px on desktop
-    mobileWidth: "auto"   // responsive on mobile - measures actual pixels
-  }} 
+// Fixed width
+<AdSlot
+  theme={{
+    width: 600  // 600px fixed width
+  }}
 />
 
-// Percentage-based widths (also measures actual pixels for backend)
-<AdSlot 
-  theme={{ 
-    width: "100%",        // full width - measures actual pixels
-    mobileWidth: "90%"    // 90% width on mobile - measures actual pixels
-  }} 
+// Percentage-based width (measures actual pixels)
+<AdSlot
+  theme={{
+    width: "100%"  // Full width - measures actual pixels
+  }}
 />
 
-// Mix of fixed and percentage
-<AdSlot 
-  theme={{ 
-    width: "75%",         // 75% width - measures actual pixels
-    mobileWidth: 320      // fixed 320px on mobile
-  }} 
+// With corner radius
+<AdSlot
+  theme={{
+    width: 500,
+    cornerRadius: 12  // 12px rounded corners
+  }}
+/>
+
+// A/B testing with accent and font arrays
+<AdSlot
+  theme={{
+    accent: ['blue', 'purple'],      // Backend picks randomly for A/B test
+    font: ['san-serif', 'serif'],    // Backend picks randomly for A/B test
+    width: "auto"
+  }}
 />
 ```
 
-### Available Color Combinations
+### Available Options
 
-The theme system automatically generates beautiful color palettes for all combinations:
+**Theme modes**: `light`, `dark`, `auto`
 
-- **Theme modes**: `light`, `dark`, `auto`
-- **Accent colors**: `blue`, `red`, `green`, `yellow`, `purple`, `pink`, `orange`, `neutral`, `gray`, `tan`
-- **Fonts**: `san-serif`, `serif`, `monospace`
+**Accent colors**: `blue`, `red`, `green`, `yellow`, `purple`, `pink`, `orange`, `neutral`, `gray`, `tan`, `transparent`, `image`
 
-Each combination provides:
-- Background gradients
-- Primary/secondary button colors
-- Border and text colors
-- Hover states
-- Shadows and surfaces
+**Fonts**: `san-serif`, `serif`, `monospace`
 
+### A/B Testing
 
----
+You can pass arrays for `accent` and `font` to enable backend A/B testing:
+
+```tsx
+<AdSlot
+  theme={{
+    accent: ['blue', 'red', 'green'],  // Backend randomly selects one
+    font: ['san-serif', 'serif']        // Backend randomly selects one
+  }}
+/>
+```
 
 ## Chat App Example with OpenAI
 
@@ -304,12 +310,11 @@ export default function ChatApp() {
               <AdSlot
                 trigger={msg.aiPromise}  // Each message has its own promise
                 messages={messages.slice(0, i + 1).slice(-6)}  // context up to this message
-                theme={{ 
+                theme={{
                   theme: "light",
-                  accent: "blue", 
+                  accent: "blue",
                   font: "san-serif",
-                  width: "auto", 
-                  mobileWidth: 320 
+                  width: "auto"
                 }}
               />
             )}
