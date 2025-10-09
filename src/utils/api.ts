@@ -154,7 +154,7 @@ export const trackImpression = async (adId: string, apiKey: string): Promise<voi
       'Authorization': `Bearer ${apiKey}`,
     };
 
-    await fetch(`${API_BASE_URL}/engagement/impression/${adId}`, {
+    await fetch(`${API_BASE_URL}/track/engagement/impression/${adId}`, {
       method: 'POST',
       headers,
       body: JSON.stringify({}),
