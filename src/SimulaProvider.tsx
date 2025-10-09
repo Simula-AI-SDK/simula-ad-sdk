@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { SimulaProviderProps, SimulaContextValue } from './types';
 import { createSession } from './utils/api';
+import { validateSimulaProviderProps } from './utils/validation';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
 
@@ -12,24 +13,29 @@ export const useSimula = (): SimulaContextValue => {
   return context;
 };
 
-export const SimulaProvider: React.FC<SimulaProviderProps> = ({ 
-  apiKey, 
-  children, 
-  devMode = false
-}) => {
+export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
+  // Validate props early
+  validateSimulaProviderProps(props);
+
+  const {
+    apiKey,
+    children,
+    devMode = false,
+    primaryUserID
+  } = props;
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
 
     async function ensureSession() {
-      const id = await createSession(apiKey, devMode);
+      const id = await createSession(apiKey, devMode, primaryUserID);
       if (!cancelled && id) setSessionId(id);
     }
 
     ensureSession();
     return () => { cancelled = true; };
-  }, [apiKey, devMode]);
+  }, [apiKey, devMode, primaryUserID]);
 
   const value: SimulaContextValue = {
     apiKey,

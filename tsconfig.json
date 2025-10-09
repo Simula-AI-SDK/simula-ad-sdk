@@ -15,7 +15,8 @@
     "noEmit": false,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
     "outDir": "dist",
     "jsx": "react-jsx"
   },

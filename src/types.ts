@@ -46,7 +46,7 @@ export interface AdData {
 export interface AdSlotProps {
   messages: Message[];
   trigger?: Promise<any>;
-  formats?: string[];
+  formats?: string | string[];
   theme?: SimulaTheme;
   debounceMs?: number;
   onImpression?: (ad: AdData) => void;
@@ -58,6 +58,7 @@ export interface SimulaProviderProps {
   apiKey: string;
   children: React.ReactNode;
   devMode?: boolean;
+  primaryUserID?: string;
 }
 
 export interface SimulaContextValue {

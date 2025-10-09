@@ -1,21 +1,185 @@
-Simula helps you monetize your app with contextual AI ads.
+# Simula Ad SDK
 
-Integration takes **two steps**:
+**React SDK for AI-Powered Contextual Ads**
 
-1. Initialize with `SimulaProvider`
-2. Add `<AdSlot />`
+Simula delivers **contextually relevant ads** for conversational AI apps and LLM-based interfaces. It’s lightweight, easy to integrate, and MRC-compliant out of the box.
 
 ---
 
-## 1. Initialization
+## 🚀 Installation
 
-Wrap your app with `SimulaProvider` and pass your API key.
+```bash
+npm install @simula/ads
+```
 
-👉 You can find this key in the **Simula dashboard** (`https://simula.ad`) under your account settings.
+---
+
+## ⚡ Quick Start
+
+Integrate in **two steps**:
+
+1. **Wrap your app** with `SimulaProvider`
+2. **Insert** `<AdSlot />` where you want ads
 
 ```tsx
-import { SimulaProvider } from "@simula/ads";
-import ChatApp from "./ChatApp";
+import { SimulaProvider, AdSlot } from "@simula/ads";
+
+function App() {
+  return (
+    <SimulaProvider apiKey="SIMULA_xxx">
+      <YourChatApp />
+    </SimulaProvider>
+  );
+}
+
+function ChatMessage({ messages }) {
+  return (
+    <div>
+      {/* Chat UI */}
+      <AdSlot
+        messages={messages}
+        theme={{ theme: "light", accent: "blue" }}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## 🧩 Components
+
+### `SimulaProvider`
+
+Initializes the SDK and manages session state.
+
+| Prop            | Type        | Required | Default | Description                                                                                                      |
+| --------------- | ----------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `apiKey`        | `string`    | ✅        | —       | Your Simula API key from the [dashboard](https://simula.ad)                                                      |
+| `children`      | `ReactNode` | ✅        | —       | Your app components                                                                                              |
+| `devMode`       | `boolean`   | ❌        | `false` | Enables development mode                                                                                         |
+| `primaryUserID` | `string`    | ❌        | —       | Publisher-provided user identifier. **Recommended** for consistent tracking across devices and sessions.         |
+
+```tsx
+// Wrap your entire app
+<SimulaProvider apiKey="SIMULA_xxx">
+  <App />
+</SimulaProvider>
+
+// Or wrap logged-in content (recommended for authenticated apps)
+function App() {
+  const { user } = useAuth();
+
+  if (!user) return <LoginPage />;
+
+  return (
+    <SimulaProvider apiKey="SIMULA_xxx" primaryUserID={user.id}>
+      <AuthenticatedApp />
+    </SimulaProvider>
+  );
+}
+```
+
+> **Provider Best Practices**
+>
+> `SimulaProvider` **doesn't need to wrap your entire app**. But for best results:
+>
+> * **Wrap logged-in content** – Place it around authenticated sections where we can track a user across a single session
+>
+> **Provide `primaryUserID`** – Use your user's ID to enable cross-device tracking and cookie-independent identification. This approach delivers:
+>
+> * **Higher CPMs** – Better user attribution leads to more valuable ad placements
+> * **Frequency capping** – Prevents oversending ads to the same user
+> * **Better ad experience** – Optimized targeting based on consistent user history
+> * **Accurate analytics** – Reliable performance metrics across devices and sessions
+>
+> For anonymous users, you can still use `SimulaProvider` without `primaryUserID`, but tracking will rely on cookies.
+
+---
+
+### `AdSlot`
+
+Displays an ad based on conversation context.
+
+| Prop           | Type                   | Required | Default                                                                                              | Description                                                                                                                                                                     |
+| -------------- | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `messages`     | `Message[]`            | ✅        | —                                                                                                    | Array of `{ role, content }`; pass recent conversation (e.g. last 6 turns).                                                                                                     |
+| `trigger`      | `Promise<any>`         | ❌        | Fires immediately on viewability                                                                     | Promise to await before fetching the ad (e.g. LLM call).                                                                                                                        |
+| `formats`      | `string \| string[]`   | ❌        | `['all']`                                                                                            | Preferred ad formats: `'text'`, `'prompt'`, `'all'`, or `['text', 'prompt']`.<br>**A/B Testing:** Pass an array to automatically A/B test different formats and let Simula pick the best over time. |
+| `theme`        | `SimulaTheme`          | ❌        | `{ theme: 'auto', width: 'auto', accent: ['neutral','image'], font: 'sans-serif', cornerRadius: 8 }` | Customize ad appearance (see Theme Options). Arrays trigger A/B testing.                                                                                                        |
+| `debounceMs`   | `number`               | ❌        | `0`                                                                                                  | Delay in milliseconds before fetching.                                                                                                                                          |
+| `onImpression` | `(ad: AdData) => void` | ❌        | `undefined`                                                                                          | Callback when ad is viewable (50% visible for ≥1s).                                                                                                                             |
+| `onClick`      | `(ad: AdData) => void` | ❌        | `undefined`                                                                                          | Callback when ad is clicked.                                                                                                                                                    |
+| `onError`      | `(err: Error) => void` | ❌        | `undefined`                                                                                          | Callback when ad fails or no-fill occurs.                                                                                                                                       |
+
+**Behavior:**
+
+* Fetches **once** per slot (static)
+* Triggers on **viewport visibility** (50% visible)
+* Includes built-in **bot protection**
+* Tracks impressions **MRC-compliantly**
+
+---
+
+## 🎨 Theme Options
+
+```ts
+interface SimulaTheme {
+  theme?: "light" | "dark" | "auto";         // default: "auto"
+  accent?: AccentOption | AccentOption[];   // default: ["neutral", "image"] (A/B tested)
+  font?: FontOption | FontOption[];         // default: "sans-serif"
+  width?: number | string;                  // default: "auto" (min 320px)
+  cornerRadius?: number;                    // default: 8
+}
+```
+
+**Modes:** `light` | `dark` | `auto`
+**Accents:**
+`blue`, `red`, `green`, `yellow`, `purple`, `pink`, `orange`, `neutral`, `gray`, `tan`, `transparent`, `image`
+**Fonts:** `sans-serif`, `serif`, `monospace`
+
+> **Height:** fixed at **265px**
+> **Width:** min **320px**, accepts px/%, or `auto`
+
+> **A/B Testing:**
+> When you pass an **array** (e.g., `accent: ['blue', 'green', 'purple']`), Simula will **automatically A/B test** across the provided options—colors, fonts, or formats—and **optimize over time for the best-performing variant**.
+
+```tsx
+// Default theme (auto)
+<AdSlot messages={messages} />
+
+// Light theme
+<AdSlot messages={messages} theme={{ theme: "light", accent: "blue" }} />
+
+// Dark theme with custom width
+<AdSlot
+  messages={messages}
+  theme={{ theme: "dark", accent: "purple", width: 600, cornerRadius: 12 }}
+/>
+
+// A/B testing
+<AdSlot
+  messages={messages}
+  theme={{
+    accent: ["blue", "green", "purple"],     // A/B test colors
+    font: ["sans-serif", "serif"],           // A/B test fonts
+    width: "100%"
+  }}
+/>
+```
+
+---
+
+## 💬 Integration Example
+
+### Chat App with OpenAI
+
+```tsx
+import { useState } from "react";
+import { SimulaProvider, AdSlot } from "@simula/ads";
+import OpenAI from "openai";
+
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default function App() {
   return (
@@ -25,329 +189,130 @@ export default function App() {
   );
 }
 
-```
-
-**Props**
-
-| Prop | Type | Required | Description |
-| --- | --- | --- | --- |
-| `apiKey` | string | ✅ Yes | Your Simula API key from the dashboard. |
-
----
-
-## 2. Displaying an Ad
-
-Use `<AdSlot />` anywhere in your UI.
-
-Each `<AdSlot />` fetches an ad **once** when triggered and then stays static forever. This makes it perfect for chat apps where each AI response gets its own permanent ad.
-
-You must provide the latest conversation messages and a trigger for when to fetch.
-
-### Example: Chat App Integration (recommended)
-
-```tsx
-// Perfect for chat apps - each AI response gets its own permanent ad
-{messages.map((msg, i) => (
-  <div key={i}>
-    <div className={`message ${msg.role}`}>
-      {msg.content}
-    </div>
-    
-    {/* Ad appears after each AI response and stays forever */}
-    {msg.role === "assistant" && (
-      <AdSlot
-        trigger={msg.promise}              // Promise from this AI response
-        messages={messages.slice(0, i+1)}  // Context up to this message
-        theme={{
-          theme: 'light',
-          accent: ['blue', 'transparent'],
-          font: 'san-serif'
-        }}
-      />
-    )}
-  </div>
-))}
-```
-
-### Key Behavior: "Fetch Once and Stay Static"
-
-- ✅ Each `<AdSlot />` fetches **once** when its trigger resolves
-- ✅ The ad then **stays static forever** - perfect for chat history
-- ✅ Changing the `trigger` prop after first fetch is **ignored**
-- ✅ Each AI response can have its own permanent, contextual ad
-
----
-
-## `<AdSlot />` Props
-
-### Mandatory
-
-| Prop | Type | Description |
-| --- | --- | --- |
-| `messages` | Array | Recent chat messages (`{ role, content }[]`). Recommended: last 6 turns. |
-
-### Optional
-
-| Prop | Type | Description |
-| --- | --- | --- |
-| `trigger` | Promise | When to fetch an ad. Usually the promise returned by your LLM API call. If not provided, fetches immediately when the ad becomes visible (as long as messages exist). |
-| `formats` | Array | Ad types (`["all"]`, `["text"]`, `["prompt"]`, etc.). |
-| `theme` | Object | Colors and sizing (see below). |
-| `debounceMs` | number | Delay before sending request, in ms. Default: **0**. |
-| `onImpression` | function | Fires when ad becomes viewable (50% visible for 1 second). |
-| `onClick` | function | Fires when user clicks the ad. |
-| `onError` | function | Fires on error or no-fill. |
-
----
-
-## 🔒 **Static Ad Behavior**
-
-### How AdSlot Works
-
-Each `<AdSlot />` component follows a **"fetch once and stay static"** pattern:
-
-1. **Waits** for the `trigger` promise to resolve
-2. **Fetches** an ad using the provided `messages` as context  
-3. **Displays** the ad
-
-### Perfect for Chat Apps
-
-```tsx
-// Each AI response gets its own permanent ad
-function ChatMessage({ message, messagePromise, allMessages, index }) {
-  return (
-    <div>
-      <div className="ai-response">{message.content}</div>
-      
-      {/* This ad will never change once loaded */}
-      <AdSlot 
-        trigger={messagePromise}                    // Promise from this specific AI call
-        messages={allMessages.slice(0, index+1)}   // Context up to this point
-        theme={{ theme: 'light', accent: 'blue' }}
-      />
-    </div>
-  );
-}
-```
-
-## `theme` Object
-
-```tsx
-type AccentOption = 'blue' | 'red' | 'green' | 'yellow'
-                  | 'purple' | 'pink' | 'orange' | 'neutral'
-                  | 'gray' | 'tan' | 'transparent' | 'image';
-
-type FontOption = 'san-serif' | 'serif' | 'monospace';
-
-type SimulaTheme = {
-  theme?: 'light' | 'dark' | 'auto';                    // Theme mode
-  accent?: AccentOption | AccentOption[];               // Accent color(s) - array for A/B testing
-  font?: FontOption | FontOption[];                     // Font family - array for A/B testing
-  width?: number | string;                              // Width in px, %, 'auto', or '500px' format (min: 320px)
-  cornerRadius?: number;                                // Corner radius in pixels
-};
-```
-
-### Ad Dimensions
-
-- **Height**: Fixed at **265px** (cannot be changed)
-- **Width**: Configurable via `theme.width` with a **minimum of 320px**
-  - Accepts: `number` (e.g., `500`), percentage (e.g., `'100%'`), `'auto'`, or px string (e.g., `'500px'`)
-  - For `'auto'` and percentage values, the SDK measures the actual pixel width of the container
-  - Always enforces 320px minimum
-
-### Theme Examples
-
-```tsx
-// Light blue theme
-<AdSlot 
-  theme={{ 
-    theme: 'light', 
-    accent: 'blue', 
-    font: 'san-serif' 
-  }} 
-/>
-
-// Dark purple theme
-<AdSlot 
-  theme={{ 
-    theme: 'dark', 
-    accent: 'purple', 
-    font: 'serif' 
-  }} 
-/>
-
-// Auto theme (follows system preference)
-<AdSlot
-  theme={{
-    theme: 'auto',
-    accent: 'green',
-    font: 'monospace'
-  }}
-/>
-
-// Responsive auto width (full width of container)
-<AdSlot
-  theme={{
-    width: "auto"  // Measures actual container width
-  }}
-/>
-
-// Fixed width
-<AdSlot
-  theme={{
-    width: 600  // 600px fixed width
-  }}
-/>
-
-// Percentage-based width (measures actual pixels)
-<AdSlot
-  theme={{
-    width: "100%"  // Full width - measures actual pixels
-  }}
-/>
-
-// With corner radius
-<AdSlot
-  theme={{
-    width: 500,
-    cornerRadius: 12  // 12px rounded corners
-  }}
-/>
-
-// A/B testing with accent and font arrays
-<AdSlot
-  theme={{
-    accent: ['blue', 'purple'],      // Backend picks randomly for A/B test
-    font: ['san-serif', 'serif'],    // Backend picks randomly for A/B test
-    width: "auto"
-  }}
-/>
-```
-
-### Available Options
-
-**Theme modes**: `light`, `dark`, `auto`
-
-**Accent colors**: `blue`, `red`, `green`, `yellow`, `purple`, `pink`, `orange`, `neutral`, `gray`, `tan`, `transparent`, `image`
-
-**Fonts**: `san-serif`, `serif`, `monospace`
-
-### A/B Testing
-
-You can pass arrays for `accent` and `font` to enable backend A/B testing:
-
-```tsx
-<AdSlot
-  theme={{
-    accent: ['blue', 'red', 'green'],  // Backend randomly selects one
-    font: ['san-serif', 'serif']        // Backend randomly selects one
-  }}
-/>
-```
-
-## Chat App Example with OpenAI
-
-```tsx
-import { useState } from "react";
-import { AdSlot } from "@simula/ads";
-import OpenAI from "openai";
-
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-export default function ChatApp() {
+function ChatApp() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [latestPromise, setLatestPromise] = useState(null);
   const [loading, setLoading] = useState(false);
 
   async function sendMessage() {
-    if (!input.trim() || loading) return;
-    
+    if (!input.trim()) return;
+
     const userMessage = { role: "user", content: input.trim() };
     const newMessages = [...messages, userMessage];
-    
     setMessages(newMessages);
     setInput("");
     setLoading(true);
 
     try {
-      // call OpenAI
       const llmPromise = client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: newMessages,
       });
 
-      // store promise for AdSlot trigger
-      setLatestPromise(llmPromise);
-
-      // wait for response
       const res = await llmPromise;
       const reply = res.choices[0].message;
 
-      // add assistant message
-      setMessages((prev) => [...prev, reply]);
-    } catch (error) {
-      console.error("Error:", error);
+      setMessages((prev) => [...prev, { ...reply, llmPromise }]);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="chat-container">
-      {/* Chat Messages */}
-      <div className="messages">
-        {messages.map((msg, i) => (
-          <div key={i}>
-            <div className={`message ${msg.role}`}>
-              <strong>{msg.role === "user" ? "You" : "AI"}:</strong>
-              <p>{msg.content}</p>
-            </div>
-            
-            {/* Ad Slot - each AI response gets its own permanent ad */}
-            {msg.role === "assistant" && (
-              <AdSlot
-                trigger={msg.aiPromise}  // Each message has its own promise
-                messages={messages.slice(0, i + 1).slice(-6)}  // context up to this message
-                theme={{
-                  theme: "light",
-                  accent: "blue",
-                  font: "san-serif",
-                  width: "auto"
-                }}
-              />
-            )}
-          </div>
-        ))}
-        {loading && <div className="message assistant">AI is thinking...</div>}
-      </div>
+    <div className="chat">
+      {messages.map((msg, i) => (
+        <div key={i}>
+          <p><strong>{msg.role}:</strong> {msg.content}</p>
 
-      {/* Input */}
-      <div className="input-area">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-          placeholder="Ask me anything..."
-          disabled={loading}
-        />
-        <button onClick={sendMessage} disabled={loading || !input.trim()}>
-          Send
-        </button>
-      </div>
+          {msg.role === "assistant" && (
+            <AdSlot
+              key={`adslot-${i}`}              // ✅ Required if rendering in a list
+              trigger={msg.llmPromise}         // default: fires immediately if not provided
+              messages={messages.slice(0, i + 1)}
+              theme={{ theme: "light", accent: "blue", width: "auto" }}
+            />
+          )}
+        </div>
+      ))}
+
+      <input
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+      />
+      <button onClick={sendMessage} disabled={loading}>Send</button>
     </div>
   );
 }
+```
 
+> **Tip:**
+>
+> * Use `key` only when `<AdSlot />` is rendered inside a list or dynamic loop.
+> * If omitted, the ad fetches immediately when viewable.
+
+---
+
+## 🔑 Features
+
+* **Contextual Targeting** – AI-powered ad matching to conversation content
+* **Bot Protection** – via [@fingerprintjs/botd](https://github.com/fingerprintjs/botd)
+* **MRC-Compliant Viewability** – 50% visible for ≥1s
+* **Responsive** – Flexible widths with enforced minimums
+* **Static Fetch** – Each slot fetches once and stays fixed
+* **Session Management** – Automatic
+* **Robust Error Handling** – Graceful degradation & callbacks
+* **TypeScript Support** – Built-in type definitions
+* **Built-in A/B Testing** – Test multiple colors, formats, or fonts by passing arrays and let Simula optimize performance over time
+
+---
+
+## ⚙️ Advanced Usage
+
+### Event Handlers
+
+```tsx
+<AdSlot
+  messages={messages}
+  onImpression={(ad) => console.log("Impression:", ad.id)}  // default: none
+  onClick={(ad) => console.log("Clicked:", ad.id)}          // default: none
+  onError={(err) => console.error("Ad error:", err)}        // default: none
+/>
+```
+
+### Debounce Fetching
+
+```tsx
+<AdSlot
+  messages={messages}
+  debounceMs={500}   // default: 0
+/>
 ```
 
 ---
 
-✅ That’s it:
+## 📦 TypeScript Types
 
-- Get your **API key from the Simula dashboard**
-- Wrap your app with `SimulaProvider`
-- Add `<AdSlot />` with `messages` + `trigger`
+```ts
+import type {
+  SimulaTheme,
+  Message,
+  AdData,
+  AdSlotProps,
+  SimulaProviderProps
+} from "@simula/ads";
+```
 
-Simula automatically fetches, renders, sizes, tracks ads, and prevents bot fraud for you.
+---
+
+## 📚 Resources
+
+* [Full Docs](https://simula.ad)
+* [GitHub Issues](https://github.com/Simula-AI-SDK/simula-ad-sdk/issues)
+* Support: **[admin@simula.ad](mailto:admin@simula.ad)**
+
+---
+
+## 📄 License
+
+MIT

@@ -6,6 +6,7 @@ import { useBotDetection } from './hooks/useBotDetection';
 import { useViewability } from './hooks/useViewability';
 import { fetchAd, trackImpression } from './utils/api';
 import { createAdSlotCSS } from './utils/styling';
+import { validateAdSlotProps } from './utils/validation';
 import { AdSlotProps, AdData } from './types';
 
 // Internal constant to prevent API abuse
@@ -14,7 +15,6 @@ const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
 // Helper functions for width validation
 const isAutoWidth = (width: any): boolean => width === 'auto';
 const isPercentageWidth = (width: any): boolean => typeof width === 'string' && /^\d+(?:\.\d+)?%$/.test(width);
-const isPixelWidth = (width: any): boolean => typeof width === 'string' && /^\d+(?:\.\d+)?px$/.test(width);
 const needsWidthMeasurement = (width: any): boolean => isAutoWidth(width) || isPercentageWidth(width);
 
 // Validate messages array has actual content
@@ -22,16 +22,24 @@ const hasValidMessages = (messages: any[]): boolean => {
   return messages.length > 0 && messages.some(msg => msg && msg.content && msg.content.trim().length > 0);
 };
 
-export const AdSlot: React.FC<AdSlotProps> = ({
-  messages,
-  trigger,
-  formats = ['all'],
-  theme = {},
-  debounceMs = 0,
-  onImpression,
-  onClick,
-  onError,
-}) => {
+export const AdSlot: React.FC<AdSlotProps> = (props) => {
+  // Validate props early
+  validateAdSlotProps(props);
+
+  const {
+    messages,
+    trigger,
+    formats: formatsRaw = ['all'],
+    theme = {},
+    debounceMs = 0,
+    onImpression,
+    onClick,
+    onError,
+  } = props;
+
+  // Normalize formats to array (similar to theme.accent and theme.font)
+  const formats = Array.isArray(formatsRaw) ? formatsRaw : [formatsRaw];
+
   const { apiKey, sessionId } = useSimula();
 
   // Generate a stable slotId for this component instance
@@ -78,21 +86,6 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
     // If no width is configured at all, skip measurement
     if (currentWidth === undefined) return;
-
-    // Validate width format
-    if (typeof currentWidth !== 'number' && typeof currentWidth !== 'string') {
-      const errorMsg = `Invalid width type "${typeof currentWidth}". Must be number, "auto", "%", or "px"`;
-      console.error(errorMsg);
-      setError(errorMsg);
-      return;
-    }
-
-    if (typeof currentWidth === 'string' && !isAutoWidth(currentWidth) && !isPercentageWidth(currentWidth) && !isPixelWidth(currentWidth)) {
-      const errorMsg = `Invalid width "${currentWidth}". Must be an integer, "auto", or a string like "100%", "500px"`;
-      console.error(errorMsg);
-      setError(errorMsg);
-      return;
-    }
 
     // Only measure if it's 'auto' or a percentage value
     const needsMeasurement = needsWidthMeasurement(currentWidth);
