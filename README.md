@@ -38,6 +38,7 @@ function ChatMessage({ messages }) {
       {/* Chat UI */}
       <AdSlot
         messages={messages}
+        format="all"
         theme={{ theme: "light", accent: "blue" }}
       />
     </div>

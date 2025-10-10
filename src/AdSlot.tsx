@@ -322,7 +322,7 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
           <iframe
             src={ad.iframeUrl}
             className="simula-ad-iframe"
-            style={{ display: 'block', verticalAlign: 'top', border: 0, margin: 0, padding: 0, width: '100%', pointerEvents: 'none' }}
+            style={{ display: 'block', verticalAlign: 'top', border: 0, margin: 0, padding: 0, width: '100%' }}
             frameBorder="0"
             scrolling="no"
             allowTransparency={true}

@@ -64,11 +64,18 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
   try {
     const conversationHistory = request.messages;
 
+    // Normalize theme accent and font to arrays for backend
+    const normalizedTheme = request.theme ? {
+      ...request.theme,
+      accent: request.theme.accent ? (Array.isArray(request.theme.accent) ? request.theme.accent : [request.theme.accent]) : undefined,
+      font: request.theme.font ? (Array.isArray(request.theme.font) ? request.theme.font : [request.theme.font]) : undefined,
+    } : undefined;
+
     const requestBody = {
       messages: conversationHistory,
       types: request.formats,
       slot_id: request.slotId,
-      theme: request.theme,
+      theme: normalizedTheme,
       session_id: request.sessionId,
     } as const;
 
