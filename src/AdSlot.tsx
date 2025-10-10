@@ -315,19 +315,19 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
 
     return (
       <div
-        className="simula-ad-slot"
+        className="simula-content-slot"
         onClick={() => onClick?.(ad)}
         style={{ cursor: onClick ? 'pointer' : 'default' }}
       >
           <iframe
             src={ad.iframeUrl}
-            className="simula-ad-iframe"
+            className="simula-content-frame"
             style={{ display: 'block', verticalAlign: 'top', border: 0, margin: 0, padding: 0, width: '100%' }}
             frameBorder="0"
             scrolling="no"
             allowTransparency={true}
             sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-            title={`Ad: ${ad.id}`}
+            title={`Content: ${ad.id}`}
             onLoad={() => {
               // Iframe loaded - now impressions can be tracked
               setIframeLoaded(true);
@@ -339,7 +339,7 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
             e.stopPropagation();
             setShowInfoModal(true);
           }}
-          aria-label="Ad information"
+          aria-label="Content information"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1" fill="none"/>
@@ -357,16 +357,15 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
                 ×
               </button>
               <p>
-                Ad powered by{' '}
-                <a 
-                  href="https://simula.ad" 
-                  target="_blank" 
+                Powered by{' '}
+                <a
+                  href="https://simula.ad"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="simula-modal-link"
                 >
                   Simula
                 </a>
-                's AI-native ad platform.
               </p>
             </div>
           </div>

@@ -64,7 +64,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
   };
 
   return `
-    .simula-ad-slot {
+    .simula-content-slot {
       width: ${getWidthCSS()};
       min-width: ${minWidth}px;
       height: ${fixedHeight}px;
@@ -74,12 +74,12 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       overflow: hidden;
     }
 
-    .simula-ad-slot * {
+    .simula-content-slot * {
       margin: 0;
       padding: 0;
     }
 
-    .simula-ad-iframe {
+    .simula-content-frame {
       width: 100%;
       height: 100%;
       border: none;
@@ -173,7 +173,7 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
       text-decoration: underline;
     }
 
-    .simula-ad-label {
+    .simula-content-label {
       font-size: 10px;
       color: ${getTextMuted(colors)};
       text-transform: uppercase;
