@@ -106,7 +106,7 @@ Displays an ad based on conversation context.
 | -------------- | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `messages`     | `Message[]`            | ✅        | —                                                                                                    | Array of `{ role, content }`; pass recent conversation (e.g. last 6 turns).                                                                                                     |
 | `trigger`      | `Promise<any>`         | ❌        | Fires immediately on viewability                                                                     | Promise to await before fetching the ad (e.g. LLM call).                                                                                                                        |
-| `formats`      | `string \| string[]`   | ❌        | `['all']`                                                                                            | Preferred ad formats: `'text'`, `'prompt'`, `'all'`, or `['text', 'prompt']`.<br>**A/B Testing:** Pass an array to automatically A/B test different formats and let Simula pick the best over time. |
+| `formats`      | `string \| string[]`   | ❌        | `['all']`                                                                                            | Preferred ad formats: `'all'`, `'tips'`, `'interactive'`, `'suggestions'`, `'text'`, `'highlight'`, `'visual_banner'`, `'image_feature'`, or an array like `['text', 'highlight']`. See [Appendix: Ad Formats](#appendix-ad-formats) for visual examples.<br>**A/B Testing:** Pass an array to automatically A/B test different formats and let Simula pick the best over time. |
 | `theme`        | `SimulaTheme`          | ❌        | `{ theme: 'auto', width: 'auto', accent: ['neutral','image'], font: 'sans-serif', cornerRadius: 8 }` | Customize ad appearance (see Theme Options). Arrays trigger A/B testing.                                                                                                        |
 | `debounceMs`   | `number`               | ❌        | `0`                                                                                                  | Delay in milliseconds before fetching.                                                                                                                                          |
 | `onImpression` | `(ad: AdData) => void` | ❌        | `undefined`                                                                                          | Callback when ad is viewable (50% visible for ≥1s).                                                                                                                             |
@@ -317,3 +317,21 @@ import type {
 ## 📄 License
 
 MIT
+
+---
+
+## 📑 Appendix: Ad Formats
+
+Visual examples of all available ad formats across mobile and desktop:
+
+| Format | Mobile | Desktop |
+|--------|--------|---------|
+| **tips** | <img src="./assets/tips_mobile.png" width="200" alt="Tips format on mobile" /> | <img src="./assets/tips_desktop.png" width="400" alt="Tips format on desktop" /> |
+| **interactive** | <img src="./assets/interactive_mobile.png" width="200" alt="Interactive format on mobile" /> | <img src="./assets/interactive_desktop.png" width="400" alt="Interactive format on desktop" /> |
+| **suggestions** | <img src="./assets/suggestions_mobile.png" width="200" alt="Suggestions format on mobile" /> | <img src="./assets/suggestions_desktop.png" width="400" alt="Suggestions format on desktop" /> |
+| **text** | <img src="./assets/text_mobile.png" width="200" alt="Text format on mobile" /> | <img src="./assets/text_desktop.png" width="400" alt="Text format on desktop" /> |
+| **highlight** | <img src="./assets/highlight_mobile.png" width="200" alt="Highlight format on mobile" /> | <img src="./assets/highlight_desktop.png" width="400" alt="Highlight format on desktop" /> |
+| **visual_banner** | <img src="./assets/visual_banner_mobile.png" width="200" alt="Visual banner format on mobile" /> | <img src="./assets/visual_banner_desktop.png" width="400" alt="Visual banner format on desktop" /> |
+| **image_feature** | <img src="./assets/image_feature_mobile.png" width="200" alt="Image feature format on mobile" /> | <img src="./assets/image_feature_desktop.png" width="400" alt="Image feature format on desktop" /> |
+
+> **Note:** The `'all'` format allows Simula to automatically select the best format based on context and performance.

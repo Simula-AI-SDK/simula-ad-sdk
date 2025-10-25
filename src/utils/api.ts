@@ -85,7 +85,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
     };
 
     console.log('🚀 Sending to Simula API:', {
-      url: `${API_BASE_URL}/render_ad/ssp/block`,
+      url: `${API_BASE_URL}/render_ad/ssp`,
       method: 'POST',
       headers: logHeaders,
       body: requestBody
@@ -96,7 +96,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
       'Authorization': `Bearer ${request.apiKey}`,
     };
 
-    const response = await fetch(`${API_BASE_URL}/render_ad/ssp/block`, {
+    const response = await fetch(`${API_BASE_URL}/render_ad/ssp`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
@@ -114,8 +114,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
 
     // Handle new API shape
     if (data && typeof data === 'object') {
-      // Explicit no-fill
-      if (data.adInserted === false) {
+      if (!data.adInserted) {
         return { error: 'No fill' };
       }
 

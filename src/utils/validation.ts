@@ -123,7 +123,7 @@ export const validateAdSlotProps = (props: any): void => {
 export const validateFormats = (formats?: string | string[]): void => {
   if (!formats) return;
 
-  const validFormatOptions = ['text', 'interactive', 'all', 'tips', 'suggestions'];
+  const validFormatOptions = ['all', 'tips', 'interactive', 'suggestions', 'text', 'highlight', 'visual_banner', 'image_feature'];
 
   // Normalize to array for validation
   const formatsArray = Array.isArray(formats) ? formats : [formats];

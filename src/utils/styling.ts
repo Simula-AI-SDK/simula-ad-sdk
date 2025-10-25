@@ -96,16 +96,16 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
 
     .simula-info-icon {
       position: absolute;
-      top: 16px;
-      right: 16px;
+      top: 12;
+      right: 12px;
       background: none;
       border: none;
-      color: ${getTextMuted(colors)};
+      color: ${colors.text};
       opacity: 0.5;
       cursor: pointer;
-      padding: 4px;
+      padding: 6px;
       border-radius: 50%;
-      transition: opacity 0.2s ease;
+      transition: all 0.2s ease;
       z-index: 10;
       display: flex;
       align-items: center;
@@ -113,7 +113,8 @@ export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
     }
 
     .simula-info-icon:hover {
-      opacity: 0.8;
+      opacity: 1;
+      transform: scale(1.1);
     }
 
     .simula-modal-overlay {

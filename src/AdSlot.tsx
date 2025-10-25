@@ -202,12 +202,18 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
       });
 
       if (result.error) {
+        console.warn('🚫 Ad fetch failed:', result.error);
         setError(result.error);
         onError?.(new Error(result.error));
       } else if (result.ad) {
+        console.log('✅ Ad fetched successfully:', { adId: result.ad.id, format: result.ad.format });
         setAd(result.ad);
         // Mark as triggered - this AdSlot will never fetch again
         setHasTriggered(true);
+      } else {
+        console.warn('🚫 No ad returned from API - no fill or invalid response');
+        setError('No ad available');
+        onError?.(new Error('No ad available'));
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch ad';
@@ -378,9 +384,9 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
     <div
       ref={elementRef}
       style={{
-        minWidth: error ? '0px' : '320px',
-        width: error ? '0px' : (!theme.width || theme.width === 'auto' ? '100%' : theme.width),
-        height: error ? '0px' : '265px',
+        minWidth: error ? '0px' : (ad && ad.id ? '320px' : '0px'),
+        width: error ? '0px' : (ad && ad.id ? (!theme.width || theme.width === 'auto' ? '100%' : theme.width) : '0px'),
+        height: error ? '0px' : (ad && ad.id ? '265px' : '0px'),
         overflow: 'hidden'
       }}
     >
