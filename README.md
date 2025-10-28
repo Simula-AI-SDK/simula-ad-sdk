@@ -247,6 +247,7 @@ function ChatApp() {
                 key={`adslot-${i}`}              // ✅ Required if rendering in a list
                 trigger={msg.llmPromise}         // default: fires immediately if not provided
                 messages={messages.slice(0, i + 1)}
+                formats="all"
                 theme={{ theme: "light", accent: "blue", width: "auto" }}
               />
             )}
