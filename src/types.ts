@@ -49,6 +49,7 @@ export interface AdSlotProps {
   formats?: string | string[];
   theme?: SimulaTheme;
   debounceMs?: number;
+  char_desc?: string;
   onImpression?: (ad: AdData) => void;
   onClick?: (ad: AdData) => void;
   onError?: (error: Error) => void;

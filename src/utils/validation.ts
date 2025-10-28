@@ -46,7 +46,7 @@ export const validateSimulaProviderProps = (props: any): void => {
  * Throws descriptive errors for invalid props
  */
 export const validateAdSlotProps = (props: any): void => {
-  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'onImpression', 'onClick', 'onError'];
+  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'char_desc', 'onImpression', 'onClick', 'onError'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -97,6 +97,11 @@ export const validateAdSlotProps = (props: any): void => {
     if (props.debounceMs < 0) {
       throw new Error(`Invalid "debounceMs" prop value: "${props.debounceMs}". Must be a non-negative number`);
     }
+  }
+
+  // Validate char_desc (optional)
+  if (props.char_desc !== undefined && typeof props.char_desc !== 'string') {
+    throw new Error(`Invalid "char_desc" prop type: "${typeof props.char_desc}". Must be a string`);
   }
 
   // Validate callbacks (optional)

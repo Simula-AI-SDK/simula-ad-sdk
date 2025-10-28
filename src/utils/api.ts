@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 // Production API URL
 // const API_BASE_URL = 'http://127.0.0.1:8000';
 // const API_BASE_URL = 'https://b789dc72b1d1.ngrok-free.app'; 
-const API_BASE_URL = 'https://fa0265f3e198.ngrok-free.app';
+// const API_BASE_URL = 'https://c3a3f7ce1e94.ngrok-free.app';
+const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -13,6 +14,7 @@ export interface FetchAdRequest {
   slotId?: string;
   theme?: SimulaTheme;
   sessionId?: string;
+  char_desc?: string;
 }
 
 export interface FetchAdResponse {
@@ -47,6 +49,9 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid API key (please check dashboard or contact Simula team for a valid API key)');
+      }
       return undefined;
     }
 
@@ -55,7 +60,11 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
       return data.sessionId;
     }
     return undefined;
-  } catch {
+  } catch (error) {
+    // Re-throw 401 errors with our custom message
+    if (error instanceof Error && error.message.includes('Invalid API key')) {
+      throw error;
+    }
     return undefined;
   }
 }
@@ -77,6 +86,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
       slot_id: request.slotId,
       theme: normalizedTheme,
       session_id: request.sessionId,
+      char_desc: request.char_desc,
     } as const;
 
     const logHeaders: Record<string, string> = {

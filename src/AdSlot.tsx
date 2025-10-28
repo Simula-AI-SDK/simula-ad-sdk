@@ -32,6 +32,7 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
     formats: formatsRaw = ['all'],
     theme = {},
     debounceMs = 0,
+    char_desc,
     onImpression,
     onClick,
     onError,
@@ -199,6 +200,7 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
         slotId,
         theme: themeForBackend,
         sessionId,
+        char_desc,
       });
 
       if (result.error) {
@@ -384,9 +386,10 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
     <div
       ref={elementRef}
       style={{
-        minWidth: error ? '0px' : (ad && ad.id ? '320px' : '0px'),
-        width: error ? '0px' : (ad && ad.id ? (!theme.width || theme.width === 'auto' ? '100%' : theme.width) : '0px'),
-        height: error ? '0px' : (ad && ad.id ? '265px' : '0px'),
+        display: error ? 'none' : 'block',
+        minWidth: ad && ad.id ? '320px' : '0px',
+        width: !theme.width || theme.width === 'auto' ? '100%' : theme.width,
+        height: ad && ad.id ? '265px' : '0px',
         overflow: 'hidden'
       }}
     >
