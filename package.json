@@ -1,45 +1,44 @@
 {
-  "name": "simula-ad",
-  "version": "1.0.4",
-  "description": "SDK for injecting ads into AI assistant responses",
-  "main": "index.js",
-  "module": "index.mjs",
-  "type": "commonjs",
-  "types": "index.d.ts",
+  "name": "@simula/ads",
+  "version": "1.1.0",
+  "description": "React SDK for integrating contextual AI ads with Simula",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "type": "module",
   "exports": {
     ".": {
-      "import": "./index.mjs",
-      "require": "./index.js",
-      "types": "./index.d.ts"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
   "files": [
-    "index.js",
-    "index.mjs",
-    "index.d.ts",
-    "simula-ad.js",
-    "simula-ad.mjs",
-    "config/",
+    "dist/",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test.js",
-    "prepublishOnly": "node test.js"
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "prepublishOnly": "npm run build",
+    "type-check": "tsc --noEmit"
   },
   "keywords": [
+    "react",
     "ai",
     "ads",
     "sdk",
-    "genai",
+    "contextual",
     "llm",
     "chatbot",
-    "monetization"
+    "monetization",
+    "typescript"
   ],
   "author": {
-    "name": "Your Name",
-    "email": "your.email@example.com",
-    "url": "https://your-website.com"
+    "name": "Simula",
+    "email": "support@simula.ad",
+    "url": "https://simula.ad"
   },
   "repository": {
     "type": "git",
@@ -49,11 +48,29 @@
     "url": "https://github.com/Simula-AI-SDK/simula-ad-sdk/issues"
   },
   "homepage": "https://simula.ad/",
-  "engines": {
-    "node": ">=14.0.0"
-  },
   "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
   "dependencies": {
-    "uuid": "^11.1.0"
+    "@fingerprintjs/botd": "^1.9.1",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^10.0.0",
+    "rollup": "^4.9.1",
+    "rollup-plugin-dts": "^6.1.0",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
