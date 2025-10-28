@@ -32,7 +32,7 @@ export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSPropertie
   } as React.CSSProperties;
 };
 
-export const createAdSlotCSS = (theme: SimulaTheme = {}) => {
+export const createInChatAdSlotCSS = (theme: SimulaTheme = {}) => {
   const {
     theme: themeMode = 'light',
     accent = 'blue',

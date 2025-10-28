@@ -1,10 +1,6 @@
 import { Message, AdData, SimulaTheme } from '../types';
-import { v4 as uuidv4 } from 'uuid';
 
 // Production API URL
-// const API_BASE_URL = 'http://127.0.0.1:8000';
-// const API_BASE_URL = 'https://b789dc72b1d1.ngrok-free.app'; 
-// const API_BASE_URL = 'https://c3a3f7ce1e94.ngrok-free.app';
 const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 
 export interface FetchAdRequest {
@@ -14,7 +10,7 @@ export interface FetchAdRequest {
   slotId?: string;
   theme?: SimulaTheme;
   sessionId?: string;
-  char_desc?: string;
+  charDesc?: string;
 }
 
 export interface FetchAdResponse {
@@ -86,20 +82,8 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
       slot_id: request.slotId,
       theme: normalizedTheme,
       session_id: request.sessionId,
-      char_desc: request.char_desc,
+      char_desc: request.charDesc,
     } as const;
-
-    const logHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${request.apiKey?.substring(0, 10)}...`,
-    };
-
-    console.log('🚀 Sending to Simula API:', {
-      url: `${API_BASE_URL}/render_ad/ssp`,
-      method: 'POST',
-      headers: logHeaders,
-      body: requestBody
-    });
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -112,15 +96,11 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
       body: JSON.stringify(requestBody),
     });
 
-    console.log('📡 API Response status:', response.status, response.statusText);
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    
-    console.log('✅ API Response data:', data);
 
     // Handle new API shape
     if (data && typeof data === 'object') {

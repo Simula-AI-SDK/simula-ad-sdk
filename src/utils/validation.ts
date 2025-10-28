@@ -42,29 +42,29 @@ export const validateSimulaProviderProps = (props: any): void => {
 };
 
 /**
- * Validates AdSlot props
+ * Validates InChatAdSlot props
  * Throws descriptive errors for invalid props
  */
-export const validateAdSlotProps = (props: any): void => {
-  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'char_desc', 'onImpression', 'onClick', 'onError'];
+export const validateInChatAdSlotProps = (props: any): void => {
+  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'charDesc', 'onImpression', 'onClick', 'onError'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
   const unknownProps = receivedProps.filter(prop => !validProps.includes(prop));
   if (unknownProps.length > 0) {
     throw new Error(
-      `Invalid prop${unknownProps.length > 1 ? 's' : ''} passed to AdSlot: ${unknownProps.map(p => `"${p}"`).join(', ')}. ` +
+      `Invalid prop${unknownProps.length > 1 ? 's' : ''} passed to InChatAdSlot: ${unknownProps.map(p => `"${p}"`).join(', ')}. ` +
       `Valid props are: ${validProps.join(', ')}`
     );
   }
 
   // Validate messages (required)
   if (!props.messages || !Array.isArray(props.messages)) {
-    throw new Error('AdSlot requires a valid "messages" prop (array of Message objects)');
+    throw new Error('InChatAdSlot requires a valid "messages" prop (array of Message objects)');
   }
 
   if (props.messages.length === 0) {
-    throw new Error('AdSlot "messages" prop cannot be an empty array');
+    throw new Error('InChatAdSlot "messages" prop cannot be an empty array');
   }
 
   props.messages.forEach((msg: any, i: number) => {
@@ -99,9 +99,9 @@ export const validateAdSlotProps = (props: any): void => {
     }
   }
 
-  // Validate char_desc (optional)
-  if (props.char_desc !== undefined && typeof props.char_desc !== 'string') {
-    throw new Error(`Invalid "char_desc" prop type: "${typeof props.char_desc}". Must be a string`);
+  // Validate charDesc (optional)
+  if (props.charDesc !== undefined && typeof props.charDesc !== 'string') {
+    throw new Error(`Invalid "charDesc" prop type: "${typeof props.charDesc}". Must be a string`);
   }
 
   // Validate callbacks (optional)

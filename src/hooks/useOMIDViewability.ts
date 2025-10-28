@@ -91,7 +91,6 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
         adSession.registerSessionObserver((event: any) => {
           switch (event.type) {
             case 'sessionStart':
-              console.log('OMID session started');
               // Signal ad loaded
               adEventsRef.current?.loaded();
               break;
@@ -100,7 +99,6 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
               initializeFallbackViewability();
               break;
             case 'sessionFinish':
-              console.log('OMID session finished');
               break;
             case 'geometryChange':
               handleGeometryChange(event.data);
@@ -249,8 +247,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
       try {
         adEventsRef.current.impressionOccurred();
         setImpressionTracked(true);
-        console.log('OMID impression tracked');
-        
+
         // After OMID tracks successfully, ping our backend
         if (onImpressionTracked && adId) {
           onImpressionTracked(adId);
@@ -262,8 +259,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
     } else {
       // Fallback impression tracking
       setImpressionTracked(true);
-      console.log('Fallback impression tracked');
-      
+
       // Still ping our backend even in fallback mode
       if (onImpressionTracked && adId) {
         onImpressionTracked(adId);

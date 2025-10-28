@@ -43,13 +43,13 @@ export interface AdData {
   iframeUrl?: string;
 }
 
-export interface AdSlotProps {
+export interface InChatAdSlotProps {
   messages: Message[];
   trigger?: Promise<any>;
   formats?: string | string[];
   theme?: SimulaTheme;
   debounceMs?: number;
-  char_desc?: string;
+  charDesc?: string;
   onImpression?: (ad: AdData) => void;
   onClick?: (ad: AdData) => void;
   onError?: (error: Error) => void;

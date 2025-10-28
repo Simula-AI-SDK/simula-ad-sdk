@@ -5,9 +5,9 @@ import { useDebounce } from './hooks/useDebounce';
 import { useBotDetection } from './hooks/useBotDetection';
 import { useViewability } from './hooks/useViewability';
 import { fetchAd, trackImpression } from './utils/api';
-import { createAdSlotCSS } from './utils/styling';
-import { validateAdSlotProps } from './utils/validation';
-import { AdSlotProps, AdData } from './types';
+import { createInChatAdSlotCSS } from './utils/styling';
+import { validateInChatAdSlotProps } from './utils/validation';
+import { InChatAdSlotProps, AdData } from './types';
 
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
@@ -22,9 +22,9 @@ const hasValidMessages = (messages: any[]): boolean => {
   return messages.length > 0 && messages.some(msg => msg && msg.content && msg.content.trim().length > 0);
 };
 
-export const AdSlot: React.FC<AdSlotProps> = (props) => {
+export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
   // Validate props early
-  validateAdSlotProps(props);
+  validateInChatAdSlotProps(props);
 
   const {
     messages,
@@ -32,7 +32,7 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
     formats: formatsRaw = ['all'],
     theme = {},
     debounceMs = 0,
-    char_desc,
+    charDesc,
     onImpression,
     onClick,
     onError,
@@ -104,7 +104,6 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
         hasMeasured = true;
         const width = Math.round(entry.contentRect.width);
         setMeasuredWidth(width);
-        console.log(`📏 AdSlot measured width: ${width}px (configured: ${currentWidth})`);
 
         // Disconnect after first measurement
         resizeObserver.disconnect();
@@ -120,6 +119,13 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
 
   const fetchAdData = useCallback(async () => {
     if (!hasBeenViewed || loading || hasTriggered || error) {
+      return;
+    }
+
+    // Block if sessionId is missing or invalid
+    if (!sessionId) {
+      setError('Session invalid, fetch ad request blocked');
+      console.error('Session invalid, fetch ad request blocked');
       return;
     }
 
@@ -180,13 +186,11 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
         if (pxMatch) {
           // Convert "400px" to 400
           themeForBackend.width = parseFloat(pxMatch[1]);
-          console.log(`🎯 Converting ${currentConfiguredWidth} to ${themeForBackend.width}px for backend`);
         } else if (measuredWidth !== null) {
           // For 'auto' and percentages, use measured width
           // If measured width is below minimum, use minimum
           const finalWidth = measuredWidth < minWidth ? minWidth : measuredWidth;
           themeForBackend.width = finalWidth;
-          console.log(`🎯 Sending width to backend: ${finalWidth}px (measured: ${measuredWidth}px, configured: ${currentConfiguredWidth})`);
         }
       } else if (typeof currentConfiguredWidth === "number") {
         // Already a number, just use it
@@ -200,7 +204,7 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
         slotId,
         theme: themeForBackend,
         sessionId,
-        char_desc,
+        charDesc,
       });
 
       if (result.error) {
@@ -208,7 +212,6 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
         setError(result.error);
         onError?.(new Error(result.error));
       } else if (result.ad) {
-        console.log('✅ Ad fetched successfully:', { adId: result.ad.id, format: result.ad.format });
         setAd(result.ad);
         // Mark as triggered - this AdSlot will never fetch again
         setHasTriggered(true);
@@ -295,7 +298,7 @@ export const AdSlot: React.FC<AdSlotProps> = (props) => {
     }
 
     // Update CSS content whenever theme changes
-    const css = createAdSlotCSS(theme);
+    const css = createInChatAdSlotCSS(theme);
     styleElementRef.current.textContent = css;
 
     // Cleanup only on unmount

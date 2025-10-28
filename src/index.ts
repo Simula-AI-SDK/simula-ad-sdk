@@ -1,5 +1,5 @@
 export { SimulaProvider, useSimula } from './SimulaProvider';
-export { AdSlot } from './AdSlot';
+export { InChatAdSlot } from './InChatAdSlot';
 export { useBotDetection } from './hooks/useBotDetection';
 export { useViewability } from './hooks/useViewability';
 export { useOMIDViewability } from './hooks/useOMIDViewability';
@@ -23,7 +23,7 @@ export type {
   SimulaTheme,
   Message,
   AdData,
-  AdSlotProps,
+  InChatAdSlotProps,
   SimulaProviderProps,
   SimulaContextValue,
   BotDetectionResult,
