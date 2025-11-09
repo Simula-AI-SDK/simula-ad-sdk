@@ -5,7 +5,6 @@ const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 
 export interface FetchAdRequest {
   messages: Message[];
-  formats: string[];
   apiKey: string;
   slotId?: string;
   theme?: SimulaTheme;
@@ -70,15 +69,19 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
     const conversationHistory = request.messages;
 
     // Normalize theme accent and font to arrays for backend
-    const normalizedTheme = request.theme ? {
-      ...request.theme,
-      accent: request.theme.accent ? (Array.isArray(request.theme.accent) ? request.theme.accent : [request.theme.accent]) : undefined,
-      font: request.theme.font ? (Array.isArray(request.theme.font) ? request.theme.font : [request.theme.font]) : undefined,
-    } : undefined;
+    // Also handle backward compatibility: prefer 'mode' over 'theme', but support both
+    const normalizedTheme = request.theme ? (() => {
+      const { theme: themeDeprecated, ...themeRest } = request.theme as any;
+      return {
+        ...themeRest,
+        mode: request.theme.mode ?? themeDeprecated, // Prefer 'mode', fallback to 'theme' for backward compatibility
+        accent: request.theme.accent ? (Array.isArray(request.theme.accent) ? request.theme.accent : [request.theme.accent]) : undefined,
+        font: request.theme.font ? (Array.isArray(request.theme.font) ? request.theme.font : [request.theme.font]) : undefined,
+      };
+    })() : undefined;
 
     const requestBody = {
       messages: conversationHistory,
-      types: request.formats,
       slot_id: request.slotId,
       theme: normalizedTheme,
       session_id: request.sessionId,

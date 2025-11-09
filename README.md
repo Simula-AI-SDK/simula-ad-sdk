@@ -45,8 +45,7 @@ function ChatInterface() {
             {msg.role === "assistant" && (
               <InChatAdSlot
                 messages={messages.slice(0, i + 1)}
-                formats="all"
-                theme={{ theme: "light", accent: "blue" }}
+                theme={{ mode: "light", accent: "blue" }}
               />
             )}
           </div>
@@ -120,8 +119,7 @@ Displays an ad based on conversation context.
 | -------------- | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `messages`     | `Message[]`            | ✅        | —                                                                                                    | Array of `{ role, content }`; pass recent conversation (e.g. last 6 turns).                                                                                                     |
 | `trigger`      | `Promise<any>`         | ❌        | Fires immediately on viewability                                                                     | Promise to await before fetching the ad (e.g. LLM call).                                                                                                                        |
-| `formats`      | `string \| string[]`   | ❌        | `['all']`                                                                                            | Preferred ad formats: `'all'`, `'tips'`, `'interactive'`, `'suggestions'`, `'text'`, `'highlight'`, `'visual_banner'`, `'image_feature'`, or an array like `['text', 'highlight']`. See [Appendix: Ad Formats](#appendix-ad-formats) for visual examples.<br>**A/B Testing:** Pass an array to automatically A/B test different formats and let Simula pick the best over time. |
-| `theme`        | `SimulaTheme`          | ❌        | `{ theme: 'auto', width: 'auto', accent: ['neutral','image'], font: 'sans-serif', cornerRadius: 8 }` | Customize ad appearance (see Theme Options). Arrays trigger A/B testing.                                                                                                        |
+| `theme`        | `SimulaTheme`          | ❌        | `{ mode: 'auto', width: 'auto', accent: ['neutral','image'], font: 'sans-serif', cornerRadius: 8 }` | Customize ad appearance (see Theme Options). Arrays trigger A/B testing.                                                                                                        |
 | `charDesc`     | `string`               | ❌        | `undefined`                                                                                          | Character description for additional context to improve ad targeting.                                                                                                           |
 | `debounceMs`   | `number`               | ❌        | `0`                                                                                                  | Delay in milliseconds before fetching.                                                                                                                                          |
 | `onImpression` | `(ad: AdData) => void` | ❌        | `undefined`                                                                                          | Callback when ad is viewable (50% visible for ≥1s).                                                                                                                             |
@@ -141,7 +139,7 @@ Displays an ad based on conversation context.
 
 ```ts
 interface SimulaTheme {
-  theme?: "light" | "dark" | "auto";         // default: "auto"
+  mode?: "light" | "dark" | "auto";         // default: "auto"
   accent?: AccentOption | AccentOption[];   // default: ["neutral", "image"] (A/B tested)
   font?: FontOption | FontOption[];         // default: "sans-serif"
   width?: number | string;                  // default: "auto" (min 320px)
@@ -158,26 +156,28 @@ interface SimulaTheme {
 > **Width:** min **320px**, accepts px/%, or `auto`
 
 > **A/B Testing:**
-> When you pass an **array** (e.g., `accent: ['blue', 'green', 'purple']`), Simula will **automatically A/B test** across the provided options—colors, fonts, or formats—and **optimize over time for the best-performing variant**.
+> When you pass an **array** (e.g., `accent: ['blue', 'green', 'purple']`), Simula will **automatically A/B test** across the provided options—colors or fonts—and **optimize over time for the best-performing variant**.
+>
+> **💡 We strongly encourage adding the `"image"` option for accent** (e.g., `accent: ['blue', 'image']`)
 
 ```tsx
-// Default theme (auto)
+// Default mode (auto)
 <InChatAdSlot messages={messages} />
 
-// Light theme
-<InChatAdSlot messages={messages} theme={{ theme: "light", accent: "blue" }} />
+// Light mode
+<InChatAdSlot messages={messages} theme={{ mode: "light", accent: "blue" }} />
 
-// Dark theme with custom width
+// Dark mode with custom width
 <InChatAdSlot
   messages={messages}
-  theme={{ theme: "dark", accent: "purple", width: 600, cornerRadius: 12 }}
+  theme={{ mode: "dark", accent: "purple", width: 600, cornerRadius: 12 }}
 />
 
-// A/B testing
+// A/B testing (recommended: include "image" for best performance)
 <InChatAdSlot
   messages={messages}
   theme={{
-    accent: ["blue", "green", "purple"],     // A/B test colors
+    accent: ["blue", "green", "image"],      // A/B test colors - include "image" for best CPM
     font: ["sans-serif", "serif"],           // A/B test fonts
     width: "100%"
   }}
@@ -247,8 +247,7 @@ function ChatApp() {
                 key={`adslot-${i}`}              // ✅ Required if rendering in a list
                 trigger={msg.llmPromise}         // default: fires immediately if not provided
                 messages={messages.slice(0, i + 1)}
-                formats="all"
-                theme={{ theme: "light", accent: "blue", width: "auto" }}
+                theme={{ mode: "light", accent: "blue", width: "auto" }}
               />
             )}
           </div>
@@ -284,7 +283,7 @@ function ChatApp() {
 * **Session Management** – Automatic
 * **Robust Error Handling** – Graceful degradation & callbacks
 * **TypeScript Support** – Built-in type definitions
-* **Built-in A/B Testing** – Test multiple colors, formats, or fonts by passing arrays and let Simula optimize performance over time
+* **Built-in A/B Testing** – Test multiple colors or fonts by passing arrays and let Simula optimize performance over time
 
 ---
 
@@ -342,6 +341,8 @@ MIT
 
 ## 📑 Appendix: Ad Formats
 
+Format examples are shown below, as well as more custom formats. If you want any formats excluded, reach out to us and we can exclude it programmatically in the backend. But we strongly encourage allowing all formats so we can A/B test the one your users are most receptive towards to maximize CPM.
+
 Visual examples of all available ad formats across mobile and desktop:
 
 | Format | Mobile | Desktop |
@@ -352,55 +353,4 @@ Visual examples of all available ad formats across mobile and desktop:
 | **text** | <img src="./assets/text_mobile.png" width="200" alt="Text format on mobile" /> | <img src="./assets/text_desktop.png" width="400" alt="Text format on desktop" /> |
 | **highlight** | <img src="./assets/highlight_mobile.png" width="200" alt="Highlight format on mobile" /> | <img src="./assets/highlight_desktop.png" width="400" alt="Highlight format on desktop" /> |
 | **visual_banner** | <img src="./assets/visual_banner_mobile.png" width="200" alt="Visual banner format on mobile" /> | <img src="./assets/visual_banner_desktop.png" width="400" alt="Visual banner format on desktop" /> |
-| **image_feature** | <img src="./assets/image_feature_mobile.png" width="200" alt="Image feature format on mobile" /> | <img src="./assets/image_feature_desktop.png" width="400" alt="Image feature format on desktop" /> |
-
-> **Note:** The `'all'` format allows Simula to automatically select the best format based on context and performance.
-
----
-
-## 📑 Appendix: Invalid Format & Accent Combinations
-
-Certain ad formats have restrictions on which accent colors can be used. **These restrictions only apply when you specify an invalid combination with no other valid options.** When A/B testing with arrays, Simula automatically selects valid combinations from the available options.
-
-| Format | Allowed Accents | Restrictions |
-|--------|----------------|--------------|
-| **interactive** | All colors, `'image'`, `'neutral'`, `'gray'`, `'tan'` | ❌ Cannot use `'transparent'` |
-| **tips** | All colors, `'image'`, `'neutral'`, `'gray'`, `'tan'` | ❌ Cannot use `'transparent'` |
-| **text** | **Only** `'transparent'` | ❌ Cannot use colors or `'image'` |
-| **highlight** | All colors, `'image'`, `'neutral'`, `'gray'`, `'tan'` | ❌ Cannot use `'transparent'` |
-| **visual_banner** | All colors, `'neutral'`, `'gray'`, `'tan'` | ❌ Cannot use `'image'` or `'transparent'` |
-| **image_feature** | All colors, `'neutral'`, `'gray'`, `'tan'` | ❌ Cannot use `'image'` or `'transparent'` |
-| **suggestions** | All accents allowed | ✅ No restrictions |
-
-**Color accents:** `'blue'`, `'red'`, `'green'`, `'yellow'`, `'purple'`, `'pink'`, `'orange'`, `'neutral'`, `'gray'`, `'tan'`
-
-### Examples
-
-```tsx
-// ✅ Valid - single format, single accent
-<InChatAdSlot formats="interactive" theme={{ accent: "blue" }} />
-<InChatAdSlot formats="text" theme={{ accent: "transparent" }} />
-<InChatAdSlot formats="visual_banner" theme={{ accent: "purple" }} />
-
-// ✅ Valid - A/B testing with arrays (Simula auto-selects valid combinations)
-<InChatAdSlot
-  formats={['text', 'highlight']}
-  theme={{ accent: ['image', 'transparent'] }}
-/>
-// If 'text' is selected → uses 'transparent' (skips 'image')
-// If 'highlight' is selected → uses 'image' (skips 'transparent')
-
-<InChatAdSlot
-  formats={['interactive', 'visual_banner']}
-  theme={{ accent: ['blue', 'transparent'] }}
-/>
-// If 'interactive' is selected → uses 'blue' (skips 'transparent')
-// If 'visual_banner' is selected → uses 'blue' (skips 'transparent')
-
-// ❌ Invalid - no valid options available
-<InChatAdSlot formats="interactive" theme={{ accent: "transparent" }} />  // interactive cannot use transparent (no fallback)
-<InChatAdSlot formats="text" theme={{ accent: "blue" }} />                // text can ONLY use transparent (no fallback)
-<InChatAdSlot formats="text" theme={{ accent: ['blue', 'red', 'image'] }} />  // text needs transparent but none provided
-```
-
-> **Key Point:** Restrictions only matter when there are **no valid alternatives**. When A/B testing with multiple formats or accents, Simula intelligently matches compatible combinations.
+| 

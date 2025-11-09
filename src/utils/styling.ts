@@ -8,8 +8,9 @@ import {
 } from './colorThemes';
 
 export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSProperties => {
+  // Backward compatibility: prefer 'mode' over 'theme', but support both
+  const themeMode = theme.mode ?? (theme as any).theme ?? 'light';
   const {
-    theme: themeMode = 'light',
     accent = 'blue',
     font = 'san-serif',
     width = 'auto',
@@ -33,8 +34,9 @@ export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSPropertie
 };
 
 export const createInChatAdSlotCSS = (theme: SimulaTheme = {}) => {
+  // Backward compatibility: prefer 'mode' over 'theme', but support both
+  const themeMode = theme.mode ?? (theme as any).theme ?? 'light';
   const {
-    theme: themeMode = 'light',
     accent = 'blue',
     font = 'san-serif',
     width = 'auto',

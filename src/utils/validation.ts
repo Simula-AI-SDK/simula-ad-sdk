@@ -79,11 +79,6 @@ export const validateInChatAdSlotProps = (props: any): void => {
     }
   });
 
-  // Validate formats (optional)
-  if (props.formats !== undefined) {
-    validateFormats(props.formats);
-  }
-
   // Validate theme (optional)
   if (props.theme !== undefined) {
     validateTheme(props.theme);
@@ -122,28 +117,6 @@ export const validateInChatAdSlotProps = (props: any): void => {
 };
 
 /**
- * Validates formats - accepts string or string[]
- * Throws descriptive errors for invalid formats
- */
-export const validateFormats = (formats?: string | string[]): void => {
-  if (!formats) return;
-
-  const validFormatOptions = ['all', 'tips', 'interactive', 'suggestions', 'text', 'highlight', 'visual_banner', 'image_feature'];
-
-  // Normalize to array for validation
-  const formatsArray = Array.isArray(formats) ? formats : [formats];
-
-  formatsArray.forEach((format, i) => {
-    if (typeof format !== 'string') {
-      throw new Error(`Invalid format type at index ${i}: "${typeof format}". Must be a string. Valid values: ${validFormatOptions.join(', ')}`);
-    }
-    if (!validFormatOptions.includes(format)) {
-      throw new Error(`Invalid format value${Array.isArray(formats) ? ` at index ${i}` : ''}: "${format}". Valid values: ${validFormatOptions.join(', ')}`);
-    }
-  });
-};
-
-/**
  * Validates theme object
  * Throws descriptive errors for invalid theme properties
  */
@@ -152,10 +125,10 @@ export const validateTheme = (theme?: SimulaTheme): void => {
     throw new Error('Invalid "theme": must be an object');
   }
 
-  const validThemeOptions = ['light', 'dark', 'auto'];
+  const validModeOptions = ['light', 'dark', 'auto'];
   const validAccentOptions = ['blue', 'red', 'green', 'yellow', 'purple', 'pink', 'orange', 'neutral', 'gray', 'tan', 'transparent', 'image'];
   const validFontOptions = ['san-serif', 'serif', 'monospace'];
-  const validKeys = ['theme', 'accent', 'font', 'width', 'cornerRadius'];
+  const validKeys = ['mode', 'theme', 'accent', 'font', 'width', 'cornerRadius']; // 'theme' kept for backward compatibility
 
   // Check for invalid top-level keys
   Object.keys(theme).forEach(key => {
@@ -164,13 +137,14 @@ export const validateTheme = (theme?: SimulaTheme): void => {
     }
   });
 
-  // Validate theme value
-  if (theme.theme !== undefined) {
-    if (typeof theme.theme !== 'string') {
-      throw new Error(`Invalid theme type "${typeof theme.theme}". Must be a string. Valid values: ${validThemeOptions.join(', ')}`);
+  // Validate mode value (prefer 'mode' over 'theme' for backward compatibility)
+  const modeValue = theme.mode ?? (theme as any).theme;
+  if (modeValue !== undefined) {
+    if (typeof modeValue !== 'string') {
+      throw new Error(`Invalid mode/theme type "${typeof modeValue}". Must be a string. Valid values: ${validModeOptions.join(', ')}`);
     }
-    if (!validThemeOptions.includes(theme.theme)) {
-      throw new Error(`Invalid theme value "${theme.theme}". Valid values: ${validThemeOptions.join(', ')}`);
+    if (!validModeOptions.includes(modeValue)) {
+      throw new Error(`Invalid mode/theme value "${modeValue}". Valid values: ${validModeOptions.join(', ')}`);
     }
   }
 
