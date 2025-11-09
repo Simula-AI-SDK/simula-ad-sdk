@@ -2,7 +2,8 @@ export type AccentOption = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pin
 export type FontOption = 'san-serif' | 'serif' | 'monospace';
 
 export interface SimulaTheme {
-  theme?: 'light' | 'dark' | 'auto';
+  mode?: 'light' | 'dark' | 'auto';
+  theme?: 'light' | 'dark' | 'auto'; // Deprecated: use 'mode' instead. Kept for backward compatibility.
   accent?: AccentOption | AccentOption[];
   font?: FontOption | FontOption[];
   width?: number | string;
@@ -46,7 +47,7 @@ export interface AdData {
 export interface InChatAdSlotProps {
   messages: Message[];
   trigger?: Promise<any>;
-  formats?: string | string[];
+  formats?: string | string[]; // Deprecated: ignored. Kept for backward compatibility.
   theme?: SimulaTheme;
   debounceMs?: number;
   charDesc?: string;

@@ -29,7 +29,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
   const {
     messages,
     trigger,
-    formats: formatsRaw = ['all'],
+    formats, // Deprecated: ignored for backward compatibility
     theme = {},
     debounceMs = 0,
     charDesc,
@@ -37,9 +37,6 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     onClick,
     onError,
   } = props;
-
-  // Normalize formats to array (similar to theme.accent and theme.font)
-  const formats = Array.isArray(formatsRaw) ? formatsRaw : [formatsRaw];
 
   const { apiKey, sessionId } = useSimula();
 
@@ -199,7 +196,6 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
 
       const result = await fetchAd({
         messages,
-        formats,
         apiKey,
         slotId,
         theme: themeForBackend,
@@ -227,7 +223,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     } finally {
       setLoading(false);
     }
-  }, [hasBeenViewed, loading, hasTriggered, error, messages, formats, apiKey, slotId, theme, onError, isBot, reasons, sessionId, measuredWidth]);
+  }, [hasBeenViewed, loading, hasTriggered, error, messages, apiKey, slotId, theme, onError, isBot, reasons, sessionId, measuredWidth]);
 
   useDebounce(
     () => {
