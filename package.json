@@ -1,6 +1,6 @@
 {
   "name": "@simula/ads",
-  "version": "1.2.0",
+  "version": "1.2.17",
   "description": "React SDK for integrating contextual AI ads with Simula",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

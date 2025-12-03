@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { useSimula } from './SimulaProvider';
-import { useDebounce } from './hooks/useDebounce';
-import { useBotDetection } from './hooks/useBotDetection';
-import { useViewability } from './hooks/useViewability';
-import { fetchAd, trackImpression } from './utils/api';
-import { createInChatAdSlotCSS } from './utils/styling';
-import { validateInChatAdSlotProps } from './utils/validation';
-import { InChatAdSlotProps, AdData } from './types';
+import { useSimula } from '../../SimulaProvider';
+import { useDebounce } from '../../hooks/useDebounce';
+import { useBotDetection } from '../../hooks/useBotDetection';
+import { useViewability } from '../../hooks/useViewability';
+import { fetchAd, trackImpression } from '../../utils/api';
+import { createInChatAdSlotCSS } from '../../utils/styling';
+import { validateInChatAdSlotProps } from '../../utils/validation';
+import { InChatAdSlotProps, AdData } from '../../types';
 
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches

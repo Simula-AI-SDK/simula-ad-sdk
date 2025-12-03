@@ -1,13 +1,15 @@
-import { Message, AdData, SimulaTheme } from '../types';
+import { Message, AdData, InChatTheme } from '../types';
 
 // Production API URL
-const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// const API_BASE_URL = 'https://573db073823d.ngrok-free.app';
+const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
 
 export interface FetchAdRequest {
   messages: Message[];
   apiKey: string;
   slotId?: string;
-  theme?: SimulaTheme;
+  theme?: InChatTheme;
   sessionId?: string;
   charDesc?: string;
 }

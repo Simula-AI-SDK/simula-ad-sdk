@@ -1,4 +1,4 @@
-import { SimulaTheme } from '../types';
+import { InChatTheme } from '../types';
 
 // Helper functions for width validation
 const isAutoWidth = (width: any): boolean => width === 'auto';
@@ -120,7 +120,7 @@ export const validateInChatAdSlotProps = (props: any): void => {
  * Validates theme object
  * Throws descriptive errors for invalid theme properties
  */
-export const validateTheme = (theme?: SimulaTheme): void => {
+export const validateTheme = (theme?: InChatTheme): void => {
   if (!theme || typeof theme !== 'object') {
     throw new Error('Invalid "theme": must be an object');
   }

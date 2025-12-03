@@ -1,5 +1,7 @@
 export { SimulaProvider, useSimula } from './SimulaProvider';
-export { InChatAdSlot } from './InChatAdSlot';
+export { InChatAdSlot } from './components/inChatAd/InChatAdSlot';
+export { MiniGameMenu } from './components/miniGame/MiniGameMenu';
+export { SponsoredSuggestions } from './components/sponsoredSuggestions/SponsoredSuggestions';
 export { useBotDetection } from './hooks/useBotDetection';
 export { useViewability } from './hooks/useViewability';
 export { useOMIDViewability } from './hooks/useOMIDViewability';
@@ -20,7 +22,7 @@ export {
 // Test utilities (removed)
 
 export type {
-  SimulaTheme,
+  InChatTheme,
   Message,
   AdData,
   InChatAdSlotProps,
@@ -32,5 +34,11 @@ export type {
   OMIDViewabilityOptions,
   OMIDViewabilityResult,
   ColorPalette,
-  FontPalette
+  FontPalette,
+  MiniGameTheme,
+  MiniGameMenuProps,
+  GameData,
+  SponsoredSuggestionsTheme,
+  SponsoredSuggestionData,
+  SponsoredSuggestionsProps
 } from './types';
