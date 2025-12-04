@@ -31,12 +31,13 @@ export default [
       typescript({
         tsconfig: './tsconfig.json',
         exclude: ['**/*.test.*', '**/*.stories.*'],
+        declarationDir: 'dist/types',
       }),
     ],
     external: ['react', 'react-dom', 'react/jsx-runtime'],
   },
   {
-    input: 'dist/index.d.ts',
+    input: 'dist/types/index.d.ts',
     output: [{ file: 'dist/index.d.ts', format: 'esm' }],
     plugins: [dts()],
     external: [/\.css$/],

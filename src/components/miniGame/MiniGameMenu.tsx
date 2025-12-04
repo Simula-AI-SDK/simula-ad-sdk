@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MiniGameMenuProps, MiniGameTheme } from '../../types';
+import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
 import { mockGames } from './mockGames';
+import { fetchCatalog } from '../../utils/api';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -24,10 +25,26 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   maxGamesToShow = 6,
   theme = {},
 }) => {
+  const [catalog, setCatalog] = useState<GameData[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  // Fetch catalog from API
+  useEffect(() => {
+    const loadCatalog = async () => {
+      try {
+        const data = await fetchCatalog();
+        setCatalog(data);
+      } catch (error) {
+        console.error('Error loading catalog:', error);
+        // Fallback to mock games if API fails
+        setCatalog(mockGames);
+      }
+    };
+    loadCatalog();
+  }, []);
 
   // Merge theme with defaults
   const appliedTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
@@ -342,7 +359,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
               }}
             >
               <GameGrid
-                games={mockGames}
+                games={catalog}
                 maxGamesToShow={maxGamesToShow}
                 charID={charID}
                 theme={appliedTheme}

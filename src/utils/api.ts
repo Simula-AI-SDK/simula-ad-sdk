@@ -1,9 +1,8 @@
-import { Message, AdData, InChatTheme } from '../types';
+import { Message, AdData, InChatTheme, GameData } from '../types';
 
 // Production API URL
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-// const API_BASE_URL = 'https://573db073823d.ngrok-free.app';
-const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
+const API_BASE_URL = "https://01f1b36edba4.ngrok-free.app"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -164,6 +163,74 @@ export const trackImpression = async (adId: string, apiKey: string): Promise<voi
     console.error('Failed to track impression:', error);
   }
 };
+
+export const fetchCatalog = async (): Promise<GameData[]> => {
+    try {
+        const response: Response = await fetch(`${API_BASE_URL}/minigames/catalog`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data: GameData[] = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Failed to fetch catalog:', error);
+        throw error;
+    }
+}
+
+export interface InitMinigameRequest {
+    game_type: string;
+    session_id: string;
+    conv_id?: string | null;
+    currency_mode?: boolean;
+    w: number;
+    h: number;
+}
+
+export interface MinigameResponse {
+    adType: 'minigame';
+    adInserted: boolean;
+    adResponse: {
+        ad_id: string;
+        iframe_url: string;
+    };
+}
+
+export const getMinigame = async (params: InitMinigameRequest): Promise<MinigameResponse> => {
+    try {
+        const response: Response = await fetch(`${API_BASE_URL}/minigames/init`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                game_type: params.game_type,
+                session_id: params.session_id,
+                conv_id: params.conv_id ?? null,
+                currency_mode: params.currency_mode ?? false,
+                w: params.w,
+                h: params.h,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data: MinigameResponse = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Failed to initialize minigame:', error);
+        throw error;
+    }
+}
 
 /* Not used for now, used when we are also mediation layer
 export const trackClick = async (adId: string, apiKey: string): Promise<void> => {

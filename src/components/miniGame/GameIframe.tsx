@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { getMinigame } from '../../utils/api';
 
 interface GameIframeProps {
   gameId: string;
@@ -10,6 +11,33 @@ interface GameIframeProps {
 export const GameIframe: React.FC<GameIframeProps> = ({ gameId, charID, onClose }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const sessionToken = useRef<string>(uuidv4());
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch the minigame iframe URL
+  useEffect(() => {
+    const initMinigame = async () => {
+      try {
+        setLoading(true);
+        const response = await getMinigame({
+          game_type: gameId,
+          session_id: sessionToken.current,
+          currency_mode: false,
+          w: window.innerWidth,
+          h: window.innerHeight,
+        });
+        setIframeUrl(response.adResponse.iframe_url);
+      } catch (err) {
+        console.error('Error initializing minigame:', err);
+        setError('Failed to load game. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initMinigame();
+  }, [gameId, charID]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -35,8 +63,6 @@ export const GameIframe: React.FC<GameIframeProps> = ({ gameId, charID, onClose 
       onClose();
     }
   };
-
-  const iframeUrl = `https://games.simula.ad/play/${gameId}?session=${sessionToken.current}&charID=${charID}`;
 
   return (
     <div
@@ -110,18 +136,43 @@ export const GameIframe: React.FC<GameIframeProps> = ({ gameId, charID, onClose 
         >
           ×
         </button>
-        <iframe
-          src={iframeUrl}
-          style={{
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            display: 'block',
-          }}
-          title={`Game: ${gameId}`}
-          allow="fullscreen"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
-        />
+
+        {loading && (
+          <div style={{
+            color: '#FFFFFF',
+            fontSize: '18px',
+            fontWeight: '500',
+          }}>
+            Loading game...
+          </div>
+        )}
+
+        {error && (
+          <div style={{
+            color: '#FFFFFF',
+            fontSize: '18px',
+            fontWeight: '500',
+            textAlign: 'center',
+            padding: '20px',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && iframeUrl && (
+          <iframe
+            src={iframeUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              display: 'block',
+            }}
+            title={`Game: ${gameId}`}
+            allow="fullscreen"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
+          />
+        )}
       </div>
     </div>
   );
