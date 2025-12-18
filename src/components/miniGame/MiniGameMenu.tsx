@@ -3,6 +3,7 @@ import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
 import { fetchCatalog } from '../../utils/api';
+import gamesUnavailableImage from '../../assets/games-unavailable.png';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -418,9 +419,35 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                     fontFamily: appliedTheme.secondaryFont,
                     fontSize: '14px',
                     padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '16px',
                   }}
                 >
-                  No games are available to play right now. Please check back later!
+                  <div
+                    style={{
+                      width: '150px',
+                      height: '150px',
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: appliedTheme.backgroundColor || '#F3F4F6',
+                    }}
+                  >
+                    <img
+                      src={gamesUnavailableImage}
+                      alt="Games unavailable"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  </div>
+                  <span>No games are available to play right now. Please check back later!</span>
                 </div>
               ) : (
                 <GameGrid

@@ -1,6 +1,7 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
+import image from '@rollup/plugin-image';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import dts from 'rollup-plugin-dts';
 import { readFileSync } from 'fs';
@@ -28,6 +29,7 @@ export default [
         browser: true,
       }),
       commonjs(),
+      image(),
       typescript({
         tsconfig: './tsconfig.json',
         exclude: ['**/*.test.*', '**/*.stories.*'],
