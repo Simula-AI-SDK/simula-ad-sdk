@@ -2,7 +2,7 @@ import { Message, AdData, InChatTheme, GameData } from '../types';
 
 // Production API URL
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
+const API_BASE_URL = "https://world-itunes-journey-agencies.trycloudflare.com"
 
 export interface FetchAdRequest {
   messages: Message[];

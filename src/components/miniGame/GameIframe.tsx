@@ -10,7 +10,7 @@ interface GameIframeProps {
   charImage: string;
   charDesc?: string;
   messages?: Message[];
-  delegateCharacter?: boolean;
+  delegateChar?: boolean;
   onClose: () => void;
 }
 
@@ -21,7 +21,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   charImage, 
   charDesc, 
   messages = [],
-  delegateCharacter = true,
+  delegateChar = true,
   onClose 
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -46,7 +46,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           char_image: charImage,
           char_desc: charDesc,
           messages: messages,
-          delegate_char: delegateCharacter,
+          delegate_char: delegateChar,
         });
         setIframeUrl(response.adResponse.iframe_url);
       } catch (err) {
@@ -58,7 +58,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     };
 
     initMinigame();
-  }, [gameId, charID, charName, charImage, charDesc, messages, delegateCharacter]);
+  }, [gameId, charID, charName, charImage, charDesc, messages, delegateChar]);
 
   // Handle ESC key to close
   useEffect(() => {

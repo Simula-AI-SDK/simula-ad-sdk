@@ -25,6 +25,7 @@ function ChatApp() {
         charName="Luna"
         charID="luna-123"
         charImage="https://example.com/avatars/luna.png"
+        delegateChar={true}
       />
     </>
   );
@@ -43,9 +44,10 @@ function ChatApp() {
 | `charID` | `string` | ✅ | — | Character identifier (included in game iframe URL) |
 | `charImage` | `string` | ✅ | — | Character avatar/image URL |
 | `messages` | `Message[]` | ❌ | `[]` | Recent conversation history |
-| `charDesc` | `string` | ❌ | `undefined` | Character description shown below name |
+| `charDesc` | `string` | ❌ | `undefined` | Character description |
 | `maxGamesToShow` | `3 \| 6 \| 9` | ❌ | `6` | Number of games displayed per page |
 | `theme` | `MiniGameTheme` | ❌ | See below | Visual styling configuration |
+| `delegateChar` | `boolean` | ❌ | `true` | Whether Simula should display the AI character within the game iframe |
 
 ### `Message` Interface
 
@@ -169,6 +171,7 @@ function ChatInterface() {
         messages={messages}
         charDesc="A playful AI companion who loves games"
         maxGamesToShow={9}
+        delegateChar={true}
         theme={{
           backgroundColor: '#7C3AED',
           titleFont: 'Inter, system-ui, sans-serif',
@@ -176,7 +179,6 @@ function ChatInterface() {
           titleFontColor: '#1F2937',
           secondaryFontColor: '#6B7280',
           iconCornerRadius: 50,
-          backgroundOpacity: 0.6,
         }}
       />
     </>
@@ -224,6 +226,7 @@ function ChatApp() {
         charImage="/avatars/luna.png"
         messages={messages}
         charDesc="Your AI gaming companion"
+        delegateChar={true}
       />
     </div>
   );
@@ -238,10 +241,12 @@ When a user clicks on a game card:
 
 1. The modal closes automatically
 2. A full-screen iframe opens with the selected game
-3. The game URL includes:
-   - Game ID: `https://games.simula.ad/play/{gameId}`
-   - Session token: Generated using `crypto.randomUUID()`
-   - Character ID: `?charID={charID}`
+3. The game is initialized with:
+   - Game type/ID
+   - Session token (generated using `uuid`)
+   - Character information (ID, name, image, description)
+   - Recent conversation messages (if provided)
+   - Character delegation setting (`delegateChar`)
 
 ### Console Logging
 
@@ -288,7 +293,11 @@ console.log('Menu closed');
   - Automatic fallback to initials if image fails to load
 - **Header Text**: 
   - "Play a Game with {charName}"
-  - Optional character description below name
+  - Optional character description
+- **Character Delegation**: 
+  - Set `delegateChar={true}` to have Simula display the AI character within the game iframe
+  - Set `delegateChar={false}` if you want to handle character display yourself
+  - When enabled, character info (name, image, description, messages) is passed to the game iframe
 
 ### Full-Screen Game Iframe
 
@@ -371,31 +380,32 @@ function MultiCharacterApp() {
 }
 ```
 
-### Custom Game Selection Handler
+### Disabling Character Delegation
+
+If you want to handle character display yourself within the game, you can disable character delegation:
 
 ```tsx
-function CustomGameHandler() {
+function NoCharacterDelegation() {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleGameSelect = (gameId: string) => {
-    // Custom logic before opening game
-    console.log(`User selected: ${gameId}`);
-    // Game iframe will open automatically
-  };
-
-  // Note: The component handles game selection internally
-  // This is just for reference - you can listen to console logs
   return (
-    <MiniGameMenu
-      isOpen={menuOpen}
-      onClose={() => setMenuOpen(false)}
-      charName="Luna"
-      charID="luna-123"
-      charImage="/avatars/luna.png"
-    />
+    <>
+      <button onClick={() => setMenuOpen(true)}>🎮 Games</button>
+
+      <MiniGameMenu
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        charName="Luna"
+        charID="luna-123"
+        charImage="/avatars/luna.png"
+        delegateChar={false}
+      />
+    </>
   );
 }
 ```
+
+**Note**: When `delegateChar={false}`, the character information is still sent to the game iframe, but Simula will not display the character within the game UI. This allows you to create custom character interactions.
 
 ---
 
@@ -445,6 +455,14 @@ const props: MiniGameMenuProps = {
   charName: "Luna",
   charID: "luna-123",
   charImage: "/avatars/luna.png",
+  messages: [],
+  charDesc: "A playful AI companion",
+  maxGamesToShow: 6,
+  delegateChar: true,
+  theme: {
+    backgroundColor: '#FFFFFF',
+    titleFontColor: '#1F2937',
+  }
 };
 ```
 

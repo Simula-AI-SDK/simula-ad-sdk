@@ -24,7 +24,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   charDesc,
   maxGamesToShow = 6,
   theme = {},
-  delegateCharacter = true,
+  delegateChar = true,
 }) => {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -183,7 +183,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
           charImage={charImage}
           charDesc={charDesc}
           messages={messages}
-          delegateCharacter={delegateCharacter}
+          delegateChar={delegateChar}
           onClose={handleIframeClose} 
         />
       )}
