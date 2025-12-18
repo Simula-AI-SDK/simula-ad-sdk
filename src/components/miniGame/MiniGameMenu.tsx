@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
-import { mockGames } from './mockGames';
 import { fetchCatalog } from '../../utils/api';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
@@ -24,27 +23,15 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   charDesc,
   maxGamesToShow = 6,
   theme = {},
+  delegateCharacter = true,
 }) => {
-  const [catalog, setCatalog] = useState<GameData[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [games, setGames] = useState<GameData[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
-
-  // Fetch catalog from API
-  useEffect(() => {
-    const loadCatalog = async () => {
-      try {
-        const data = await fetchCatalog();
-        setCatalog(data);
-      } catch (error) {
-        console.error('Error loading catalog:', error);
-        // Fallback to mock games if API fails
-        setCatalog(mockGames);
-      }
-    };
-    loadCatalog();
-  }, []);
 
   // Merge theme with defaults
   const appliedTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
@@ -61,6 +48,28 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Fetch catalog when menu opens
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadCatalog = async () => {
+      setCatalogLoading(true);
+      setCatalogError(false);
+      try {
+        const catalogData = await fetchCatalog();
+        setGames(catalogData);
+      } catch (error) {
+        console.error('Failed to load game catalog:', error);
+        setCatalogError(true);
+        setGames([]);
+      } finally {
+        setCatalogLoading(false);
+      }
+    };
+
+    loadCatalog();
+  }, [isOpen]);
 
   // Handle ESC key
   useEffect(() => {
@@ -166,7 +175,16 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     <>
       {/* Game Iframe */}
       {selectedGameId && (
-        <GameIframe gameId={selectedGameId} charID={charID} onClose={handleIframeClose} />
+        <GameIframe 
+          gameId={selectedGameId} 
+          charID={charID}
+          charName={charName}
+          charImage={charImage}
+          charDesc={charDesc}
+          messages={messages}
+          delegateCharacter={delegateCharacter}
+          onClose={handleIframeClose} 
+        />
       )}
 
       {/* Modal */}
@@ -356,15 +374,63 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 overflowX: 'visible',
                 flex: 1,
                 position: 'relative',
+                display: 'flex',
+                alignItems: catalogError || catalogLoading ? 'center' : 'flex-start',
+                justifyContent: catalogError || catalogLoading ? 'center' : 'flex-start',
               }}
             >
-              <GameGrid
-                games={catalog}
-                maxGamesToShow={maxGamesToShow}
-                charID={charID}
-                theme={appliedTheme}
-                onGameSelect={handleGameSelect}
-              />
+              {catalogLoading ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: appliedTheme.secondaryFontColor,
+                    fontFamily: appliedTheme.secondaryFont,
+                    fontSize: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      border: '3px solid rgba(0, 0, 0, 0.1)',
+                      borderTop: `3px solid ${appliedTheme.titleFontColor}`,
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                    }}
+                  />
+                  <style>{`
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}</style>
+                  <span>Loading games...</span>
+                </div>
+              ) : catalogError ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: appliedTheme.secondaryFontColor,
+                    fontFamily: appliedTheme.secondaryFont,
+                    fontSize: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  No games are available to play right now. Please check back later!
+                </div>
+              ) : (
+                <GameGrid
+                  games={games}
+                  maxGamesToShow={maxGamesToShow}
+                  charID={charID}
+                  theme={appliedTheme}
+                  onGameSelect={handleGameSelect}
+                />
+              )}
             </div>
           </div>
         </div>

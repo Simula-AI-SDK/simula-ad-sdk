@@ -10,8 +10,16 @@ interface GameCardProps {
 
 export const GameCard: React.FC<GameCardProps> = ({ game, charID, theme, onGameSelect }) => {
   const [showDescription, setShowDescription] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   const cardRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Random fallback icon selection (5 game-related emojis)
+  const fallbackIcons = ['🎲', '🎮', '🎰', '🧩', '🎯'];
+  const [randomFallback] = useState(() => 
+    fallbackIcons[Math.floor(Math.random() * fallbackIcons.length)]
+  );
 
   const handleClick = () => {
     console.log('Game launched:', { gameId: game.id, charID });
@@ -161,17 +169,62 @@ export const GameCard: React.FC<GameCardProps> = ({ game, charID, theme, onGameS
           overflow: 'hidden',
         }}
       >
-        <span style={{ 
-          fontSize: '100%',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          lineHeight: '1',
-        }}>
-          {game.icon}
-        </span>
+        {imageError ? (
+          <span style={{ 
+            fontSize: '100%',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: '1',
+          }}>
+            {game.iconFallback || randomFallback}
+          </span>
+        ) : (
+          <>
+            {imageLoading && (
+              <div
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.backgroundColor || 'transparent',
+                }}
+              >
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    border: '2px solid rgba(0, 0, 0, 0.1)',
+                    borderTop: `2px solid ${theme.titleFontColor || '#1F2937'}`,
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                  }}
+                />
+              </div>
+            )}
+            <img 
+              src={game.iconUrl}
+              alt={game.name}
+              onLoad={() => setImageLoading(false)}
+              onError={() => {
+                setImageError(true);
+                setImageLoading(false);
+              }}
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                borderRadius: iconBorderRadius,
+                display: imageLoading ? 'none' : 'block',
+              }}
+            />
+          </>
+        )}
       </div>
 
       {/* Game Name */}
@@ -187,8 +240,8 @@ export const GameCard: React.FC<GameCardProps> = ({ game, charID, theme, onGameS
         {game.name}
       </div>
 
-      {/* Hover Description Overlay */}
-      {showDescription && (
+      {/* Hover Description Overlay - Commented out for now */}
+      {/* {showDescription && (
         <div
           ref={tooltipRef}
           style={{
@@ -228,7 +281,7 @@ export const GameCard: React.FC<GameCardProps> = ({ game, charID, theme, onGameS
             }}
           />
         </div>
-      )}
+      )} */}
     </div>
   );
 };

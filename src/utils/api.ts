@@ -2,7 +2,7 @@ import { Message, AdData, InChatTheme, GameData } from '../types';
 
 // Production API URL
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-const API_BASE_URL = "https://01f1b36edba4.ngrok-free.app"
+const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -177,8 +177,18 @@ export const fetchCatalog = async (): Promise<GameData[]> => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data: GameData[] = await response.json();
-        return data;
+        const responseData: { data: any[] } = await response.json();
+        
+        // Map API response to GameData format (icon -> iconUrl)
+        const games: GameData[] = responseData.data.map((game: any) => ({
+            id: game.id,
+            name: game.name,
+            iconUrl: game.icon, // API returns 'icon', we use 'iconUrl'
+            description: game.description,
+            iconFallback: game.iconFallback,
+        }));
+        
+        return games;
     } catch (error) {
         console.error('Failed to fetch catalog:', error);
         throw error;
@@ -192,6 +202,12 @@ export interface InitMinigameRequest {
     currency_mode?: boolean;
     w: number;
     h: number;
+    char_id?: string;
+    char_name?: string;
+    char_image?: string;
+    char_desc?: string;
+    messages?: Message[];
+    delegate_char?: boolean;
 }
 
 export interface MinigameResponse {
@@ -217,6 +233,12 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
                 currency_mode: params.currency_mode ?? false,
                 w: params.w,
                 h: params.h,
+                char_id: params.char_id,
+                char_name: params.char_name,
+                char_image: params.char_image,
+                char_desc: params.char_desc,
+                messages: params.messages,
+                delegate_char: params.delegate_char ?? true,
             }),
         });
 

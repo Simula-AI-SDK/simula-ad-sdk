@@ -116,8 +116,9 @@ export interface MiniGameTheme {
 export interface GameData {
   id: string;
   name: string;
-  icon: string;
+  iconUrl: string;
   description: string;
+  iconFallback?: string; // Optional fallback emoji (defaults to 🎮)
 }
 
 export interface MiniGameMenuProps {
@@ -130,6 +131,7 @@ export interface MiniGameMenuProps {
   charDesc?: string;
   maxGamesToShow?: 3 | 6 | 9;
   theme?: MiniGameTheme;
+  delegateCharacter?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
 }
 
 // SponsoredSuggestions types
