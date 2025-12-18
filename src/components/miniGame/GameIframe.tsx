@@ -6,9 +6,23 @@ interface GameIframeProps {
   gameId: string;
   charID: string;
   onClose: () => void;
+  onAdIdReceived?: (adId: string) => void;
+  turnsBtwnMsgs?: number;
+  usePubCharApi?: string;
+  charDesc?: string;
+  exampleCharMsgs?: string;
 }
 
-export const GameIframe: React.FC<GameIframeProps> = ({ gameId, charID, onClose }) => {
+export const GameIframe: React.FC<GameIframeProps> = ({ 
+  gameId, 
+  charID, 
+  onClose, 
+  onAdIdReceived,
+  turnsBtwnMsgs, 
+  usePubCharApi, 
+  charDesc, 
+  exampleCharMsgs 
+}) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const sessionToken = useRef<string>(uuidv4());
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
@@ -21,13 +35,21 @@ export const GameIframe: React.FC<GameIframeProps> = ({ gameId, charID, onClose 
       try {
         setLoading(true);
         const response = await getMinigame({
-          game_type: gameId,
-          session_id: sessionToken.current,
-          currency_mode: false,
+          gameType: gameId,
+          sessionId: sessionToken.current,
+          currencyMode: false,
           w: window.innerWidth,
           h: window.innerHeight,
+          turnsBtwnMsgs,
+          usePubCharApi,
+          charDesc,
+          exampleCharMsgs,
         });
         setIframeUrl(response.adResponse.iframe_url);
+        // Callback with the ad_id for tracking
+        if (onAdIdReceived && response.adResponse.ad_id) {
+          onAdIdReceived(response.adResponse.ad_id);
+        }
       } catch (err) {
         console.error('Error initializing minigame:', err);
         setError('Failed to load game. Please try again.');

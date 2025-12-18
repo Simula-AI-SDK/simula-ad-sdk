@@ -2,7 +2,7 @@ import { Message, AdData, InChatTheme, GameData } from '../types';
 
 // Production API URL
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-const API_BASE_URL = "https://01f1b36edba4.ngrok-free.app"
+const API_BASE_URL = "https://b0658a594eee.ngrok-free.app"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -177,8 +177,9 @@ export const fetchCatalog = async (): Promise<GameData[]> => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data: GameData[] = await response.json();
-        return data;
+        const res = await response.json();
+        const data: GameData[] = res.data;
+        return data
     } catch (error) {
         console.error('Failed to fetch catalog:', error);
         throw error;
@@ -186,12 +187,16 @@ export const fetchCatalog = async (): Promise<GameData[]> => {
 }
 
 export interface InitMinigameRequest {
-    game_type: string;
-    session_id: string;
-    conv_id?: string | null;
-    currency_mode?: boolean;
+    gameType: string;
+    sessionId: string;
+    convId?: string | null;
+    currencyMode?: boolean;
     w: number;
     h: number;
+    turnsBtwnMsgs?: number;
+    usePubCharApi?: string;
+    charDesc?: string;
+    exampleCharMsgs?: string;
 }
 
 export interface MinigameResponse {
@@ -211,12 +216,16 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                game_type: params.game_type,
-                session_id: params.session_id,
-                conv_id: params.conv_id ?? null,
-                currency_mode: params.currency_mode ?? false,
+                game_type: params.gameType,
+                session_id: params.sessionId,
+                conv_id: params.convId ?? null,
+                currency_mode: params.currencyMode ?? false,
                 w: params.w,
                 h: params.h,
+                character_mode: true,
+                use_pub_char_api: params.usePubCharApi,
+                char_desc: params.charDesc,
+                example_char_msgs: params.exampleCharMsgs,
             }),
         });
 
@@ -231,6 +240,32 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
         throw error;
     }
 }
+
+export const fetchAdForMinigame = async (aid: string): Promise<string | null> => {
+    try {
+        const response: Response = await fetch(`${API_BASE_URL}/minigames/fallback_ad/${aid}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data: MinigameResponse = await response.json();
+        
+        if (data.adResponse && data.adResponse.iframe_url) {
+            return data.adResponse.iframe_url;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Failed to fetch ad for minigame:', error);
+        return null;
+    }
+};
 
 /* Not used for now, used when we are also mediation layer
 export const trackClick = async (adId: string, apiKey: string): Promise<void> => {
