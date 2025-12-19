@@ -9,7 +9,7 @@ interface GameIframeProps {
   charName: string;
   charImage: string;
   messages?: Message[];
-  delegateCharacter?: boolean;
+  delegateChar?: boolean;
   onClose: () => void;
   onAdIdReceived?: (adId: string) => void;
   turnsBtwnMsgs?: number;
@@ -26,7 +26,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   charName, 
   charImage, 
   messages = [],
-  delegateCharacter = true,
+  delegateChar = true,
   onClose, 
   onAdIdReceived,
   charDesc, 
@@ -54,7 +54,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           char_image: charImage,
           char_desc: charDesc,
           messages: messages,
-          delegate_char: delegateCharacter,
+          delegate_char: delegateChar,
         });
         setIframeUrl(response.adResponse.iframe_url);
         // Callback with the ad_id for tracking
@@ -70,7 +70,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     };
 
     initMinigame();
-  }, [gameId, charID, charName, charImage, charDesc, messages, delegateCharacter]);
+  }, [gameId, charID, charName, charImage, charDesc, messages, delegateChar]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -147,8 +147,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             background: 'rgba(255, 255, 255, 0.9)',
             border: 'none',
             borderRadius: '50%',
-            width: '40px',
-            height: '40px',
+            width: '44px',
+            height: '44px',
+            minWidth: '44px',
+            minHeight: '44px',
             fontSize: '24px',
             cursor: 'pointer',
             display: 'flex',

@@ -24,7 +24,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   charDesc,
   maxGamesToShow = 6,
   theme = {},
-  delegateCharacter = true,
+  delegateChar = true,
 }) => {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -225,7 +225,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             charImage={charImage}
             charDesc={charDesc}
             messages={messages}
-            delegateCharacter={delegateCharacter}
+            delegateChar={delegateChar}
             onClose={handleIframeClose}
             onAdIdReceived={handleAdIdReceived}
         />
@@ -272,8 +272,10 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 background: 'rgba(255, 255, 255, 0.9)',
                 border: 'none',
                 borderRadius: '50%',
-                width: '40px',
-                height: '40px',
+                width: '44px',
+                height: '44px',
+                minWidth: '44px',
+                minHeight: '44px',
                 fontSize: '24px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -465,15 +467,17 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   fontSize: '24px',
                   cursor: 'pointer',
                   color: appliedTheme.secondaryFontColor,
-                  padding: '4px',
+                  padding: '8px',
                   lineHeight: '1',
                   borderRadius: '4px',
                   transition: 'background-color 0.2s ease, color 0.2s ease',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '32px',
-                  height: '32px',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  width: '44px',
+                  height: '44px',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#F3F4F6';

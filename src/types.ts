@@ -131,7 +131,7 @@ export interface MiniGameMenuProps {
   charDesc?: string;
   maxGamesToShow?: 3 | 6 | 9;
   theme?: MiniGameTheme;
-  delegateCharacter?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
+  delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
 }
 
 // SponsoredSuggestions types
