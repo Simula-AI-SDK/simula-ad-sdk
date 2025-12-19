@@ -3,7 +3,7 @@ import { Message, AdData, InChatTheme, GameData } from '../types';
 // Production API URL
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
-const API_BASE_URL = "https://splittable-unpatient-maxine.ngrok-free.dev"
+const API_BASE_URL = "https://710e52738b44.ngrok-free.app"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -201,10 +201,10 @@ export const fetchCatalog = async (): Promise<GameData[]> => {
 }
 
 export interface InitMinigameRequest {
-    game_type: string;
-    session_id: string;
-    conv_id?: string | null;
-    currency_mode?: boolean;
+    gameType: string;
+    sessionId: string;
+    convId?: string | null;
+    currencyMode?: boolean;
     w: number;
     h: number;
     char_id?: string;
@@ -233,10 +233,10 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
                 'ngrok-skip-browser-warning': '1',
             },
             body: JSON.stringify({
-                game_type: params.game_type,
-                session_id: params.session_id,
-                conv_id: params.conv_id ?? null,
-                currency_mode: params.currency_mode ?? false,
+                game_type: params.gameType,
+                session_id: params.sessionId,
+                conv_id: params.convId ?? null,
+                currency_mode: params.currencyMode ?? false,
                 w: params.w,
                 h: params.h,
                 char_id: params.char_id,
@@ -259,6 +259,32 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
         throw error;
     }
 }
+
+export const fetchAdForMinigame = async (aid: string): Promise<string | null> => {
+    try {
+        const response: Response = await fetch(`${API_BASE_URL}/minigames/fallback_ad/${aid}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data: MinigameResponse = await response.json();
+        
+        if (data.adResponse && data.adResponse.iframe_url) {
+            return data.adResponse.iframe_url;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Failed to fetch ad for minigame:', error);
+        return null;
+    }
+};
 
 /* Not used for now, used when we are also mediation layer
 export const trackClick = async (adId: string, apiKey: string): Promise<void> => {

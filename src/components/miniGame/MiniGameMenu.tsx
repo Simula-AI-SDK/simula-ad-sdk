@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
-import { fetchCatalog } from '../../utils/api';
+import { fetchCatalog, fetchAdForMinigame } from '../../utils/api';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
@@ -24,14 +24,18 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   charDesc,
   maxGamesToShow = 6,
   theme = {},
-  delegateChar = true,
+  delegateCharacter = true,
 }) => {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [games, setGames] = useState<GameData[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
+  const [adFetched, setAdFetched] = useState(false);
+  const [adIframeUrl, setAdIframeUrl] = useState<string | null>(null);
+  const [currentAdId, setCurrentAdId] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
   // Merge theme with defaults
@@ -74,12 +78,14 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
 
   // Handle ESC key
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen && !selectedGameId && !adIframeUrl) return;
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (selectedGameId) {
-          setSelectedGameId(null);
+        if (adIframeUrl) {
+          handleAdIframeClose();
+        } else if (selectedGameId) {
+          handleIframeClose();
         } else {
           handleClose();
         }
@@ -88,7 +94,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, selectedGameId]);
+  }, [isOpen, selectedGameId, adIframeUrl]);
 
   // Focus trap
   useEffect(() => {
@@ -136,9 +142,9 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     };
   }, [isOpen]);
 
-  // Prevent body scroll when modal is open
+  // Prevent body scroll when modal or ad iframe is open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen || adIframeUrl) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -146,7 +152,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, adIframeUrl]);
 
   const handleClose = useCallback(() => {
     console.log('Menu closed');
@@ -162,13 +168,49 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const handleGameSelect = (gameId: string) => {
     handleClose();
     setSelectedGameId(gameId);
+    // Reset ad tracking when a new game is selected
+    setAdFetched(false);
+    setCurrentAdId(null);
   };
 
-  const handleIframeClose = () => {
-    setSelectedGameId(null);
+  const handleAdIdReceived = (adId: string) => {
+    setCurrentAdId(adId);
   };
 
-  if (!isOpen && !selectedGameId) {
+  const handleIframeClose = async () => {
+    if (!adFetched) {
+      // Make API request and fetch / display ad.html here
+      if (currentAdId) {
+        try {
+          const iframeUrl = await fetchAdForMinigame(currentAdId);
+          if (iframeUrl) {
+            setAdIframeUrl(iframeUrl);
+            setAdFetched(true);
+          }
+        } catch (error) {
+          console.error('Error fetching ad:', error);
+          // If ad fetch fails, just close without showing ad
+        }
+      }
+      setSelectedGameId(null);
+    } else {
+      // If ad has already been already fetched, just close so we don't double count impressions
+      setSelectedGameId(null);
+    }
+  };
+
+  const handleAdIframeClose = () => {
+    setAdIframeUrl(null);
+    // Keep adFetched as true so we don't show another ad
+  };
+
+  const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === adOverlayRef.current) {
+      handleAdIframeClose();
+    }
+  };
+
+  if (!isOpen && !selectedGameId && !adIframeUrl) {
     return null;
   }
 
@@ -177,15 +219,95 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       {/* Game Iframe */}
       {selectedGameId && (
         <GameIframe 
-          gameId={selectedGameId} 
-          charID={charID}
-          charName={charName}
-          charImage={charImage}
-          charDesc={charDesc}
-          messages={messages}
-          delegateChar={delegateChar}
-          onClose={handleIframeClose} 
+            gameId={selectedGameId} 
+            charID={charID}
+            charName={charName}
+            charImage={charImage}
+            charDesc={charDesc}
+            messages={messages}
+            delegateCharacter={delegateCharacter}
+            onClose={handleIframeClose}
+            onAdIdReceived={handleAdIdReceived}
         />
+      )}
+
+      {/* Ad Iframe */}
+      {adIframeUrl && (
+        <div
+          ref={adOverlayRef}
+          onClick={handleAdOverlayClick}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Ad iframe"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <button
+              onClick={handleAdIframeClose}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                fontSize: '24px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+                color: '#1F2937',
+                fontWeight: 'bold',
+                transition: 'background-color 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+              }}
+              aria-label="Close ad"
+            >
+              ×
+            </button>
+            <iframe
+              src={adIframeUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                display: 'block',
+              }}
+              title="Advertisement"
+              allow="fullscreen"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
+            />
+          </div>
+        </div>
       )}
 
       {/* Modal */}

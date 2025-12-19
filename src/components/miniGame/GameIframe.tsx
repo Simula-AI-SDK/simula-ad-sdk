@@ -8,21 +8,29 @@ interface GameIframeProps {
   charID: string;
   charName: string;
   charImage: string;
-  charDesc?: string;
   messages?: Message[];
-  delegateChar?: boolean;
+  delegateCharacter?: boolean;
   onClose: () => void;
+  onAdIdReceived?: (adId: string) => void;
+  turnsBtwnMsgs?: number;
+  usePubCharApi?: string;
+  charDesc?: string;
+  exampleCharMsgs?: string;
 }
 
 export const GameIframe: React.FC<GameIframeProps> = ({ 
+  
   gameId, 
+  
   charID, 
   charName, 
   charImage, 
-  charDesc, 
   messages = [],
-  delegateChar = true,
-  onClose 
+  delegateCharacter = true,
+  onClose, 
+  onAdIdReceived,
+  charDesc, 
+
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const sessionToken = useRef<string>(uuidv4());
@@ -36,9 +44,9 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       try {
         setLoading(true);
         const response = await getMinigame({
-          game_type: gameId,
-          session_id: sessionToken.current,
-          currency_mode: false,
+          gameType: gameId,
+          sessionId: sessionToken.current,
+          currencyMode: false,
           w: window.innerWidth,
           h: window.innerHeight,
           char_id: charID,
@@ -46,9 +54,13 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           char_image: charImage,
           char_desc: charDesc,
           messages: messages,
-          delegate_char: delegateChar,
+          delegate_char: delegateCharacter,
         });
         setIframeUrl(response.adResponse.iframe_url);
+        // Callback with the ad_id for tracking
+        if (onAdIdReceived && response.adResponse.ad_id) {
+          onAdIdReceived(response.adResponse.ad_id);
+        }
       } catch (err) {
         console.error('Error initializing minigame:', err);
         setError('Failed to load game. Please try again.');
@@ -58,7 +70,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     };
 
     initMinigame();
-  }, [gameId, charID, charName, charImage, charDesc, messages, delegateChar]);
+  }, [gameId, charID, charName, charImage, charDesc, messages, delegateCharacter]);
 
   // Handle ESC key to close
   useEffect(() => {
