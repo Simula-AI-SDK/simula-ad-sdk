@@ -1,10 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { getMinigame } from '../../utils/api';
+import { Message } from '../../types';
 
 interface GameIframeProps {
   gameId: string;
   charID: string;
+  charName: string;
+  charImage: string;
+  messages?: Message[];
+  delegateCharacter?: boolean;
   onClose: () => void;
   onAdIdReceived?: (adId: string) => void;
   turnsBtwnMsgs?: number;
@@ -14,14 +19,18 @@ interface GameIframeProps {
 }
 
 export const GameIframe: React.FC<GameIframeProps> = ({ 
+  
   gameId, 
+  
   charID, 
+  charName, 
+  charImage, 
+  messages = [],
+  delegateCharacter = true,
   onClose, 
   onAdIdReceived,
-  turnsBtwnMsgs, 
-  usePubCharApi, 
   charDesc, 
-  exampleCharMsgs 
+
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const sessionToken = useRef<string>(uuidv4());
@@ -40,10 +49,12 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           currencyMode: false,
           w: window.innerWidth,
           h: window.innerHeight,
-          turnsBtwnMsgs,
-          usePubCharApi,
-          charDesc,
-          exampleCharMsgs,
+          char_id: charID,
+          char_name: charName,
+          char_image: charImage,
+          char_desc: charDesc,
+          messages: messages,
+          delegate_char: delegateCharacter,
         });
         setIframeUrl(response.adResponse.iframe_url);
         // Callback with the ad_id for tracking
@@ -59,7 +70,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     };
 
     initMinigame();
-  }, [gameId, charID]);
+  }, [gameId, charID, charName, charImage, charDesc, messages, delegateCharacter]);
 
   // Handle ESC key to close
   useEffect(() => {

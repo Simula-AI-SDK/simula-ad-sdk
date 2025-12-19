@@ -1,6 +1,6 @@
 {
   "name": "@simula/ads",
-  "version": "1.2.17",
+  "version": "1.2.38",
   "description": "React SDK for integrating contextual AI ads with Simula",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -59,6 +59,7 @@
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-image": "^3.0.3",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/react": "^18.2.45",

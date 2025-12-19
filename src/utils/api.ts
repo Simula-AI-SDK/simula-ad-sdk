@@ -2,7 +2,8 @@ import { Message, AdData, InChatTheme, GameData } from '../types';
 
 // Production API URL
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-const API_BASE_URL = "https://b0658a594eee.ngrok-free.app"
+// const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
+const API_BASE_URL = "https://710e52738b44.ngrok-free.app"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -177,9 +178,18 @@ export const fetchCatalog = async (): Promise<GameData[]> => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const res = await response.json();
-        const data: GameData[] = res.data;
-        return data
+        const responseData: { data: any[] } = await response.json();
+        
+        // Map API response to GameData format (icon -> iconUrl)
+        const games: GameData[] = responseData.data.map((game: any) => ({
+            id: game.id,
+            name: game.name,
+            iconUrl: game.icon, // API returns 'icon', we use 'iconUrl'
+            description: game.description,
+            iconFallback: game.iconFallback,
+        }));
+        
+        return games;
     } catch (error) {
         console.error('Failed to fetch catalog:', error);
         throw error;
@@ -193,10 +203,12 @@ export interface InitMinigameRequest {
     currencyMode?: boolean;
     w: number;
     h: number;
-    turnsBtwnMsgs?: number;
-    usePubCharApi?: string;
-    charDesc?: string;
-    exampleCharMsgs?: string;
+    char_id?: string;
+    char_name?: string;
+    char_image?: string;
+    char_desc?: string;
+    messages?: Message[];
+    delegate_char?: boolean;
 }
 
 export interface MinigameResponse {
@@ -222,10 +234,12 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
                 currency_mode: params.currencyMode ?? false,
                 w: params.w,
                 h: params.h,
-                character_mode: true,
-                use_pub_char_api: params.usePubCharApi,
-                char_desc: params.charDesc,
-                example_char_msgs: params.exampleCharMsgs,
+                char_id: params.char_id,
+                char_name: params.char_name,
+                char_image: params.char_image,
+                char_desc: params.char_desc,
+                messages: params.messages,
+                delegate_char: params.delegate_char ?? true,
             }),
         });
 
