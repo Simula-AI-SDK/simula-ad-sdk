@@ -3,7 +3,7 @@ import { Message, AdData, InChatTheme, GameData } from '../types';
 // Production API URL
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
-const API_BASE_URL = "https://710e52738b44.ngrok-free.app"
+const API_BASE_URL = "https://splittable-unpatient-maxine.ngrok-free.dev"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -25,6 +25,7 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
+      'ngrok-skip-browser-warning': '1',
     };
 
     // Build query parameters
@@ -93,6 +94,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${request.apiKey}`,
+      'ngrok-skip-browser-warning': '1',
     };
 
     const response = await fetch(`${API_BASE_URL}/render_ad/ssp`, {
@@ -153,6 +155,7 @@ export const trackImpression = async (adId: string, apiKey: string): Promise<voi
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
+      'ngrok-skip-browser-warning': '1',
     };
 
     await fetch(`${API_BASE_URL}/track/engagement/impression/${adId}`, {
@@ -171,6 +174,7 @@ export const fetchCatalog = async (): Promise<GameData[]> => {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': '1',
             },
         });
 
@@ -226,6 +230,7 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': '1',
             },
             body: JSON.stringify({
                 game_type: params.game_type,
