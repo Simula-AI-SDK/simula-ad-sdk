@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { getMinigame } from '../../utils/api';
 import { Message } from '../../types';
+import { useSimula } from '../../SimulaProvider';
 
 interface GameIframeProps {
   gameId: string;
@@ -33,19 +33,26 @@ export const GameIframe: React.FC<GameIframeProps> = ({
 
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const sessionToken = useRef<string>(uuidv4());
+  const { sessionId } = useSimula();
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch the minigame iframe URL
   useEffect(() => {
+    // Block if sessionId is missing or invalid
+    if (!sessionId) {
+      setError('Session invalid, cannot initialize minigame');
+      setLoading(false);
+      return;
+    }
+
     const initMinigame = async () => {
       try {
         setLoading(true);
         const response = await getMinigame({
           gameType: gameId,
-          sessionId: sessionToken.current,
+          sessionId: sessionId,
           currencyMode: false,
           w: window.innerWidth,
           h: window.innerHeight,
@@ -70,7 +77,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     };
 
     initMinigame();
-  }, [gameId, charID, charName, charImage, charDesc, messages, delegateChar]);
+  }, [gameId, charID, charName, charImage, charDesc, messages, delegateChar, sessionId]);
 
   // Handle ESC key to close
   useEffect(() => {
