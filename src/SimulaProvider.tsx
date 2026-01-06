@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { SimulaProviderProps, SimulaContextValue } from './types';
 import { createSession } from './utils/api';
 import { validateSimulaProviderProps } from './utils/validation';
@@ -24,17 +24,21 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     primaryUserID
   } = props;
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const callIdRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const currentCallId = ++callIdRef.current;
 
     async function ensureSession() {
       const id = await createSession(apiKey, devMode, primaryUserID);
-      if (!cancelled && id) setSessionId(id);
+      // Allow override: only update if this is still the latest call
+      // This ensures the most recent session creation always wins
+      if (currentCallId === callIdRef.current && id) {
+        setSessionId(id);
+      }
     }
 
     ensureSession();
-    return () => { cancelled = true; };
   }, [apiKey, devMode, primaryUserID]);
 
   const value: SimulaContextValue = {
