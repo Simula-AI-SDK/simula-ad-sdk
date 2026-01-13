@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { SimulaProviderProps, SimulaContextValue } from './types';
 import { createSession } from './utils/api';
 import { validateSimulaProviderProps } from './utils/validation';
@@ -29,19 +29,38 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     let cancelled = false;
 
     async function ensureSession() {
+      console.log('[SimulaProvider] Creating session with:', { apiKey: apiKey?.substring(0, 10) + '...', devMode, primaryUserID });
       const id = await createSession(apiKey, devMode, primaryUserID);
-      if (!cancelled && id) setSessionId(id);
+      if (!cancelled && id) {
+        console.log('[SimulaProvider] Session created and set:', id);
+        setSessionId(id);
+      } else if (cancelled) {
+        console.log('[SimulaProvider] Session creation cancelled');
+      } else {
+        console.warn('[SimulaProvider] Session creation returned undefined');
+      }
     }
 
     ensureSession();
-    return () => { cancelled = true; };
+    return () => { 
+      console.log('[SimulaProvider] Cleaning up session creation');
+      cancelled = true; 
+    };
   }, [apiKey, devMode, primaryUserID]);
 
-  const value: SimulaContextValue = {
+  // Memoize context value to prevent unnecessary re-renders
+  const value: SimulaContextValue = useMemo(() => ({
     apiKey,
     devMode,
     sessionId,
-  };
+  }), [apiKey, devMode, sessionId]);
+
+  // Log when sessionId changes
+  useEffect(() => {
+    if (sessionId) {
+      console.log('[SimulaProvider] Context sessionId updated to:', sessionId);
+    }
+  }, [sessionId]);
 
   return (
     <SimulaContext.Provider value={value}>

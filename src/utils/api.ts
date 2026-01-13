@@ -226,26 +226,29 @@ export interface MinigameResponse {
 
 export const getMinigame = async (params: InitMinigameRequest): Promise<MinigameResponse> => {
     try {
+        console.log('[getMinigame] Request params.sessionId:', params.sessionId);
+        const requestBody = {
+            game_type: params.gameType,
+            session_id: params.sessionId,
+            conv_id: params.convId ?? null,
+            currency_mode: params.currencyMode ?? false,
+            w: params.w,
+            h: params.h,
+            char_id: params.char_id,
+            char_name: params.char_name,
+            char_image: params.char_image,
+            char_desc: params.char_desc,
+            messages: params.messages,
+            delegate_char: params.delegate_char ?? true,
+        };
+        console.log('[getMinigame] Request body session_id:', requestBody.session_id);
         const response: Response = await fetch(`${API_BASE_URL}/minigames/init`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'ngrok-skip-browser-warning': '1',
             },
-            body: JSON.stringify({
-                game_type: params.gameType,
-                session_id: params.sessionId,
-                conv_id: params.convId ?? null,
-                currency_mode: params.currencyMode ?? false,
-                w: params.w,
-                h: params.h,
-                char_id: params.char_id,
-                char_name: params.char_name,
-                char_image: params.char_image,
-                char_desc: params.char_desc,
-                messages: params.messages,
-                delegate_char: params.delegate_char ?? true,
-            }),
+            body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {

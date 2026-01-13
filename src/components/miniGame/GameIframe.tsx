@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { getMinigame } from '../../utils/api';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
@@ -37,6 +37,14 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const sessionIdRef = useRef<string | undefined>(sessionId);
+  const currentRequestRef = useRef<Promise<void> | null>(null);
+  const initKeyRef = useRef<string | null>(null);
+
+  // Keep ref in sync with sessionId
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Fetch the minigame iframe URL
   useEffect(() => {
@@ -47,12 +55,48 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       return;
     }
 
+    // Create a unique key for this initialization based on the actual parameters
+    const initKey = `${gameId}-${charID}-${sessionId}`;
+    
+    // Prevent multiple initializations with the same key
+    if (currentRequestRef.current && initKeyRef.current === initKey) {
+      console.log('[GameIframe] Initialization already in progress for key:', initKey);
+      return;
+    }
+
+    // If there's a different request in progress, we'll let it complete but won't process its result
+    // (the new request will override)
+    if (currentRequestRef.current && initKeyRef.current !== initKey) {
+      console.log('[GameIframe] New parameters detected, will override previous request. Old key:', initKeyRef.current, 'New key:', initKey);
+    }
+
+    // Set the key immediately
+    initKeyRef.current = initKey;
+
+    console.log('[GameIframe] Initializing minigame with sessionId:', sessionId);
+    console.log('[GameIframe] sessionId from context:', sessionId);
+    console.log('[GameIframe] sessionIdRef.current:', sessionIdRef.current);
+
     const initMinigame = async () => {
+      // Use the latest sessionId from ref to avoid stale closures
+      const currentSessionId = sessionIdRef.current;
+      if (!currentSessionId) {
+        console.error('[GameIframe] Session ID became undefined during initialization');
+        setError('Session invalid, cannot initialize minigame');
+        setLoading(false);
+        if (initKeyRef.current === initKey) {
+          currentRequestRef.current = null;
+          initKeyRef.current = null;
+        }
+        return;
+      }
+
       try {
         setLoading(true);
+        console.log('[GameIframe] Calling getMinigame with sessionId:', currentSessionId);
         const response = await getMinigame({
           gameType: gameId,
-          sessionId: sessionId,
+          sessionId: currentSessionId,
           currencyMode: false,
           w: window.innerWidth,
           h: window.innerHeight,
@@ -63,21 +107,47 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           messages: messages,
           delegate_char: delegateChar,
         });
+        
+        // Only process response if this is still the current request
+        if (initKeyRef.current !== initKey) {
+          console.log('[GameIframe] Response received but parameters changed, ignoring');
+          return;
+        }
+
         setIframeUrl(response.adResponse.iframe_url);
         // Callback with the ad_id for tracking
         if (onAdIdReceived && response.adResponse.ad_id) {
           onAdIdReceived(response.adResponse.ad_id);
         }
       } catch (err) {
+        // Only set error if this is still the current request
+        if (initKeyRef.current !== initKey) {
+          console.log('[GameIframe] Error occurred but parameters changed, ignoring');
+          return;
+        }
         console.error('Error initializing minigame:', err);
         setError('Failed to load game. Please try again.');
       } finally {
-        setLoading(false);
+        // Only update loading state if this is still the current request
+        if (initKeyRef.current === initKey) {
+          setLoading(false);
+          currentRequestRef.current = null;
+          // Don't clear initKeyRef here - let the next effect run decide
+        }
       }
     };
 
-    initMinigame();
-  }, [gameId, charID, charName, charImage, charDesc, messages, delegateChar, sessionId]);
+    // Store the promise and execute
+    const requestPromise = initMinigame();
+    currentRequestRef.current = requestPromise;
+
+    // Cleanup function
+    return () => {
+      // If parameters changed, the new effect will handle it
+      // We don't need to abort here since we check initKeyRef in the async function
+      console.log('[GameIframe] Cleanup for key:', initKey);
+    };
+  }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -143,21 +213,28 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          pointerEvents: 'none',
         }}
       >
         <button
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+          }}
           style={{
             position: 'absolute',
-            top: '16px',
-            right: '16px',
+            top: 'max(16px, env(safe-area-inset-top, 16px))',
+            right: 'max(16px, env(safe-area-inset-right, 16px))',
             background: 'rgba(255, 255, 255, 0.9)',
             border: 'none',
             borderRadius: '50%',
-            width: '44px',
-            height: '44px',
-            minWidth: '44px',
-            minHeight: '44px',
+            width: '48px',
+            height: '48px',
+            minWidth: '48px',
+            minHeight: '48px',
             fontSize: '24px',
             cursor: 'pointer',
             display: 'flex',
@@ -167,6 +244,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             color: '#1F2937',
             fontWeight: 'bold',
             transition: 'background-color 0.2s ease',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            pointerEvents: 'auto',
+            userSelect: 'none',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
@@ -209,6 +290,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
               height: '100%',
               border: 'none',
               display: 'block',
+              pointerEvents: 'auto',
             }}
             title={`Game: ${gameId}`}
             allow="fullscreen"
