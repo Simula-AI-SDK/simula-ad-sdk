@@ -2,6 +2,7 @@ export { SimulaProvider, useSimula } from './SimulaProvider';
 export { InChatAdSlot } from './components/inChatAd/InChatAdSlot';
 export { MiniGameMenu } from './components/miniGame/MiniGameMenu';
 export { SponsoredSuggestions } from './components/sponsoredSuggestions/SponsoredSuggestions';
+export { NativeBanner } from './components/nativeBanner/NativeBanner';
 export { useBotDetection } from './hooks/useBotDetection';
 export { useViewability } from './hooks/useViewability';
 export { useOMIDViewability } from './hooks/useOMIDViewability';
@@ -40,5 +41,7 @@ export type {
   GameData,
   SponsoredSuggestionsTheme,
   SponsoredSuggestionData,
-  SponsoredSuggestionsProps
+  SponsoredSuggestionsProps,
+  NativeContext,
+  NativeBannerProps
 } from './types';

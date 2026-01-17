@@ -1,4 +1,4 @@
-import { InChatTheme } from '../types';
+import { InChatTheme, NativeContext } from '../types';
 
 // Helper functions for width validation
 const isAutoWidth = (width: any): boolean => width === 'auto';
@@ -187,5 +187,156 @@ export const validateTheme = (theme?: InChatTheme): void => {
   // Validate cornerRadius
   if (theme.cornerRadius !== undefined && typeof theme.cornerRadius !== 'number') {
     throw new Error(`Invalid cornerRadius type "${typeof theme.cornerRadius}". Must be a number`);
+  }
+};
+
+/**
+ * Validates NativeContext object
+ * Throws descriptive errors for invalid context properties
+ */
+export const validateNativeContext = (context: any): void => {
+  if (!context || typeof context !== 'object') {
+    throw new Error('Invalid "context": must be an object');
+  }
+
+  const validKeys = ['searchTerm', 'tags', 'category', 'title', 'description', 'userProfile', 'customContext'];
+
+  // Check for invalid top-level keys
+  Object.keys(context).forEach(key => {
+    if (!validKeys.includes(key)) {
+      throw new Error(`Invalid context parameter "${key}". Valid parameters: ${validKeys.join(', ')}`);
+    }
+  });
+
+  // Validate searchTerm (optional string)
+  if (context.searchTerm !== undefined && typeof context.searchTerm !== 'string') {
+    throw new Error(`Invalid "searchTerm" type: "${typeof context.searchTerm}". Must be a string`);
+  }
+
+  // Validate tags (optional array of strings, max 10)
+  if (context.tags !== undefined) {
+    if (!Array.isArray(context.tags)) {
+      throw new Error(`Invalid "tags" type: "${typeof context.tags}". Must be an array of strings`);
+    }
+    if (context.tags.length > 10) {
+      throw new Error(`"tags" array exceeds maximum length of 10 (received ${context.tags.length})`);
+    }
+    context.tags.forEach((tag: any, i: number) => {
+      if (typeof tag !== 'string') {
+        throw new Error(`Invalid tag at index ${i}: "${typeof tag}". Must be a string`);
+      }
+      if (tag.startsWith('#')) {
+        throw new Error(`Invalid tag at index ${i}: "${tag}". Tags should not include # prefix`);
+      }
+    });
+  }
+
+  // Validate category (optional string)
+  if (context.category !== undefined && typeof context.category !== 'string') {
+    throw new Error(`Invalid "category" type: "${typeof context.category}". Must be a string`);
+  }
+
+  // Validate title (optional string)
+  if (context.title !== undefined && typeof context.title !== 'string') {
+    throw new Error(`Invalid "title" type: "${typeof context.title}". Must be a string`);
+  }
+
+  // Validate description (optional string)
+  if (context.description !== undefined && typeof context.description !== 'string') {
+    throw new Error(`Invalid "description" type: "${typeof context.description}". Must be a string`);
+  }
+
+  // Validate userProfile (optional string)
+  if (context.userProfile !== undefined && typeof context.userProfile !== 'string') {
+    throw new Error(`Invalid "userProfile" type: "${typeof context.userProfile}". Must be a string`);
+  }
+
+  // Validate customContext (optional object with max 10 keys)
+  if (context.customContext !== undefined) {
+    if (typeof context.customContext !== 'object' || context.customContext === null || Array.isArray(context.customContext)) {
+      throw new Error(`Invalid "customContext" type: must be an object with string or string[] values`);
+    }
+    const keys = Object.keys(context.customContext);
+    if (keys.length > 10) {
+      throw new Error(`"customContext" exceeds maximum of 10 keys (received ${keys.length})`);
+    }
+    keys.forEach(key => {
+      const value = context.customContext[key];
+      if (typeof value === 'string') {
+        // Valid
+      } else if (Array.isArray(value)) {
+        value.forEach((v: any, i: number) => {
+          if (typeof v !== 'string') {
+            throw new Error(`Invalid customContext["${key}"][${i}]: "${typeof v}". Must be a string`);
+          }
+        });
+      } else {
+        throw new Error(`Invalid customContext["${key}"]: "${typeof value}". Must be a string or string[]`);
+      }
+    });
+  }
+};
+
+/**
+ * Validates NativeBanner props
+ * Throws descriptive errors for invalid props
+ */
+export const validateNativeBannerProps = (props: any): void => {
+  const validProps = ['width', 'height', 'position', 'context', 'onImpression', 'onClick', 'onError'];
+  const receivedProps = Object.keys(props);
+
+  // Check for unknown props
+  const unknownProps = receivedProps.filter(prop => !validProps.includes(prop));
+  if (unknownProps.length > 0) {
+    throw new Error(
+      `Invalid prop${unknownProps.length > 1 ? 's' : ''} passed to NativeBanner: ${unknownProps.map(p => `"${p}"`).join(', ')}. ` +
+      `Valid props are: ${validProps.join(', ')}`
+    );
+  }
+
+  // Validate width (required)
+  if (props.width === undefined) {
+    throw new Error('NativeBanner requires a "width" prop (number, "100%", or "auto")');
+  }
+  if (typeof props.width !== 'number' && props.width !== '100%' && props.width !== 'auto') {
+    throw new Error(`Invalid "width" prop: "${props.width}". Must be a number, "100%", or "auto"`);
+  }
+
+  // Validate height (required)
+  if (props.height === undefined) {
+    throw new Error('NativeBanner requires a "height" prop (number, "100%", or "auto")');
+  }
+  if (typeof props.height !== 'number' && props.height !== '100%' && props.height !== 'auto') {
+    throw new Error(`Invalid "height" prop: "${props.height}". Must be a number, "100%", or "auto"`);
+  }
+
+  // Validate position (required, non-negative number)
+  if (props.position === undefined) {
+    throw new Error('NativeBanner requires a "position" prop (non-negative number)');
+  }
+  if (typeof props.position !== 'number') {
+    throw new Error(`Invalid "position" prop type: "${typeof props.position}". Must be a number`);
+  }
+  if (props.position < 0) {
+    throw new Error(`Invalid "position" prop value: "${props.position}". Must be a non-negative number`);
+  }
+
+  // Validate context (required)
+  if (props.context === undefined) {
+    throw new Error('NativeBanner requires a "context" prop (NativeContext object)');
+  }
+  validateNativeContext(props.context);
+
+  // Validate callbacks (optional)
+  if (props.onImpression !== undefined && typeof props.onImpression !== 'function') {
+    throw new Error(`Invalid "onImpression" prop type: "${typeof props.onImpression}". Must be a function`);
+  }
+
+  if (props.onClick !== undefined && typeof props.onClick !== 'function') {
+    throw new Error(`Invalid "onClick" prop type: "${typeof props.onClick}". Must be a function`);
+  }
+
+  if (props.onError !== undefined && typeof props.onError !== 'function') {
+    throw new Error(`Invalid "onError" prop type: "${typeof props.onError}". Must be a function`);
   }
 };

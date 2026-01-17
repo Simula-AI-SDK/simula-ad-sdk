@@ -66,4 +66,7 @@ build/
 
 # OS specific files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Temporary Claude files
+tmpclaude-* 

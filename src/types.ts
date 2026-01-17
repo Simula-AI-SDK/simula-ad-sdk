@@ -158,3 +158,24 @@ export interface SponsoredSuggestionsProps {
   onSuggestionClick?: (suggestion: SponsoredSuggestionData) => void;
   onImpression?: (suggestion: SponsoredSuggestionData) => void;
 }
+
+// NativeBanner types
+export interface NativeContext {
+  searchTerm?: string;
+  tags?: string[];
+  category?: string;
+  title?: string;
+  description?: string;
+  userProfile?: string;
+  customContext?: Record<string, string | string[]>;
+}
+
+export interface NativeBannerProps {
+  width: number | '100%' | 'auto';
+  height: number | '100%' | 'auto';
+  position: number;
+  context: NativeContext;
+  onImpression?: (ad: AdData) => void;
+  onClick?: (ad: AdData) => void;
+  onError?: (error: Error) => void;
+}

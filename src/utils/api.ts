@@ -1,9 +1,9 @@
-import { Message, AdData, InChatTheme, GameData } from '../types';
+import { Message, AdData, InChatTheme, GameData, NativeContext } from '../types';
 
 // Production API URL
-// const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
-const API_BASE_URL = "https://splittable-unpatient-maxine.ngrok-free.dev"
+// const API_BASE_URL = "https://splittable-unpatient-maxine.ngrok-free.dev"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -277,7 +277,7 @@ export const fetchAdForMinigame = async (aid: string): Promise<string | null> =>
         }
 
         const data: MinigameResponse = await response.json();
-        
+
         if (data.adResponse && data.adResponse.iframe_url) {
             return data.adResponse.iframe_url;
         }
@@ -287,6 +287,87 @@ export const fetchAdForMinigame = async (aid: string): Promise<string | null> =>
         console.error('Failed to fetch ad for minigame:', error);
         return null;
     }
+};
+
+// NativeBanner API
+export interface FetchNativeBannerRequest {
+  apiKey: string;
+  sessionId: string;
+  slotId: string;
+  position: number;
+  context: NativeContext;
+  width?: number;
+  height?: number;
+}
+
+export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Promise<FetchAdResponse> => {
+  try {
+    const requestBody = {
+      session_id: request.sessionId,
+      slot_id: request.slotId,
+      position: request.position,
+      context: request.context,
+      width: request.width,
+      height: request.height,
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${request.apiKey}`,
+      'ngrok-skip-browser-warning': '1',
+    };
+
+    const response = await fetch(`${API_BASE_URL}/render_ad/native_banner`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Handle API response shape
+    if (data && typeof data === 'object') {
+      if (!data.adInserted) {
+        return { error: 'No fill' };
+      }
+
+      // New shape: { adType, adInserted, adResponse: { ad_id, iframe_url, ... } }
+      if (data.adResponse && typeof data.adResponse === 'object') {
+        const ar = data.adResponse;
+        const ad: AdData = {
+          id: ar.ad_id ?? ar.id,
+          format: (data.adType ?? ar.format ?? 'iframe'),
+          iframeUrl: ar.iframe_url ?? ar.iframeUrl,
+        };
+
+        if (ad.id && ad.iframeUrl) {
+          return { ad };
+        }
+
+        return { error: 'Invalid ad response' };
+      }
+
+      // Legacy shape: { ad: { ... } }
+      if (data.ad) {
+        return { ad: data.ad };
+      }
+
+      if (data.error) {
+        return { error: data.error };
+      }
+    }
+
+    return { error: 'Unexpected response from ad server' };
+  } catch (error) {
+    console.error('❌ NativeBanner API Request failed:', error);
+    return {
+      error: error instanceof Error ? error.message : 'Failed to fetch native banner ad'
+    };
+  }
 };
 
 /* Not used for now, used when we are also mediation layer
