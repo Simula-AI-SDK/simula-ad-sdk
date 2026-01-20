@@ -134,31 +134,6 @@ export interface MiniGameMenuProps {
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
 }
 
-// SponsoredSuggestions types
-export interface SponsoredSuggestionsTheme {
-  mode?: 'light' | 'dark' | 'auto';
-  theme?: 'light' | 'dark' | 'auto'; // Deprecated: use 'mode' instead. Kept for backward compatibility.
-  accent?: AccentOption | AccentOption[];
-  font?: FontOption | FontOption[];
-  width?: number | string;
-  height?: number | string; // Configurable height (unlike InChatAdSlot which has fixed height)
-  cornerRadius?: number;
-}
-
-export interface SponsoredSuggestionData {
-  id: string;
-  title: string;
-  description: string;
-  iframeUrl: string;
-  imageUrl?: string;
-}
-
-export interface SponsoredSuggestionsProps {
-  theme?: SponsoredSuggestionsTheme;
-  onSuggestionClick?: (suggestion: SponsoredSuggestionData) => void;
-  onImpression?: (suggestion: SponsoredSuggestionData) => void;
-}
-
 // NativeBanner types
 export interface NativeContext {
   searchTerm?: string;

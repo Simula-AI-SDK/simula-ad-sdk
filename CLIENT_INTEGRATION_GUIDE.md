@@ -49,82 +49,6 @@ Add components where you want ads or games to appear. No additional configuratio
 
 ## Components
 
-### SponsoredSuggestions
-
-Displays contextual sponsored content with configurable dimensions and theming.
-
-#### Basic Usage
-
-```tsx
-import { SponsoredSuggestions } from "@simula/ads";
-
-function Sidebar() {
-  return (
-    <SponsoredSuggestions
-      theme={{
-        mode: "light",
-        accent: "blue",
-        height: 400,
-        width: 300,
-        cornerRadius: 12
-      }}
-      onSuggestionClick={(suggestion) => {
-        // Handle click event
-      }}
-      onImpression={(suggestion) => {
-        // Handle impression event
-      }}
-    />
-  );
-}
-```
-
-#### Props
-
-| Prop | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `theme` | `SponsoredSuggestionsTheme` | No | `{}` | Theme configuration |
-| `onSuggestionClick` | `(suggestion: SponsoredSuggestionData) => void` | No | - | Click event handler |
-| `onImpression` | `(suggestion: SponsoredSuggestionData) => void` | No | - | Impression event handler |
-
-#### Theme Configuration
-
-```typescript
-interface SponsoredSuggestionsTheme {
-  mode?: "light" | "dark" | "auto";
-  accent?: AccentOption | AccentOption[];
-  font?: FontOption | FontOption[];
-  width?: number | string;
-  height?: number | string;
-  cornerRadius?: number;
-}
-```
-
-**Theme Options:**
-- `mode`: Color scheme (`"light"`, `"dark"`, or `"auto"` for system preference)
-- `accent`: Color accent (`"blue"`, `"red"`, `"green"`, `"yellow"`, `"purple"`, `"pink"`, `"orange"`, `"neutral"`, `"gray"`, `"tan"`, `"transparent"`, `"image"`). Supports array for A/B testing.
-- `font`: Font family (`"san-serif"`, `"serif"`, `"monospace"`). Supports array for A/B testing.
-- `width`: Component width in pixels, percentage string, or `"auto"`
-- `height`: Component height in pixels or CSS string (default: `400px`)
-- `cornerRadius`: Border radius in pixels
-
-**Example:**
-
-```tsx
-<SponsoredSuggestions
-  theme={{
-    mode: "dark",
-    accent: "purple",
-    font: "serif",
-    height: 500,
-    width: "100%",
-    cornerRadius: 16
-  }}
-/>
-```
-
----
-
 ### MiniGameMenu
 
 Modal component for displaying and launching sponsored mini-games.
@@ -209,20 +133,6 @@ interface MiniGameTheme {
 
 ## Event Handlers
 
-### SponsoredSuggestions Events
-
-```tsx
-<SponsoredSuggestions
-  onImpression={(suggestion) => {
-    // Fired when suggestion is viewed
-    // suggestion: { id, title, description, iframeUrl, imageUrl? }
-  }}
-  onSuggestionClick={(suggestion) => {
-    // Fired when suggestion is clicked
-  }}
-/>
-```
-
 ### Message Type
 
 ```typescript
@@ -239,7 +149,6 @@ interface Message {
 ```tsx
 import { 
   SimulaProvider, 
-  SponsoredSuggestions, 
   MiniGameMenu 
 } from "@simula/ads";
 import { useState } from "react";
@@ -251,17 +160,6 @@ function ChatApp() {
   return (
     <SimulaProvider apiKey="YOUR_API_KEY">
       <div className="app-layout">
-        <aside>
-          <SponsoredSuggestions
-            theme={{
-              mode: "light",
-              accent: "blue",
-              height: 400,
-              width: 300
-            }}
-          />
-        </aside>
-
         <main>
           <ChatInterface messages={messages} />
           <button onClick={() => setMenuOpen(true)}>
@@ -336,9 +234,6 @@ Full TypeScript definitions are included. All components and types are exported 
 
 ```typescript
 import type {
-  SponsoredSuggestionsProps,
-  SponsoredSuggestionsTheme,
-  SponsoredSuggestionData,
   MiniGameMenuProps,
   MiniGameTheme,
   Message
