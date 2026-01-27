@@ -377,8 +377,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       return '0px'; // No height until ad loads
     }
     if (measuredHeight) {
-      console.log(`We got a measured height of ${measuredHeight}`)
-      return `${measuredHeight}px`;
+      return `${measuredHeight + 10}px`;
     }
     return '100px'; // Small placeholder while waiting for height
   }, [ad, measuredHeight]);
