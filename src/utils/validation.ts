@@ -319,12 +319,12 @@ export const validateNativeBannerProps = (props: any): void => {
     throw new Error('NativeBanner "slot" prop cannot be an empty string');
   }
 
-  // Validate width (required)
-  if (props.width === undefined) {
-    throw new Error('NativeBanner requires a "width" prop (number, "100%", or "auto")');
+  // Validate width (optional)
+  if (props.width !== undefined && props.width !== null && typeof props.width !== 'number') {
+    throw new Error(`Invalid "width" prop: "${props.width}". Must be a number or null`);
   }
-  if (typeof props.width !== 'number' && props.width !== '100%' && props.width !== 'auto') {
-    throw new Error(`Invalid "width" prop: "${props.width}". Must be a number, "100%", or "auto"`);
+  if (typeof props.width === 'number' && props.width < 0) {
+    throw new Error(`Invalid "width" prop value: "${props.width}". Must be a non-negative number or null`);
   }
 
   // Validate position (required, non-negative number)
