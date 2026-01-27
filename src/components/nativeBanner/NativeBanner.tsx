@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { useSimula } from '../../SimulaProvider';
 import { useBotDetection } from '../../hooks/useBotDetection';
 import { useViewability } from '../../hooks/useViewability';
-import { fetchNativeBannerAd, trackImpression } from '../../utils/api';
+import { fetchNativeBannerAd, trackImpression, trackViewportEntry, trackViewportExit } from '../../utils/api';
 import { validateNativeBannerProps } from '../../utils/validation';
-import { NativeBannerProps, AdData } from '../../types';
+import { NativeBannerProps, AdData, filterContextForPrivacy } from '../../types';
 
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
@@ -15,24 +14,81 @@ const isAutoDimension = (dim: any): boolean => dim === 'auto';
 const isPercentageDimension = (dim: any): boolean => dim === '100%';
 const needsWidthMeasurement = (width: any): boolean => isAutoDimension(width) || isPercentageDimension(width);
 
+// Radial lines spinner component (matching Flutter SDK)
+const RadialLinesSpinner: React.FC = () => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress((prev) => (prev + 1 / 12) % 1);
+    }, 100); // 1200ms / 12 lines = 100ms per line
+    return () => clearInterval(interval);
+  }, []);
+
+  const lineCount = 12;
+  const radius = 8;
+  const lineLength = radius * 0.6;
+  const currentLine = Math.floor(progress * lineCount) % lineCount;
+
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16">
+      {Array.from({ length: lineCount }).map((_, i) => {
+        const angle = (i * 2 * Math.PI) / lineCount;
+        const distance = (i - currentLine + lineCount) % lineCount;
+        
+        let opacity = 0.35;
+        if (distance === 0) opacity = 1.0;
+        else if (distance === 1) opacity = 0.75;
+        else if (distance === 2) opacity = 0.5;
+        else if (distance === 3) opacity = 0.4;
+
+        const startX = 8 + (radius - lineLength) * Math.cos(angle);
+        const startY = 8 + (radius - lineLength) * Math.sin(angle);
+        const endX = 8 + radius * Math.cos(angle);
+        const endY = 8 + radius * Math.sin(angle);
+
+        return (
+          <line
+            key={i}
+            x1={startX}
+            y1={startY}
+            x2={endX}
+            y2={endY}
+            stroke="white"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            opacity={opacity}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
 export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
   // Validate props early
   validateNativeBannerProps(props);
 
   const {
+    slot,
     width,
-    height,
     position,
     context,
     onImpression,
-    onClick,
     onError,
   } = props;
 
-  const { apiKey, sessionId } = useSimula();
-
-  // Generate a stable slotId for this component instance
-  const slotId = useMemo(() => `native-banner-${uuidv4()}`, []);
+  const { 
+    apiKey, 
+    sessionId, 
+    hasPrivacyConsent,
+    getCachedAd,
+    cacheAd,
+    getCachedHeight,
+    cacheHeight,
+    hasNoFill,
+    markNoFill,
+  } = useSimula();
 
   const [ad, setAd] = useState<AdData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,12 +97,19 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  const [preservedWidth, setPreservedWidth] = useState<number | null>(null);
 
   // Track if this component has already fetched an ad
   const [hasTriggered, setHasTriggered] = useState(false);
+  
+  // Track viewport visibility for entry/exit tracking
+  const [isInViewport, setIsInViewport] = useState(false);
+  const wasInViewportRef = useRef(false);
 
   const lastFetchTimeRef = useRef<number>(0);
   const adRef = useRef<AdData | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Keep adRef in sync with ad state
   useEffect(() => {
@@ -73,26 +136,45 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
 
   const { isBot, reasons } = useBotDetection();
 
+  // Listen for postMessage from iframe to get dynamic height
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = event.data;
+        if (data && data.type === 'AD_HEIGHT' && typeof data.height === 'number') {
+          // Add a small buffer (10px) to prevent cut-off
+          const heightWithBuffer = data.height + 10;
+          
+          // Cache the height in the provider
+          cacheHeight(slot, position, heightWithBuffer);
+          
+          setMeasuredHeight(heightWithBuffer);
+          setIframeLoaded(true);
+        }
+      } catch (e) {
+        // Silently ignore parsing errors
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [slot, position, cacheHeight]);
+
   // Measure actual width once when element is ready
   useEffect(() => {
-    // Only measure if width is 'auto' or '100%'
     const needsMeasurement = needsWidthMeasurement(width);
 
     if (!needsMeasurement) return;
     if (!elementRef.current) return;
 
-    // Track if already measured to prevent re-observation
     let hasMeasured = false;
 
-    // Use ResizeObserver to get the initial size
     const resizeObserver = new ResizeObserver(entries => {
       const entry = entries[0];
       if (entry && !hasMeasured) {
         hasMeasured = true;
         const measuredW = Math.round(entry.contentRect.width);
         setMeasuredWidth(measuredW);
-
-        // Disconnect after first measurement
         resizeObserver.disconnect();
       }
     });
@@ -105,20 +187,43 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
   }, [width, elementRef]);
 
   const fetchAdData = useCallback(async () => {
-    if (!hasBeenViewed || loading || hasTriggered || error) {
+    // Never retry if there's an error - once failed, stay failed
+    if (error) return;
+
+    // If ad already exists, don't fetch again
+    if (ad) return;
+
+    // Prevent duplicate concurrent fetches
+    if (loading || hasTriggered) return;
+
+    // Check if we know there's no fill for this slot/position
+    if (hasNoFill(slot, position)) {
+      setError('No ad available');
+      onError?.(new Error('No ad available'));
+      return;
+    }
+
+    // Check for cached ad
+    const cachedAd = getCachedAd(slot, position);
+    const cachedHeight = getCachedHeight(slot, position);
+    if (cachedAd) {
+      setAd(cachedAd);
+      setHasTriggered(true);
+      if (cachedHeight) {
+        setMeasuredHeight(cachedHeight);
+        setIframeLoaded(true);
+      }
       return;
     }
 
     // Block if sessionId is missing or invalid
     if (!sessionId) {
-      setError('Session invalid, fetch ad request blocked');
-      console.error('[NativeBanner] Session invalid, fetch ad request blocked');
+      // Session not ready yet - will retry when sessionId becomes available
       return;
     }
 
     // Wait for width measurement when using auto or percentage values
     const needsMeasurement = needsWidthMeasurement(width);
-
     if (needsMeasurement && measuredWidth === null) {
       return;
     }
@@ -147,34 +252,36 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
         widthValue = measuredWidth;
       }
 
-      // Determine height value for API
-      let heightValue: number | undefined;
-      if (typeof height === 'number') {
-        heightValue = height;
+      // Preserve width once calculated
+      if (widthValue && !preservedWidth) {
+        setPreservedWidth(widthValue);
       }
-      // For 'auto' or '100%' height, we don't send a value and let the backend decide
+
+      // Filter context for privacy
+      const filteredContext = filterContextForPrivacy(context, hasPrivacyConsent);
 
       const result = await fetchNativeBannerAd({
         apiKey,
         sessionId,
-        slotId,
+        slot,
         position,
-        context,
+        context: filteredContext,
         width: widthValue,
-        height: heightValue,
       });
 
       if (result.error) {
         console.warn('[NativeBanner] Ad fetch failed:', result.error);
         setError(result.error);
+        markNoFill(slot, position);
         onError?.(new Error(result.error));
       } else if (result.ad) {
         setAd(result.ad);
-        // Mark as triggered - this component will never fetch again
+        cacheAd(slot, position, result.ad);
         setHasTriggered(true);
       } else {
         console.warn('[NativeBanner] No ad returned from API - no fill or invalid response');
         setError('No ad available');
+        markNoFill(slot, position);
         onError?.(new Error('No ad available'));
       }
     } catch (err) {
@@ -184,21 +291,21 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
     } finally {
       setLoading(false);
     }
-  }, [hasBeenViewed, loading, hasTriggered, error, apiKey, sessionId, slotId, position, context, width, height, isBot, reasons, measuredWidth, onError]);
+  }, [ad, error, loading, hasTriggered, apiKey, sessionId, slot, position, context, width, isBot, reasons, measuredWidth, preservedWidth, hasPrivacyConsent, onError, getCachedAd, getCachedHeight, cacheAd, hasNoFill, markNoFill]);
+
+  // Trigger ad fetch when session becomes available
+  useEffect(() => {
+    if (sessionId && !hasTriggered && !error && !ad) {
+      fetchAdData();
+    }
+  }, [sessionId, hasTriggered, error, ad, fetchAdData]);
 
   // Trigger ad fetch when conditions are met
   useEffect(() => {
-    // Don't trigger if already triggered
     if (hasTriggered) return;
-
-    // Don't trigger if not viewed yet
     if (!hasBeenViewed) return;
-
-    // Don't trigger if waiting for width measurement
     const needsMeasurement = needsWidthMeasurement(width);
     if (needsMeasurement && measuredWidth === null) return;
-
-    // All conditions met, trigger fetch
     fetchAdData();
   }, [hasBeenViewed, hasTriggered, measuredWidth, width, fetchAdData]);
 
@@ -209,43 +316,58 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
     }
   }, [ad, isViewable, isBot, iframeLoaded, viewabilityTrackImpression]);
 
+  // Track viewport entry/exit
+  useEffect(() => {
+    if (!ad || isBot) return;
+    
+    const currentlyInViewport = hasBeenViewed && iframeLoaded;
+    
+    if (currentlyInViewport && !wasInViewportRef.current) {
+      setIsInViewport(true);
+      wasInViewportRef.current = true;
+      trackViewportEntry(ad.id, apiKey);
+    }
+    
+    if (!currentlyInViewport && wasInViewportRef.current && isInViewport) {
+      setIsInViewport(false);
+      wasInViewportRef.current = false;
+      trackViewportExit(ad.id, apiKey);
+    }
+  }, [ad, hasBeenViewed, iframeLoaded, isBot, apiKey, isInViewport]);
+
+  // Track viewport exit on unmount
+  useEffect(() => {
+    return () => {
+      if (adRef.current && wasInViewportRef.current) {
+        trackViewportExit(adRef.current.id, apiKey);
+      }
+    };
+  }, [apiKey]);
+
   // Calculate container dimensions
   const containerWidth = useMemo(() => {
+    // Use preserved width if available
+    if (preservedWidth) {
+      return `${preservedWidth}px`;
+    }
     if (width === 'auto' || width === '100%') {
       return '100%';
     }
     return typeof width === 'number' ? `${width}px` : width;
-  }, [width]);
+  }, [width, preservedWidth]);
 
+  // Height is dynamic from postMessage, or small placeholder while waiting
   const containerHeight = useMemo(() => {
     if (!ad) {
       return '0px'; // No height until ad loads
     }
-    if (height === 'auto') {
-      // For auto height, use a default that allows the iframe content to determine its size
-      // The iframe will resize based on its content
-      return 'auto';
+    if (measuredHeight) {
+      return `${measuredHeight}px`;
     }
-    if (height === '100%') {
-      return '100%';
-    }
-    return typeof height === 'number' ? `${height}px` : height;
-  }, [ad, height]);
-
-  // For auto height, we need the iframe to have some minimum height
-  // The actual height will be determined by the ad content
-  const iframeHeight = useMemo(() => {
-    if (height === 'auto') {
-      return '250px'; // Default minimum height for auto; ad content may resize
-    }
-    return '100%';
-  }, [height]);
+    return '50px'; // Small placeholder while waiting for height
+  }, [ad, measuredHeight]);
 
   const renderContent = () => {
-    if (loading) {
-      return null;
-    }
-
     if (error) {
       return null;
     }
@@ -254,18 +376,35 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       return null;
     }
 
+    // Show loading spinner while waiting for height measurement
+    if (!measuredHeight) {
+      return (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '50px',
+            backgroundColor: 'transparent',
+          }}
+        >
+          <RadialLinesSpinner />
+        </div>
+      );
+    }
+
     return (
       <div
         className="simula-native-banner-content"
-        onClick={() => onClick?.(ad)}
         style={{
-          cursor: onClick ? 'pointer' : 'default',
           position: 'relative',
           width: '100%',
-          height: height === 'auto' ? 'auto' : '100%',
+          height: '100%',
         }}
       >
         <iframe
+          ref={iframeRef}
           src={ad.iframeUrl}
           className="simula-native-banner-frame"
           style={{
@@ -275,7 +414,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
             margin: 0,
             padding: 0,
             width: '100%',
-            height: iframeHeight,
+            height: '100%',
           }}
           frameBorder="0"
           scrolling="no"
@@ -283,7 +422,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
           title={`Native Banner: ${ad.id}`}
           onLoad={() => {
-            setIframeLoaded(true);
+            // Try to inject script to listen for postMessage and forward to parent
+            // Height will be received via postMessage from the iframe content
           }}
         />
         <button

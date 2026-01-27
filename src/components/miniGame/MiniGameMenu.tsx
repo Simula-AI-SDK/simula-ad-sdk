@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
-import { fetchCatalog, fetchAdForMinigame } from '../../utils/api';
+import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick } from '../../utils/api';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
+import { useSimula } from '../../SimulaProvider';
 
-const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
+const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
   secondaryFont: 'Inter, system-ui, sans-serif',
   titleFontColor: '#1F2937',
   secondaryFontColor: '#6B7280',
   iconCornerRadius: 8,
   borderColor: 'rgba(0, 0, 0, 0.08)',
+  accentColor: '#3B82F6',
 };
 
 export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
@@ -26,9 +28,13 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   theme = {},
   delegateChar = true,
 }) => {
+  const { apiKey } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [games, setGames] = useState<GameData[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [menuId, setMenuId] = useState<string | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
   const [adFetched, setAdFetched] = useState(false);
@@ -37,9 +43,27 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Filter games based on search query
+  const filteredGames = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return games;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return games.filter((game) => game.name.toLowerCase().includes(query));
+  }, [games, searchQuery]);
+
+  // Reset search when menu closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+      setIsSearchFocused(false);
+    }
+  }, [isOpen]);
 
   // Merge theme with defaults
-  const appliedTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string } = {
+  const appliedTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
     ...defaultTheme,
     ...theme,
   };
@@ -54,6 +78,17 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       .slice(0, 2);
   };
 
+  // Handle search input change
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  // Clear search
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    searchInputRef.current?.focus();
+  }, []);
+
   // Fetch catalog when menu opens
   useEffect(() => {
     if (!isOpen) return;
@@ -62,12 +97,14 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       setCatalogLoading(true);
       setCatalogError(false);
       try {
-        const catalogData = await fetchCatalog();
-        setGames(catalogData);
+        const catalogResponse = await fetchCatalog();
+        setGames(catalogResponse.games);
+        setMenuId(catalogResponse.menuId || null);
       } catch (error) {
         console.error('Failed to load game catalog:', error);
         setCatalogError(true);
         setGames([]);
+        setMenuId(null);
       } finally {
         setCatalogLoading(false);
       }
@@ -165,7 +202,14 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
   };
 
-  const handleGameSelect = (gameId: string) => {
+  const handleGameSelect = (gameId: string, gameName: string) => {
+    // Track menu game click if menuId is available
+    if (menuId && gameName) {
+      trackMenuGameClick(menuId, gameName, apiKey).catch(() => {
+        // Silently fail - tracking is best effort
+      });
+    }
+    
     handleClose();
     setSelectedGameId(gameId);
     // Reset ad tracking when a new game is selected
@@ -228,6 +272,9 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             delegateChar={delegateChar}
             onClose={handleIframeClose}
             onAdIdReceived={handleAdIdReceived}
+            menuId={menuId}
+            playableHeight={appliedTheme.playableHeight}
+            playableBorderColor={appliedTheme.playableBorderColor}
         />
       )}
 
@@ -502,7 +549,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 flex: 1,
                 position: 'relative',
                 display: 'flex',
-                alignItems: catalogError || catalogLoading ? 'center' : 'flex-start',
+                flexDirection: 'column',
+                alignItems: catalogError || catalogLoading ? 'center' : 'stretch',
                 justifyContent: catalogError || catalogLoading ? 'center' : 'flex-start',
               }}
             >
@@ -576,13 +624,108 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   <span>No games are available to play right now. Please check back later!</span>
                 </div>
               ) : (
-                <GameGrid
-                  games={games}
-                  maxGamesToShow={maxGamesToShow}
-                  charID={charID}
-                  theme={appliedTheme}
-                  onGameSelect={handleGameSelect}
-                />
+                <>
+                  {/* Search Bar */}
+                  {games.length > 0 && (
+                    <div
+                      style={{
+                        marginBottom: '16px',
+                        position: 'relative',
+                      }}
+                    >
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        onFocus={() => setIsSearchFocused(true)}
+                        onBlur={() => setIsSearchFocused(false)}
+                        placeholder="Search games..."
+                        style={{
+                          width: '100%',
+                          padding: '12px 40px 12px 40px',
+                          fontSize: '14px',
+                          fontFamily: appliedTheme.secondaryFont || 'Inter, system-ui, sans-serif',
+                          color: appliedTheme.titleFontColor || '#1F2937',
+                          backgroundColor: appliedTheme.backgroundColor || '#FFFFFF',
+                          border: `1px solid ${isSearchFocused ? (appliedTheme.accentColor || '#3B82F6') : (appliedTheme.borderColor || 'rgba(0, 0, 0, 0.08)')}`,
+                          borderRadius: '8px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          transition: 'border-color 0.2s ease',
+                        }}
+                        aria-label="Search games"
+                      />
+                      {/* Search Icon */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '12px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: appliedTheme.secondaryFontColor || '#6B7280',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="11" cy="11" r="8" />
+                          <path d="M21 21l-4.35-4.35" />
+                        </svg>
+                      </div>
+                      {/* Clear Button */}
+                      {searchQuery && (
+                        <button
+                          onClick={handleClearSearch}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: appliedTheme.secondaryFontColor || '#6B7280',
+                            borderRadius: '4px',
+                          }}
+                          aria-label="Clear search"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* No Results Message */}
+                  {filteredGames.length === 0 && searchQuery ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        color: appliedTheme.secondaryFontColor,
+                        fontFamily: appliedTheme.secondaryFont,
+                        fontSize: '14px',
+                        padding: '24px 0',
+                      }}
+                    >
+                      No games found for "{searchQuery}"
+                    </div>
+                  ) : (
+                    <GameGrid
+                      games={filteredGames}
+                      maxGamesToShow={maxGamesToShow}
+                      charID={charID}
+                      theme={appliedTheme}
+                      onGameSelect={handleGameSelect}
+                      menuId={menuId}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>

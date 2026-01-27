@@ -1,9 +1,9 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext } from '../types';
 
 // Production API URL
-const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
-// const API_BASE_URL = "https://splittable-unpatient-maxine.ngrok-free.dev"
+const API_BASE_URL = "https://splittable-unpatient-maxine.ngrok-free.dev"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -168,9 +168,78 @@ export const trackImpression = async (adId: string, apiKey: string): Promise<voi
   }
 };
 
-export const fetchCatalog = async (): Promise<GameData[]> => {
+export const trackMenuGameClick = async (menuId: string, gameName: string, apiKey: string): Promise<void> => {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'ngrok-skip-browser-warning': '1',
+    };
+
+    await fetch(`${API_BASE_URL}/minigames/menu/track/click`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        menu_id: menuId,
+        game_name: gameName,
+      }),
+    });
+  } catch (error) {
+    // Silently fail - tracking is best effort
+    console.error('Failed to track menu game click:', error);
+  }
+};
+
+export const trackViewportEntry = async (adId: string, apiKey: string): Promise<void> => {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'ngrok-skip-browser-warning': '1',
+    };
+
+    await fetch(`${API_BASE_URL}/track/engagement/viewport_entry/${adId}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (error) {
+    // Silently fail - tracking is best effort
+    console.error('Failed to track viewport entry:', error);
+  }
+};
+
+export const trackViewportExit = async (adId: string, apiKey: string): Promise<void> => {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'ngrok-skip-browser-warning': '1',
+    };
+
+    await fetch(`${API_BASE_URL}/track/engagement/viewport_exit/${adId}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (error) {
+    // Silently fail - tracking is best effort
+    console.error('Failed to track viewport exit:', error);
+  }
+};
+
+export interface CatalogResponse {
+    menuId: string;
+    games: GameData[];
+}
+
+export const fetchCatalog = async (): Promise<CatalogResponse> => {
     try {
-        const response: Response = await fetch(`${API_BASE_URL}/minigames/catalog`, {
+        const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -182,18 +251,40 @@ export const fetchCatalog = async (): Promise<GameData[]> => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const responseData: { data: any[] } = await response.json();
+        const responseData = await response.json();
+        
+        // Extract menu_id from response
+        const menuId = responseData.menu_id ?? '';
+        
+        // Handle different response formats: catalog.data or direct data array
+        let gamesList: any[];
+        if (responseData.catalog != null) {
+            // New format: catalog is in the response
+            const catalog = responseData.catalog;
+            if (Array.isArray(catalog)) {
+                gamesList = catalog;
+            } else if (catalog && catalog.data != null) {
+                // Nested format: catalog.data
+                gamesList = catalog.data as any[];
+            } else {
+                // Fallback: try responseData.data for backwards compatibility
+                gamesList = responseData.data ?? [];
+            }
+        } else {
+            // Fallback: try responseData.data for backwards compatibility
+            gamesList = responseData.data ?? [];
+        }
         
         // Map API response to GameData format (icon -> iconUrl)
-        const games: GameData[] = responseData.data.map((game: any) => ({
+        const games: GameData[] = gamesList.map((game: any) => ({
             id: game.id,
             name: game.name,
             iconUrl: game.icon, // API returns 'icon', we use 'iconUrl'
-            description: game.description,
+            description: game.description ?? '',
             iconFallback: game.iconFallback,
         }));
         
-        return games;
+        return { menuId, games };
     } catch (error) {
         console.error('Failed to fetch catalog:', error);
         throw error;
@@ -213,6 +304,7 @@ export interface InitMinigameRequest {
     char_desc?: string;
     messages?: Message[];
     delegate_char?: boolean;
+    menuId?: string;
 }
 
 export interface MinigameResponse {
@@ -226,8 +318,7 @@ export interface MinigameResponse {
 
 export const getMinigame = async (params: InitMinigameRequest): Promise<MinigameResponse> => {
     try {
-        console.log('[getMinigame] Request params.sessionId:', params.sessionId);
-        const requestBody = {
+        const requestBody: Record<string, any> = {
             game_type: params.gameType,
             session_id: params.sessionId,
             conv_id: params.convId ?? null,
@@ -241,7 +332,12 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
             messages: params.messages,
             delegate_char: params.delegate_char ?? true,
         };
-        console.log('[getMinigame] Request body session_id:', requestBody.session_id);
+        
+        // Include menu_id if provided
+        if (params.menuId) {
+            requestBody.menu_id = params.menuId;
+        }
+        
         const response: Response = await fetch(`${API_BASE_URL}/minigames/init`, {
             method: 'POST',
             headers: {
@@ -293,22 +389,20 @@ export const fetchAdForMinigame = async (aid: string): Promise<string | null> =>
 export interface FetchNativeBannerRequest {
   apiKey: string;
   sessionId: string;
-  slotId: string;
+  slot: string;
   position: number;
   context: NativeContext;
   width?: number;
-  height?: number;
 }
 
 export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Promise<FetchAdResponse> => {
   try {
     const requestBody = {
       session_id: request.sessionId,
-      slot_id: request.slotId,
+      slot: request.slot,
       position: request.position,
       context: request.context,
       width: request.width,
-      height: request.height,
     };
 
     const headers: Record<string, string> = {

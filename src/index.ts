@@ -19,6 +19,9 @@ export {
   getShadow
 } from './utils/colorThemes';
 
+// Privacy utilities
+export { filterContextForPrivacy } from './types';
+
 // Test utilities (removed)
 
 export type {

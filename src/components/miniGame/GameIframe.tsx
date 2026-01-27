@@ -12,16 +12,16 @@ interface GameIframeProps {
   delegateChar?: boolean;
   onClose: () => void;
   onAdIdReceived?: (adId: string) => void;
-  turnsBtwnMsgs?: number;
-  usePubCharApi?: string;
   charDesc?: string;
-  exampleCharMsgs?: string;
+  menuId?: string | null;
+  /** Controls the height of the game iframe (px, percentage, or null for fullscreen) */
+  playableHeight?: number | string;
+  /** Background color for the bottom sheet border area */
+  playableBorderColor?: string;
 }
 
 export const GameIframe: React.FC<GameIframeProps> = ({ 
-  
   gameId, 
-  
   charID, 
   charName, 
   charImage, 
@@ -30,7 +30,9 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   onClose, 
   onAdIdReceived,
   charDesc, 
-
+  menuId,
+  playableHeight,
+  playableBorderColor = '#262626',
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const { sessionId } = useSimula();
@@ -106,6 +108,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           char_desc: charDesc,
           messages: messages,
           delegate_char: delegateChar,
+          menuId: menuId ?? undefined,
         });
         
         // Only process response if this is still the current request
@@ -147,7 +150,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       // We don't need to abort here since we check initKeyRef in the async function
       console.log('[GameIframe] Cleanup for key:', initKey);
     };
-  }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId]);
+  }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId, menuId]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -174,6 +177,25 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     }
   };
 
+  // Calculate effective height for bottom sheet mode
+  const getIframeHeight = useMemo(() => {
+    if (!playableHeight) return '100%';
+    
+    if (typeof playableHeight === 'number') {
+      const minHeight = 500;
+      return `${Math.max(playableHeight, minHeight)}px`;
+    }
+    
+    if (typeof playableHeight === 'string' && playableHeight.includes('%')) {
+      // For percentage, we'll handle it in CSS
+      return playableHeight;
+    }
+    
+    return '100%';
+  }, [playableHeight]);
+
+  const isBottomSheetMode = !!playableHeight;
+
   return (
     <div
       ref={overlayRef}
@@ -187,7 +209,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         zIndex: 9999,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: isBottomSheetMode ? 'flex-end' : 'center',
         justifyContent: 'center',
         animation: 'fadeIn 0.2s ease-in',
       }}
@@ -204,18 +226,56 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             opacity: 1;
           }
         }
+        @keyframes slideUp {
+          from {
+            transform: translateY(100%);
+          }
+          to {
+            transform: translateY(0);
+          }
+        }
       `}</style>
       <div
         style={{
           position: 'relative',
           width: '100%',
-          height: '100%',
+          height: isBottomSheetMode ? getIframeHeight : '100%',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: isBottomSheetMode ? 'flex-end' : 'center',
           pointerEvents: 'none',
+          ...(isBottomSheetMode ? {
+            animation: 'slideUp 0.3s ease-out',
+          } : {}),
         }}
       >
+        {/* Bottom sheet header with drag handle */}
+        {isBottomSheetMode && (
+          <div
+            style={{
+              width: '100%',
+              backgroundColor: playableBorderColor,
+              borderTopLeftRadius: '16px',
+              borderTopRightRadius: '16px',
+              padding: '12px 0',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              pointerEvents: 'auto',
+            }}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '4px',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '2px',
+              }}
+            />
+          </div>
+        )}
+        
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -226,7 +286,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           }}
           style={{
             position: 'absolute',
-            top: 'max(16px, env(safe-area-inset-top, 16px))',
+            top: isBottomSheetMode ? '4px' : 'max(16px, env(safe-area-inset-top, 16px))',
             right: 'max(16px, env(safe-area-inset-right, 16px))',
             background: 'rgba(255, 255, 255, 0.9)',
             border: 'none',
@@ -265,6 +325,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             color: '#FFFFFF',
             fontSize: '18px',
             fontWeight: '500',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}>
             Loading game...
           </div>
@@ -277,6 +341,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             fontWeight: '500',
             textAlign: 'center',
             padding: '20px',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}>
             {error}
           </div>
@@ -287,7 +355,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             src={iframeUrl}
             style={{
               width: '100%',
-              height: '100%',
+              flex: 1,
               border: 'none',
               display: 'block',
               pointerEvents: 'auto',

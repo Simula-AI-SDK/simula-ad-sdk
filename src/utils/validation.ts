@@ -10,7 +10,7 @@ const isPixelWidth = (width: any): boolean => typeof width === 'string' && /^\d+
  * Throws descriptive errors for invalid props
  */
 export const validateSimulaProviderProps = (props: any): void => {
-  const validProps = ['apiKey', 'children', 'devMode', 'primaryUserID'];
+  const validProps = ['apiKey', 'children', 'devMode', 'primaryUserID', 'hasPrivacyConsent'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -38,6 +38,10 @@ export const validateSimulaProviderProps = (props: any): void => {
 
   if (props.primaryUserID !== undefined && typeof props.primaryUserID !== 'string') {
     throw new Error(`Invalid "primaryUserID" prop type: "${typeof props.primaryUserID}". Must be a string`);
+  }
+
+  if (props.hasPrivacyConsent !== undefined && typeof props.hasPrivacyConsent !== 'boolean') {
+    throw new Error(`Invalid "hasPrivacyConsent" prop type: "${typeof props.hasPrivacyConsent}". Must be a boolean`);
   }
 };
 
@@ -199,7 +203,7 @@ export const validateNativeContext = (context: any): void => {
     throw new Error('Invalid "context": must be an object');
   }
 
-  const validKeys = ['searchTerm', 'tags', 'category', 'title', 'description', 'userProfile', 'customContext'];
+  const validKeys = ['searchTerm', 'tags', 'category', 'title', 'description', 'userProfile', 'userEmail', 'nsfw', 'customContext'];
 
   // Check for invalid top-level keys
   Object.keys(context).forEach(key => {
@@ -251,6 +255,16 @@ export const validateNativeContext = (context: any): void => {
     throw new Error(`Invalid "userProfile" type: "${typeof context.userProfile}". Must be a string`);
   }
 
+  // Validate userEmail (optional string)
+  if (context.userEmail !== undefined && typeof context.userEmail !== 'string') {
+    throw new Error(`Invalid "userEmail" type: "${typeof context.userEmail}". Must be a string`);
+  }
+
+  // Validate nsfw (optional boolean)
+  if (context.nsfw !== undefined && typeof context.nsfw !== 'boolean') {
+    throw new Error(`Invalid "nsfw" type: "${typeof context.nsfw}". Must be a boolean`);
+  }
+
   // Validate customContext (optional object with max 10 keys)
   if (context.customContext !== undefined) {
     if (typeof context.customContext !== 'object' || context.customContext === null || Array.isArray(context.customContext)) {
@@ -282,7 +296,7 @@ export const validateNativeContext = (context: any): void => {
  * Throws descriptive errors for invalid props
  */
 export const validateNativeBannerProps = (props: any): void => {
-  const validProps = ['width', 'height', 'position', 'context', 'onImpression', 'onClick', 'onError'];
+  const validProps = ['slot', 'width', 'position', 'context', 'onImpression', 'onError'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -294,20 +308,23 @@ export const validateNativeBannerProps = (props: any): void => {
     );
   }
 
+  // Validate slot (required)
+  if (props.slot === undefined) {
+    throw new Error('NativeBanner requires a "slot" prop (placement identifier string, e.g., "feed", "explore")');
+  }
+  if (typeof props.slot !== 'string') {
+    throw new Error(`Invalid "slot" prop type: "${typeof props.slot}". Must be a string`);
+  }
+  if (props.slot.trim() === '') {
+    throw new Error('NativeBanner "slot" prop cannot be an empty string');
+  }
+
   // Validate width (required)
   if (props.width === undefined) {
     throw new Error('NativeBanner requires a "width" prop (number, "100%", or "auto")');
   }
   if (typeof props.width !== 'number' && props.width !== '100%' && props.width !== 'auto') {
     throw new Error(`Invalid "width" prop: "${props.width}". Must be a number, "100%", or "auto"`);
-  }
-
-  // Validate height (required)
-  if (props.height === undefined) {
-    throw new Error('NativeBanner requires a "height" prop (number, "100%", or "auto")');
-  }
-  if (typeof props.height !== 'number' && props.height !== '100%' && props.height !== 'auto') {
-    throw new Error(`Invalid "height" prop: "${props.height}". Must be a number, "100%", or "auto"`);
   }
 
   // Validate position (required, non-negative number)
@@ -330,10 +347,6 @@ export const validateNativeBannerProps = (props: any): void => {
   // Validate callbacks (optional)
   if (props.onImpression !== undefined && typeof props.onImpression !== 'function') {
     throw new Error(`Invalid "onImpression" prop type: "${typeof props.onImpression}". Must be a function`);
-  }
-
-  if (props.onClick !== undefined && typeof props.onClick !== 'function') {
-    throw new Error(`Invalid "onClick" prop type: "${typeof props.onClick}". Must be a function`);
   }
 
   if (props.onError !== undefined && typeof props.onError !== 'function') {

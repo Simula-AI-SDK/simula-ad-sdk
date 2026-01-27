@@ -61,12 +61,28 @@ export interface SimulaProviderProps {
   children: React.ReactNode;
   devMode?: boolean;
   primaryUserID?: string;
+  /** Privacy consent flag. When false, suppresses collection of PII (primaryUserID). Defaults to true. */
+  hasPrivacyConsent?: boolean;
 }
 
 export interface SimulaContextValue {
   apiKey: string;
   devMode: boolean;
   sessionId?: string;
+  /** Privacy consent flag. When false, PII should not be collected. */
+  hasPrivacyConsent: boolean;
+  /** Get cached ad for a slot/position */
+  getCachedAd: (slot: string, position: number) => AdData | null;
+  /** Cache an ad for a slot/position */
+  cacheAd: (slot: string, position: number, ad: AdData) => void;
+  /** Get cached height for a slot/position */
+  getCachedHeight: (slot: string, position: number) => number | null;
+  /** Cache height for a slot/position */
+  cacheHeight: (slot: string, position: number, height: number) => void;
+  /** Check if a slot/position has no fill */
+  hasNoFill: (slot: string, position: number) => boolean;
+  /** Mark a slot/position as having no fill */
+  markNoFill: (slot: string, position: number) => void;
 }
 
 export interface BotDetectionResult {
@@ -111,6 +127,21 @@ export interface MiniGameTheme {
   titleFontColor?: string;
   secondaryFontColor?: string;
   iconCornerRadius?: number;
+  /** Unified accent color for interactive elements (search bar focus, pagination). Default: '#3B82F6' (blue-500) */
+  accentColor?: string;
+  /** 
+   * Controls the height of the Mini Game iframe (not the ad).
+   * - number: pixel value (e.g., 500 = 500px)
+   * - string with %: percentage of screen height (e.g., "80%")
+   * - undefined/null: full screen (default behavior)
+   * Minimum height is 500px.
+   */
+  playableHeight?: number | string;
+  /** 
+   * Controls the background color of the curved border area above the playable
+   * when playableHeight is set (bottom sheet mode). Default: '#262626'
+   */
+  playableBorderColor?: string;
 }
 
 export interface GameData {
@@ -142,15 +173,31 @@ export interface NativeContext {
   title?: string;
   description?: string;
   userProfile?: string;
+  /** User email (requires privacy consent) */
+  userEmail?: string;
+  /** NSFW content flag */
+  nsfw?: boolean;
   customContext?: Record<string, string | string[]>;
 }
 
+/**
+ * Filter NativeContext for privacy - removes PII fields when consent is not granted.
+ * When hasPrivacyConsent is false, removes userEmail and userProfile.
+ */
+export const filterContextForPrivacy = (context: NativeContext, hasPrivacyConsent: boolean): NativeContext => {
+  if (hasPrivacyConsent) {
+    return context;
+  }
+  // Return a copy without userEmail and userProfile
+  const { userEmail, userProfile, ...filtered } = context;
+  return filtered;
+};
+
 export interface NativeBannerProps {
+  slot: string; // Placement identifier (e.g., 'feed', 'explore')
   width: number | '100%' | 'auto';
-  height: number | '100%' | 'auto';
   position: number;
   context: NativeContext;
   onImpression?: (ad: AdData) => void;
-  onClick?: (ad: AdData) => void;
   onError?: (error: Error) => void;
 }

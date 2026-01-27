@@ -6,9 +6,10 @@ interface GameCardProps {
   charID: string;
   theme: MiniGameTheme;
   onGameSelect: (gameId: string) => void;
+  menuId?: string | null;
 }
 
-export const GameCard: React.FC<GameCardProps> = ({ game, charID, theme, onGameSelect }) => {
+export const GameCard: React.FC<GameCardProps> = ({ game, charID, theme, onGameSelect, menuId }) => {
   const [showDescription, setShowDescription] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
@@ -22,7 +23,7 @@ export const GameCard: React.FC<GameCardProps> = ({ game, charID, theme, onGameS
   );
 
   const handleClick = () => {
-    console.log('Game launched:', { gameId: game.id, charID });
+    // Tracking is now done in MiniGameMenu via GameGrid's onGameSelect(gameId, gameName)
     onGameSelect(game.id);
   };
 
