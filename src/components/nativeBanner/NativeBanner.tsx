@@ -11,61 +11,10 @@ const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
 
 // Helper functions for dimension validation
 // Width < 1 is percentage (e.g., 0.8 = 80%), > 1 is pixels (e.g., 400.0 = 400px)
-// null, undefined, 0, or 1 means fill container (min 320px)
+// null, undefined, 0, or 1 means fill container (min 200px)
 const isPercentageWidth = (width: number | null | undefined): boolean => width != null && width > 0 && width < 1;
 const isPixelWidth = (width: number | null | undefined): boolean => width != null && width > 1;
 const needsWidthMeasurement = (width: number | null | undefined): boolean => width == null || width === 0 || width === 1 || isPercentageWidth(width);
-
-// Radial lines spinner component (matching Flutter SDK)
-const RadialLinesSpinner: React.FC = () => {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((prev) => (prev + 1 / 12) % 1);
-    }, 100); // 1200ms / 12 lines = 100ms per line
-    return () => clearInterval(interval);
-  }, []);
-
-  const lineCount = 12;
-  const radius = 8;
-  const lineLength = radius * 0.6;
-  const currentLine = Math.floor(progress * lineCount) % lineCount;
-
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16">
-      {Array.from({ length: lineCount }).map((_, i) => {
-        const angle = (i * 2 * Math.PI) / lineCount;
-        const distance = (i - currentLine + lineCount) % lineCount;
-        
-        let opacity = 0.35;
-        if (distance === 0) opacity = 1.0;
-        else if (distance === 1) opacity = 0.75;
-        else if (distance === 2) opacity = 0.5;
-        else if (distance === 3) opacity = 0.4;
-
-        const startX = 8 + (radius - lineLength) * Math.cos(angle);
-        const startY = 8 + (radius - lineLength) * Math.sin(angle);
-        const endX = 8 + radius * Math.cos(angle);
-        const endY = 8 + radius * Math.sin(angle);
-
-        return (
-          <line
-            key={i}
-            x1={startX}
-            y1={startY}
-            x2={endX}
-            y2={endY}
-            stroke="black" // white
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            opacity={opacity}
-          />
-        );
-      })}
-    </svg>
-  );
-};
 
 export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
   // Validate props early
@@ -139,26 +88,32 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
   const { isBot, reasons } = useBotDetection();
 
   // Listen for postMessage from iframe to get dynamic height
+  // Only process messages from this component's own iframe to prevent cross-contamination
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = event.data;
-        console.log(`Got data ${JSON.stringify(data)}`)
-        if (data && data.type === 'AD_HEIGHT' && typeof data.height === 'number') {
-          // Add a small buffer (10px) to prevent cut-off
-          const heightWithBuffer = data.height + 30;
-          cacheHeight(slot, position, heightWithBuffer);
-          setMeasuredHeight(heightWithBuffer);
-          setIframeLoaded(true);
-        }
-      } catch (e) {
-        // Silently ignore parsing errors
+      // Only process messages if iframe ref is available
+      if (!iframeRef.current?.contentWindow) {
+        return;
       }
+      
+      // Only process messages from this component's iframe (the wrapper window)
+      if (event.source !== iframeRef.current.contentWindow) {
+        return;
+      }
+      
+      // Only process AD_HEIGHT messages
+      if (event.data?.type !== 'AD_HEIGHT') return;
+      
+      const newHeight = event.data.height + 10;
+      if (typeof newHeight !== 'number' || newHeight <= 0) return;
+      
+      console.log(`Received height from iframe with type ${event.data.type}: ${JSON.stringify(event.data)}`);
+      setMeasuredHeight(newHeight);
+      setIframeLoaded(true);
     };
-
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [slot, position, cacheHeight]);
+  }, []);
 
   // Measure actual width once when element is ready (needed for null/0/1 or percentage widths)
   useEffect(() => {
@@ -174,8 +129,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       if (entry && !hasMeasured) {
         hasMeasured = true;
         const measuredW = Math.round(entry.contentRect.width);
-        // Ensure minimum 320px for null/undefined/0/1 width (fill container)
-        const finalWidth = (width == null || width === 0 || width === 1) ? Math.max(measuredW, 320) : measuredW;
+        // Ensure minimum 200px for null/undefined/0/1 width (fill container)
+        const finalWidth = (width == null || width === 0 || width === 1) ? Math.max(measuredW, 200) : measuredW;
         setMeasuredWidth(finalWidth);
         resizeObserver.disconnect();
       }
@@ -207,14 +162,9 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
 
     // Check for cached ad
     const cachedAd = getCachedAd(slot, position);
-    const cachedHeight = getCachedHeight(slot, position);
     if (cachedAd) {
       setAd(cachedAd);
       setHasTriggered(true);
-      if (cachedHeight) {
-        setMeasuredHeight(cachedHeight);
-        setIframeLoaded(true);
-      }
       return;
     }
 
@@ -249,18 +199,18 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       let widthValue: number | undefined;
       
       if (width == null || width === 0 || width === 1) {
-        // null/undefined/0/1 width: use measured container width (min 320px)
+        // null/undefined/0/1 width: use measured container width (min 200px)
         if (measuredWidth !== null) {
-          widthValue = Math.max(measuredWidth, 320);
+          widthValue = Math.max(measuredWidth, 200);
         }
       } else if (isPercentageWidth(width)) {
         // Percentage width (< 1): calculate from measured container width
         if (measuredWidth !== null) {
-          widthValue = Math.max(Math.round(measuredWidth * width), 320);
+          widthValue = Math.max(Math.round(measuredWidth * width), 200);
         }
       } else if (isPixelWidth(width)) {
-        // Pixel width (>= 1): use directly, enforce minimum 320px
-        widthValue = Math.max(Math.round(width), 320);
+        // Pixel width (>= 1): use directly, enforce minimum 200px
+        widthValue = Math.max(Math.round(width), 200);
       }
 
       // Preserve width once calculated
@@ -301,7 +251,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
     } finally {
       setLoading(false);
     }
-  }, [ad, error, loading, hasTriggered, apiKey, sessionId, slot, position, context, width, isBot, reasons, measuredWidth, preservedWidth, hasPrivacyConsent, onError, getCachedAd, getCachedHeight, cacheAd, hasNoFill, markNoFill]);
+  }, [ad, error, loading, hasTriggered, apiKey, sessionId, slot, position, context, width, isBot, reasons, measuredWidth, preservedWidth, hasPrivacyConsent, onError, getCachedAd, cacheAd, hasNoFill, markNoFill]);
 
   // Trigger ad fetch when session becomes available
   useEffect(() => {
@@ -358,29 +308,19 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
   // Calculate container dimensions
   const containerWidth = useMemo(() => {
     if (width == null || width === 0 || width === 1) {
-      // null/undefined/0/1: fill container width (min 320px)
+      // null/undefined/0/1: fill container width (min 200px)
       return '100%';
     } else if (isPercentageWidth(width)) {
       // Percentage (< 1): use as percentage
       return `${width * 100}%`;
     } else if (isPixelWidth(width)) {
-      // Pixels (>= 1): use as pixels, enforce minimum 320px
-      return `${Math.max(Math.round(width), 320)}px`;
+      // Pixels (>= 1): use as pixels, enforce minimum 200px
+      return `${Math.max(Math.round(width), 200)}px`;
     }
     // Fallback (shouldn't happen)
     return '100%';
   }, [width]);
 
-  // Height is dynamic from postMessage, or small placeholder while waiting
-  const containerHeight = useMemo(() => {
-    if (!ad) {
-      return '0px'; // No height until ad loads
-    }
-    if (measuredHeight) {
-      return `${measuredHeight + 10}px`;
-    }
-    return '100px'; // Small placeholder while waiting for height
-  }, [ad, measuredHeight]);
 
   const renderContent = () => {
     if (error) {
@@ -429,7 +369,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
             margin: 0,
             padding: 0,
             width: '100%',
-            height: '100%',
+            height: measuredHeight ? `${measuredHeight}px` : '150px',
           }}
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
           title={`Native Banner: ${ad.id}`}
@@ -438,39 +378,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
             // Height will be received via postMessage from the iframe content
           }}
         />
-        <button
-          className="simula-native-banner-info-icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowInfoModal(true);
-          }}
-          aria-label="Ad information"
-          style={{
-            position: 'absolute',
-            top: '4px',
-            right: '4px',
-            width: '20px',
-            height: '20px',
-            padding: 0,
-            border: 'none',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(0, 0, 0, 0.4)',
-            color: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '12px',
-            fontFamily: 'serif',
-            opacity: 0.7,
-            transition: 'opacity 0.2s',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1" fill="none"/>
-            <text x="8" y="12" textAnchor="middle" fontSize="10" fontFamily="serif">i</text>
-          </svg>
-        </button>
         {showInfoModal && (
           <div
             className="simula-native-banner-modal-overlay"
@@ -545,8 +452,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       style={{
         display: error ? 'none' : 'block',
         width: containerWidth,
-        minWidth: '320px', // Enforce minimum 320px for all width types
-        height: containerHeight,
+        minWidth: '200px', // Enforce minimum 200px for all width types
+        height: !ad ? '0px' : (measuredHeight ? `${measuredHeight}px` : '200px'),
         overflow: 'hidden',
       }}
     >
