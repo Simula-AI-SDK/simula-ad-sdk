@@ -9,6 +9,57 @@ import { NativeBannerProps, AdData, filterContextForPrivacy } from '../../types'
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
 
+// Radial lines spinner component (matching Flutter SDK)
+const RadialLinesSpinner: React.FC = () => {
+    const [progress, setProgress] = useState(0);
+  
+    useEffect(() => {
+      const interval = setInterval(() => {
+        setProgress((prev) => (prev + 1 / 12) % 1);
+      }, 100); // 1200ms / 12 lines = 100ms per line
+      return () => clearInterval(interval);
+    }, []);
+  
+    const lineCount = 12;
+    const radius = 8;
+    const lineLength = radius * 0.6;
+    const currentLine = Math.floor(progress * lineCount) % lineCount;
+  
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        {Array.from({ length: lineCount }).map((_, i) => {
+          const angle = (i * 2 * Math.PI) / lineCount;
+          const distance = (i - currentLine + lineCount) % lineCount;
+          
+          let opacity = 0.35;
+          if (distance === 0) opacity = 1.0;
+          else if (distance === 1) opacity = 0.75;
+          else if (distance === 2) opacity = 0.5;
+          else if (distance === 3) opacity = 0.4;
+  
+          const startX = 8 + (radius - lineLength) * Math.cos(angle);
+          const startY = 8 + (radius - lineLength) * Math.sin(angle);
+          const endX = 8 + radius * Math.cos(angle);
+          const endY = 8 + radius * Math.sin(angle);
+  
+          return (
+            <line
+              key={i}
+              x1={startX}
+              y1={startY}
+              x2={endX}
+              y2={endY}
+              stroke="black" // white
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              opacity={opacity}
+            />
+          );
+        })}
+      </svg>
+    );
+  };
+
 // Helper functions for dimension validation
 // Width < 1 is percentage (e.g., 0.8 = 80%), > 1 is pixels (e.g., 400.0 = 400px)
 // null, undefined, 0, or 1 means fill container (min 200px)
@@ -104,7 +155,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       // Only process AD_HEIGHT messages
       if (event.data?.type !== 'AD_HEIGHT') return;
       
-      const newHeight = event.data.height + 10;
+      const newHeight = event.data.height + 20;
       if (typeof newHeight !== 'number' || newHeight <= 0) return;
       
       console.log(`Received height from iframe with type ${event.data.type}: ${JSON.stringify(event.data)}`);
@@ -331,24 +382,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       return null;
     }
 
-    // Show loading spinner while waiting for height measurement
-    // if (!measuredHeight) {
-    //   return (
-    //     <div
-    //       style={{
-    //         display: 'flex',
-    //         alignItems: 'center',
-    //         justifyContent: 'center',
-    //         width: '100%',
-    //         height: '50px',
-    //         backgroundColor: 'transparent',
-    //       }}
-    //     >
-    //       <RadialLinesSpinner />
-    //     </div>
-    //   );
-    // }
-
     return (
       <div
         className="simula-native-banner-content"
@@ -374,10 +407,27 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
           title={`Native Banner: ${ad.id}`}
           onLoad={() => {
-            // Try to inject script to listen for postMessage and forward to parent
-            // Height will be received via postMessage from the iframe content
+            setIframeLoaded(true);
           }}
         />
+        {!iframeLoaded && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
+              zIndex: 1,
+            }}
+          >
+            <RadialLinesSpinner />
+          </div>
+        )}
         {showInfoModal && (
           <div
             className="simula-native-banner-modal-overlay"
