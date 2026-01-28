@@ -2,7 +2,6 @@ export { SimulaProvider, useSimula } from './SimulaProvider';
 export { InChatAdSlot } from './components/inChatAd/InChatAdSlot';
 export { MiniGameMenu } from './components/miniGame/MiniGameMenu';
 export { NativeBanner } from './components/nativeBanner/NativeBanner';
-export { NativeBannerTest } from './components/nativeBanner/NativeBannerTest';
 export { useBotDetection } from './hooks/useBotDetection';
 export { useViewability } from './hooks/useViewability';
 export { useOMIDViewability } from './hooks/useOMIDViewability';
