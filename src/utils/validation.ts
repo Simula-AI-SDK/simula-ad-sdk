@@ -296,7 +296,7 @@ export const validateNativeContext = (context: any): void => {
  * Throws descriptive errors for invalid props
  */
 export const validateNativeBannerProps = (props: any): void => {
-  const validProps = ['slot', 'width', 'position', 'context', 'onImpression', 'onError'];
+  const validProps = ['slot', 'width', 'position', 'context', 'onImpression', 'onError', 'loadingComponent'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props

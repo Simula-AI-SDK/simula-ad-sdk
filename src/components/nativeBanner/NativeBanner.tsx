@@ -1,63 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSimula } from '../../SimulaProvider';
 import { useBotDetection } from '../../hooks/useBotDetection';
+import { useAssetLoadDetection } from '../../hooks/useAssetLoadDetection';
 import { fetchNativeBannerAd, trackImpression, trackViewportEntry, trackViewportExit } from '../../utils/api';
 import { validateNativeBannerProps } from '../../utils/validation';
 import { NativeBannerProps, AdData, filterContextForPrivacy } from '../../types';
+import { RadialLinesSpinner } from './RadialLinesSpinner';
 
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
-
-// Radial lines spinner component (matching Flutter SDK)
-const RadialLinesSpinner: React.FC = () => {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((prev) => (prev + 1 / 12) % 1);
-    }, 100); // 1200ms / 12 lines = 100ms per line
-    return () => clearInterval(interval);
-  }, []);
-
-  const lineCount = 12;
-  const radius = 8;
-  const lineLength = radius * 0.6;
-  const currentLine = Math.floor(progress * lineCount) % lineCount;
-
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16">
-      {Array.from({ length: lineCount }).map((_, i) => {
-        const angle = (i * 2 * Math.PI) / lineCount;
-        const distance = (i - currentLine + lineCount) % lineCount;
-        
-        let opacity = 0.35;
-        if (distance === 0) opacity = 1.0;
-        else if (distance === 1) opacity = 0.75;
-        else if (distance === 2) opacity = 0.5;
-        else if (distance === 3) opacity = 0.4;
-
-        const startX = 8 + (radius - lineLength) * Math.cos(angle);
-        const startY = 8 + (radius - lineLength) * Math.sin(angle);
-        const endX = 8 + radius * Math.cos(angle);
-        const endY = 8 + radius * Math.sin(angle);
-
-        return (
-          <line
-            key={i}
-            x1={startX}
-            y1={startY}
-            x2={endX}
-            y2={endY}
-            stroke="black"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            opacity={opacity}
-          />
-        );
-      })}
-    </svg>
-  );
-};
 
 // Helper functions for dimension validation and parsing
 type WidthInput = number | string | null | undefined;
@@ -124,6 +75,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     context,
     onImpression,
     onError,
+    loadingComponent: LoadingComponent,
   } = props;
 
   const { 
@@ -146,6 +98,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
   // Refs for tracking (no re-renders)
   const elementRef = useRef<HTMLDivElement>(null);
+  const htmlContentRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const hasFetchedRef = useRef(false);
   const lastFetchTimeRef = useRef<number>(0);
@@ -172,6 +125,12 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   }, [ad]);
 
   const { isBot } = useBotDetection();
+
+  // Detect when HTML content images have finished loading
+  const hookEnabled = !!ad?.html && isLoading;
+  console.log('[NativeBanner] useAssetLoadDetection params - ad?.html:', !!ad?.html, 'isLoading:', isLoading, 'enabled:', hookEnabled);
+  const { isLoaded: assetsLoaded } = useAssetLoadDetection(htmlContentRef, hookEnabled);
+  console.log('[NativeBanner] assetsLoaded:', assetsLoaded);
 
   // Measure width once (only if needed)
   useEffect(() => {
@@ -212,17 +171,15 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     return () => window.removeEventListener('message', handleMessage);
   }, [ad?.iframeUrl]);
 
-  // Mark HTML as loaded immediately, iframe when onLoad fires
+  // Mark HTML as loaded when assets (images) have finished loading
   useEffect(() => {
-    if (ad?.html) {
-      // Small delay for smooth transition
-      const timer = setTimeout(() => {
-        setIsLoaded(true);
-        setIsLoading(false);
-      }, 50);
-      return () => clearTimeout(timer);
+    console.log('[NativeBanner] Loading effect - ad?.html:', !!ad?.html, 'assetsLoaded:', assetsLoaded);
+    if (ad?.html && assetsLoaded) {
+      console.log('[NativeBanner] Setting isLoaded=true, isLoading=false');
+      setIsLoaded(true);
+      setIsLoading(false);
     }
-  }, [ad?.html]);
+  }, [ad?.html, assetsLoaded]);
 
   // Viewability and impression tracking (using refs, no re-renders)
   useEffect(() => {
@@ -496,6 +453,16 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     );
   }
 
+  // Helper to render the loading component
+  const renderLoader = () => {
+    // null = explicitly disabled
+    if (LoadingComponent === null) return null;
+    // Custom component provided
+    if (LoadingComponent) return <LoadingComponent />;
+    // Default spinner
+    return <RadialLinesSpinner />;
+  };
+
   // Render HTML directly
   if (ad.html) {
     return (
@@ -511,8 +478,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           position: 'relative',
         }}
       >
-        {/* Loading spinner overlay */}
-        {isLoading && (
+        {/* Loading overlay */}
+        {isLoading && LoadingComponent !== null && (
           <div
             style={{
               position: 'absolute',
@@ -530,12 +497,13 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
               pointerEvents: 'none',
             }}
           >
-            <RadialLinesSpinner />
+            {renderLoader()}
           </div>
         )}
-        
+
         {/* Ad content with fade-in animation */}
         <div
+          ref={htmlContentRef}
           className="simula-native-banner-html"
           dangerouslySetInnerHTML={{ __html: ad.html }}
           style={{
@@ -564,8 +532,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         position: 'relative',
       }}
     >
-      {/* Loading spinner overlay */}
-      {isLoading && (
+      {/* Loading overlay */}
+      {isLoading && LoadingComponent !== null && (
         <div
           style={{
             position: 'absolute',
@@ -583,7 +551,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
             pointerEvents: 'none',
           }}
         >
-          <RadialLinesSpinner />
+          {renderLoader()}
         </div>
       )}
       
