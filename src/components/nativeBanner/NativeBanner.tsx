@@ -155,7 +155,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       // Only process AD_HEIGHT messages
       if (event.data?.type !== 'AD_HEIGHT') return;
       
-      const newHeight = event.data.height + 20;
+      const newHeight = event.data.height;
       if (typeof newHeight !== 'number' || newHeight <= 0) return;
       
       console.log(`Received height from iframe with type ${event.data.type}: ${JSON.stringify(event.data)}`);
