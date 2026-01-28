@@ -414,7 +414,7 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
       'ngrok-skip-browser-warning': '1',
     };
 
-    const response = await fetch(`${API_BASE_URL}/render_ad/ssp/native/komiko`, {
+    const response = await fetch(`${API_BASE_URL}/render_ad/ssp/native`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
@@ -427,38 +427,25 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('text/html')) {
       const html = await response.text();
-      console.log(`HTML is ${html}`);
-      // Extract ad_id from response headers or generate a temporary one
-      // For now, we'll use a timestamp-based ID since HTML responses don't include JSON metadata
-      const adId = response.headers.get('x-ad-id') || `html-ad-${Date.now()}`;
-      const adFormat = response.headers.get('x-ad-format') || 'html';
-      
+      // Extract ad_id from response headers (FastAPI sends it as "aid" header)
+      const adId = response.headers.get('aid');
+      console.log(`Got aid ${adId}`);
       return {
         ad: {
-          id: adId,
-          format: adFormat,
+          id: adId ?? '',
+          format: "native",
           html: html
         }
       };
     }
-
-    // Handle JSON response (legacy)
-    const data = await response.json();
-    console.log(`Data is ${JSON.stringify(data)}`);
-    if (data) {
-        if (!data.ad_inserted) {
-            return { error: 'No fill' };
-        } else {
-            return {
-                ad: {
-                    id: data.ad_id,
-                    format: data.ad_format,
-                    iframeUrl: data.iframe_url
-                }
-            }
+    // Fallback
+    return {
+        ad: {
+          id: '',
+          format: '',
+          html: ''
         }
-    }
-    return { error: 'Unexpected response from ad server' };
+      };
   } catch (error) {
     console.error('❌ NativeBanner API Request failed:', error);
     return {

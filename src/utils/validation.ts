@@ -320,11 +320,32 @@ export const validateNativeBannerProps = (props: any): void => {
   }
 
   // Validate width (optional)
-  if (props.width !== undefined && props.width !== null && typeof props.width !== 'number') {
-    throw new Error(`Invalid "width" prop: "${props.width}". Must be a number or null`);
-  }
-  if (typeof props.width === 'number' && props.width < 0) {
-    throw new Error(`Invalid "width" prop value: "${props.width}". Must be a non-negative number or null`);
+  if (props.width !== undefined && props.width !== null) {
+    const width = props.width;
+    // Allow number, string, "auto", or null
+    if (typeof width !== 'number' && typeof width !== 'string') {
+      throw new Error(`Invalid "width" prop type: "${typeof width}". Must be a number, string (e.g., "10%", "500", "auto"), or null`);
+    }
+    // Validate number width
+    if (typeof width === 'number' && width < 0) {
+      throw new Error(`Invalid "width" prop value: "${width}". Must be a non-negative number`);
+    }
+    // Validate string width formats
+    if (typeof width === 'string' && width !== 'auto' && width !== '') {
+      // Check if it's a percentage string
+      if (width.endsWith('%')) {
+        const percentValue = parseFloat(width);
+        if (isNaN(percentValue) || percentValue <= 0 || percentValue > 100) {
+          throw new Error(`Invalid "width" prop value: "${width}". Percentage must be between 0 and 100`);
+        }
+      } else {
+        // Check if it's a pixel string
+        const pixelValue = parseFloat(width);
+        if (isNaN(pixelValue) || pixelValue <= 0) {
+          throw new Error(`Invalid "width" prop value: "${width}". Must be a valid number, percentage (e.g., "10%"), or "auto"`);
+        }
+      }
+    }
   }
 
   // Validate position (required, non-negative number)

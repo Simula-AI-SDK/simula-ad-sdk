@@ -197,10 +197,14 @@ export const filterContextForPrivacy = (context: NativeContext, hasPrivacyConsen
 export interface NativeBannerProps {
   slot: string; // Placement identifier (e.g., 'feed', 'explore')
   /** 
-   * Ad width as float: < 1 is percentage (e.g., 0.8 = 80%), > 1 is pixels (e.g., 400.0 = 400px).
-   * If null or undefined, fills container width (min 320px).
+   * Ad width. Supports multiple formats:
+   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
+   * - number >= 1: pixels (e.g., 500 = 500px)
+   * - string with %: percentage (e.g., "10%" = 10%)
+   * - string with number: pixels (e.g., "500" = 500px)
+   * - "auto" or null: fills container width (min 200px)
    */
-  width?: number | null;
+  width?: number | string | null;
   position: number;
   context: NativeContext;
   onImpression?: (ad: AdData) => void;

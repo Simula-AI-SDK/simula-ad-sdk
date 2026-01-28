@@ -1,17 +1,117 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSimula } from '../../SimulaProvider';
 import { useBotDetection } from '../../hooks/useBotDetection';
-import { fetchNativeBannerAd, trackImpression } from '../../utils/api';
+import { fetchNativeBannerAd, trackImpression, trackViewportEntry, trackViewportExit } from '../../utils/api';
 import { validateNativeBannerProps } from '../../utils/validation';
 import { NativeBannerProps, AdData, filterContextForPrivacy } from '../../types';
 
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
 
-// Helper functions for dimension validation
-const isPercentageWidth = (width: number | null | undefined): boolean => width != null && width > 0 && width < 1;
-const isPixelWidth = (width: number | null | undefined): boolean => width != null && width > 1;
-const needsWidthMeasurement = (width: number | null | undefined): boolean => width == null || width === 0 || width === 1 || isPercentageWidth(width);
+// Radial lines spinner component (matching Flutter SDK)
+const RadialLinesSpinner: React.FC = () => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress((prev) => (prev + 1 / 12) % 1);
+    }, 100); // 1200ms / 12 lines = 100ms per line
+    return () => clearInterval(interval);
+  }, []);
+
+  const lineCount = 12;
+  const radius = 8;
+  const lineLength = radius * 0.6;
+  const currentLine = Math.floor(progress * lineCount) % lineCount;
+
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16">
+      {Array.from({ length: lineCount }).map((_, i) => {
+        const angle = (i * 2 * Math.PI) / lineCount;
+        const distance = (i - currentLine + lineCount) % lineCount;
+        
+        let opacity = 0.35;
+        if (distance === 0) opacity = 1.0;
+        else if (distance === 1) opacity = 0.75;
+        else if (distance === 2) opacity = 0.5;
+        else if (distance === 3) opacity = 0.4;
+
+        const startX = 8 + (radius - lineLength) * Math.cos(angle);
+        const startY = 8 + (radius - lineLength) * Math.sin(angle);
+        const endX = 8 + radius * Math.cos(angle);
+        const endY = 8 + radius * Math.sin(angle);
+
+        return (
+          <line
+            key={i}
+            x1={startX}
+            y1={startY}
+            x2={endX}
+            y2={endY}
+            stroke="black"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            opacity={opacity}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
+// Helper functions for dimension validation and parsing
+type WidthInput = number | string | null | undefined;
+
+const parseWidth = (width: WidthInput): { type: 'fill' | 'percentage' | 'pixels'; value?: number } => {
+  // Handle null, undefined, "auto"
+  if (width == null || width === 'auto' || width === '') {
+    return { type: 'fill' };
+  }
+
+  // Handle string percentages (e.g., "10%")
+  if (typeof width === 'string' && width.endsWith('%')) {
+    const percentValue = parseFloat(width);
+    if (!isNaN(percentValue) && percentValue > 0 && percentValue <= 100) {
+      return { type: 'percentage', value: percentValue / 100 };
+    }
+  }
+
+  // Handle string pixels (e.g., "500")
+  if (typeof width === 'string') {
+    const pixelValue = parseFloat(width);
+    if (!isNaN(pixelValue) && pixelValue > 0) {
+      return { type: 'pixels', value: pixelValue };
+    }
+  }
+
+  // Handle number < 1 as percentage (e.g., 0.8 = 80%)
+  if (typeof width === 'number' && width > 0 && width < 1) {
+    return { type: 'percentage', value: width };
+  }
+
+  // Handle number >= 1 as pixels (e.g., 500 = 500px)
+  if (typeof width === 'number' && width >= 1) {
+    return { type: 'pixels', value: width };
+  }
+
+  // Default to fill
+  return { type: 'fill' };
+};
+
+const isPercentageWidth = (width: WidthInput): boolean => {
+  const parsed = parseWidth(width);
+  return parsed.type === 'percentage';
+};
+
+const isPixelWidth = (width: WidthInput): boolean => {
+  const parsed = parseWidth(width);
+  return parsed.type === 'pixels';
+};
+
+const needsWidthMeasurement = (width: WidthInput): boolean => {
+  const parsed = parseWidth(width);
+  return parsed.type === 'fill' || parsed.type === 'percentage';
+};
 
 export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   // Validate props early
@@ -36,12 +136,15 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     markNoFill,
   } = useSimula();
 
-  // Single state: the ad data. Once set, never changes.
+  // Minimal state - only what's needed for rendering
   const [ad, setAd] = useState<AdData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
 
+  // Refs for tracking (no re-renders)
   const elementRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const hasFetchedRef = useRef(false);
@@ -49,7 +152,24 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const impressionTrackedRef = useRef(false);
   const viewableStartTimeRef = useRef<number | null>(null);
   const hasMetDurationRef = useRef(false);
+  const wasInViewportRef = useRef(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const adIdRef = useRef<string | null>(null);
+  const adRef = useRef<AdData | null>(null);
+  const onImpressionRef = useRef(onImpression);
+  const onErrorRef = useRef(onError);
+  const errorHandledRef = useRef(false);
+
+  // Keep refs in sync with props
+  useEffect(() => {
+    onImpressionRef.current = onImpression;
+    onErrorRef.current = onError;
+  }, [onImpression, onError]);
+
+  // Keep adRef in sync with ad state
+  useEffect(() => {
+    adRef.current = ad;
+  }, [ad]);
 
   const { isBot } = useBotDetection();
 
@@ -74,7 +194,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     return () => resizeObserver.disconnect();
   }, [width, measuredWidth]);
 
-  // Listen for height messages from iframe (only once, no re-renders)
+  // Listen for height messages from iframe
   useEffect(() => {
     if (!ad?.iframeUrl) return;
 
@@ -92,12 +212,25 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     return () => window.removeEventListener('message', handleMessage);
   }, [ad?.iframeUrl]);
 
-  // Viewability tracking with IntersectionObserver (no re-renders)
+  // Mark HTML as loaded immediately, iframe when onLoad fires
   useEffect(() => {
-    if (!ad || !elementRef.current || isBot || impressionTrackedRef.current) return;
+    if (ad?.html) {
+      // Small delay for smooth transition
+      const timer = setTimeout(() => {
+        setIsLoaded(true);
+        setIsLoading(false);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [ad?.html]);
+
+  // Viewability and impression tracking (using refs, no re-renders)
+  useEffect(() => {
+    if (!ad || !elementRef.current || isBot || !adIdRef.current || impressionTrackedRef.current) return;
 
     const threshold = 0.5;
     const durationMs = 1000; // 1 second for MRC compliance
+    const currentAdId = adIdRef.current;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -107,23 +240,13 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         if (viewable) {
           if (viewableStartTimeRef.current === null) {
             viewableStartTimeRef.current = now;
-          }
-          
-          // Check if duration has been met
-          if (!hasMetDurationRef.current && viewableStartTimeRef.current !== null) {
-            const elapsed = now - viewableStartTimeRef.current;
-            if (elapsed >= durationMs) {
-              hasMetDurationRef.current = true;
-              // Track impression once
-              if (!impressionTrackedRef.current && ad) {
-                impressionTrackedRef.current = true;
-                trackImpression(ad.id, apiKey);
-                onImpression?.(ad);
-              }
-            }
+            console.log('[NativeBanner] Ad became viewable, starting duration timer');
           }
         } else {
           // Reset when not viewable
+          if (viewableStartTimeRef.current !== null) {
+            console.log('[NativeBanner] Ad no longer viewable, resetting timer');
+          }
           viewableStartTimeRef.current = null;
           hasMetDurationRef.current = false;
         }
@@ -137,16 +260,21 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     observer.observe(elementRef.current);
     observerRef.current = observer;
 
-    // Also check periodically for duration (in case intersection doesn't fire)
+    // Check periodically for duration
     const intervalId = setInterval(() => {
       if (viewableStartTimeRef.current !== null && !hasMetDurationRef.current) {
         const elapsed = Date.now() - viewableStartTimeRef.current;
         if (elapsed >= durationMs) {
           hasMetDurationRef.current = true;
-          if (!impressionTrackedRef.current && ad) {
+          if (!impressionTrackedRef.current && currentAdId) {
             impressionTrackedRef.current = true;
-            trackImpression(ad.id, apiKey);
-            onImpression?.(ad);
+            console.log('[NativeBanner] Tracking impression for ad:', currentAdId);
+            trackImpression(currentAdId, apiKey);
+            // Use ref to get current ad value (avoid stale closure)
+            const currentAd = adRef.current;
+            if (currentAd && onImpressionRef.current) {
+              onImpressionRef.current(currentAd);
+            }
           }
         }
       }
@@ -157,7 +285,49 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
       observerRef.current = null;
       clearInterval(intervalId);
     };
-  }, [ad, isBot, apiKey, onImpression]);
+  }, [ad, isBot, apiKey]);
+
+  // Viewport entry/exit tracking (using refs, no re-renders)
+  useEffect(() => {
+    if (!ad || !elementRef.current || isBot || !adIdRef.current) return;
+
+    const currentAdId = adIdRef.current;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const inViewport = entry.intersectionRatio > 0;
+        
+        if (inViewport && !wasInViewportRef.current) {
+          wasInViewportRef.current = true;
+          console.log('[NativeBanner] Ad entered viewport, tracking entry:', currentAdId);
+          trackViewportEntry(currentAdId, apiKey);
+        } else if (!inViewport && wasInViewportRef.current) {
+          wasInViewportRef.current = false;
+          console.log('[NativeBanner] Ad exited viewport, tracking exit:', currentAdId);
+          trackViewportExit(currentAdId, apiKey);
+        }
+      },
+      { 
+        threshold: 0,
+        rootMargin: '0px'
+      }
+    );
+
+    observer.observe(elementRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [ad, isBot, apiKey]);
+
+  // Track viewport exit on unmount
+  useEffect(() => {
+    return () => {
+      if (adIdRef.current && wasInViewportRef.current) {
+        trackViewportExit(adIdRef.current, apiKey);
+      }
+    };
+  }, [apiKey]);
 
   // Fetch ad once
   useEffect(() => {
@@ -166,16 +336,24 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     // Check cache first
     const cachedAd = getCachedAd(slot, position);
     if (cachedAd) {
+      // Set ad ID ref BEFORE setting ad state
+      adIdRef.current = cachedAd.id;
+      console.log('[NativeBanner] Using cached ad, ID:', cachedAd.id);
       setAd(cachedAd);
       hasFetchedRef.current = true;
-      // Don't track impression here - let viewability tracking handle it
       return;
     }
 
     // Check no-fill
     if (hasNoFill(slot, position)) {
-      setError('No ad available');
-      onError?.(new Error('No ad available'));
+      if (!errorHandledRef.current) {
+        errorHandledRef.current = true;
+        setError('No ad available');
+        const error = new Error('No ad available');
+        if (onErrorRef.current) {
+          onErrorRef.current(error);
+        }
+      }
       hasFetchedRef.current = true;
       return;
     }
@@ -200,15 +378,19 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
     hasFetchedRef.current = true;
     lastFetchTimeRef.current = now;
+    // Reset error handling flag for new fetch attempt
+    errorHandledRef.current = false;
 
-    // Calculate width
+    // Calculate width using parsed width
+    const parsedWidth = parseWidth(width);
     let widthValue: number | undefined;
-    if (width == null || width === 0 || width === 1) {
+    
+    if (parsedWidth.type === 'fill') {
       widthValue = measuredWidth !== null ? Math.max(measuredWidth, 200) : undefined;
-    } else if (isPercentageWidth(width)) {
-      widthValue = measuredWidth !== null ? Math.max(Math.round(measuredWidth * width), 200) : undefined;
-    } else if (isPixelWidth(width)) {
-      widthValue = Math.max(Math.round(width), 200);
+    } else if (parsedWidth.type === 'percentage' && parsedWidth.value !== undefined) {
+      widthValue = measuredWidth !== null ? Math.max(Math.round(measuredWidth * parsedWidth.value), 200) : undefined;
+    } else if (parsedWidth.type === 'pixels' && parsedWidth.value !== undefined) {
+      widthValue = Math.max(Math.round(parsedWidth.value), 200);
     }
 
     if (needsMeasurement && widthValue === undefined) {
@@ -227,33 +409,60 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
       width: widthValue,
     }).then(result => {
       if (result.error) {
-        setError(result.error);
-        markNoFill(slot, position);
-        onError?.(new Error(result.error));
+        if (!errorHandledRef.current) {
+          errorHandledRef.current = true;
+          setError(result.error);
+          markNoFill(slot, position);
+          const error = new Error(result.error);
+          if (onErrorRef.current) {
+            onErrorRef.current(error);
+          }
+        }
       } else if (result.ad) {
+        // Reset error handling flag on successful fetch
+        errorHandledRef.current = false;
+        // Set ad ID ref BEFORE setting ad state to ensure tracking works
+        adIdRef.current = result.ad.id;
+        console.log('[NativeBanner] Ad fetched, ID:', result.ad.id);
         setAd(result.ad);
         cacheAd(slot, position, result.ad);
-        // Don't track impression here - let viewability tracking handle it
+        // Keep loading state until content is ready
+        setIsLoading(true);
+        setIsLoaded(false);
       } else {
-        setError('No ad available');
-        markNoFill(slot, position);
-        onError?.(new Error('No ad available'));
+        if (!errorHandledRef.current) {
+          errorHandledRef.current = true;
+          setError('No ad available');
+          markNoFill(slot, position);
+          const error = new Error('No ad available');
+          if (onErrorRef.current) {
+            onErrorRef.current(error);
+          }
+        }
       }
     }).catch(err => {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch ad';
-      setError(errorMessage);
-      onError?.(new Error(errorMessage));
+      if (!errorHandledRef.current) {
+        errorHandledRef.current = true;
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch ad';
+        setError(errorMessage);
+        const error = new Error(errorMessage);
+        if (onErrorRef.current) {
+          onErrorRef.current(error);
+        }
+      }
     });
-  }, [sessionId, slot, position, context, width, measuredWidth, error, ad, apiKey, isBot, hasPrivacyConsent, onError, onImpression, getCachedAd, cacheAd, hasNoFill, markNoFill]);
+  }, [sessionId, slot, position, context, width, measuredWidth, error, ad, apiKey, isBot, hasPrivacyConsent, onError, getCachedAd, cacheAd, hasNoFill, markNoFill]);
 
   // Calculate container dimensions (memoized, no re-renders)
   const containerWidth = useMemo(() => {
-    if (width == null || width === 0 || width === 1) {
+    const parsedWidth = parseWidth(width);
+    
+    if (parsedWidth.type === 'fill') {
       return '100%';
-    } else if (isPercentageWidth(width)) {
-      return `${width * 100}%`;
-    } else if (isPixelWidth(width)) {
-      return `${Math.max(Math.round(width), 200)}px`;
+    } else if (parsedWidth.type === 'percentage' && parsedWidth.value !== undefined) {
+      return `${parsedWidth.value * 100}%`;
+    } else if (parsedWidth.type === 'pixels' && parsedWidth.value !== undefined) {
+      return `${Math.max(Math.round(parsedWidth.value), 200)}px`;
     }
     return '100%';
   }, [width]);
@@ -299,8 +508,33 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           minWidth: '200px',
           height: 'fit-content',
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
+        {/* Loading spinner overlay */}
+        {isLoading && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
+              zIndex: 2,
+              opacity: isLoaded ? 0 : 1,
+              transition: 'opacity 0.3s ease-out',
+              pointerEvents: 'none',
+            }}
+          >
+            <RadialLinesSpinner />
+          </div>
+        )}
+        
+        {/* Ad content with fade-in animation */}
         <div
           className="simula-native-banner-html"
           dangerouslySetInnerHTML={{ __html: ad.html }}
@@ -308,6 +542,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
             display: 'block',
             width: '100%',
             height: 'fit-content',
+            opacity: isLoaded ? 1 : 0,
+            transition: 'opacity 0.4s ease-out',
           }}
         />
       </div>
@@ -325,8 +561,33 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         minWidth: '200px',
         height: containerHeight,
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
+      {/* Loading spinner overlay */}
+      {isLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent',
+            zIndex: 2,
+            opacity: isLoaded ? 0 : 1,
+            transition: 'opacity 0.3s ease-out',
+            pointerEvents: 'none',
+          }}
+        >
+          <RadialLinesSpinner />
+        </div>
+      )}
+      
+      {/* Iframe with fade-in animation */}
       <iframe
         ref={iframeRef}
         src={ad.iframeUrl}
@@ -338,9 +599,17 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           padding: 0,
           width: '100%',
           height: measuredHeight ? `${measuredHeight}px` : '200px',
+          opacity: isLoaded ? 1 : 0,
+          transition: 'opacity 0.4s ease-out',
         }}
         sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         title={`Native Banner: ${ad.id}`}
+        onLoad={() => {
+          setTimeout(() => {
+            setIsLoaded(true);
+            setIsLoading(false);
+          }, 50);
+        }}
       />
     </div>
   );
