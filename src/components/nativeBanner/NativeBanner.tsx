@@ -402,14 +402,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     return '100%';
   }, [width]);
 
-  const containerHeight = useMemo(() => {
-    if (!ad) return '0px';
-    if (ad.html) {
-      return 'fit-content';
-    }
-    return measuredHeight ? `${measuredHeight}px` : '200px';
-  }, [ad, measuredHeight]);
-
   // Render once, never changes
   if (error) {
     return null;
@@ -451,7 +443,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           display: 'block',
           width: containerWidth,
           minWidth: '130px',
-          height: isLoaded ? 'fit-content' : 'auto',
           minHeight: isLoading ? '60px' : undefined,
           overflow: 'hidden',
           position: 'relative',
@@ -488,7 +479,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           style={{
             display: 'block',
             width: '100%',
-            height: 'fit-content',
             opacity: isLoaded ? 1 : 0,
             visibility: isLoaded ? 'visible' : 'hidden',
             transition: 'opacity 0.4s ease-out',
@@ -507,7 +497,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         display: 'block',
         width: containerWidth,
         minWidth: '130px',
-        height: containerHeight,
+        height: measuredHeight ? `${measuredHeight}px` : '200px',
         minHeight: isLoading ? '60px' : undefined,
         overflow: 'hidden',
         position: 'relative',
