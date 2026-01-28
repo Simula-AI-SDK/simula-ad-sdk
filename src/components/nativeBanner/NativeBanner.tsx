@@ -63,6 +63,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     width,
     position,
     context,
+    onLoad,
     onImpression,
     onError,
     loadingComponent: LoadingComponent,
@@ -98,15 +99,18 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const wasInViewportRef = useRef(false);
   const adIdRef = useRef<string | null>(null);
   const adRef = useRef<AdData | null>(null);
+  const onLoadRef = useRef(onLoad);
   const onImpressionRef = useRef(onImpression);
   const onErrorRef = useRef(onError);
   const errorHandledRef = useRef(false);
+  const loadCalledRef = useRef(false);
 
   // Keep refs in sync with props
   useEffect(() => {
+    onLoadRef.current = onLoad;
     onImpressionRef.current = onImpression;
     onErrorRef.current = onError;
-  }, [onImpression, onError]);
+  }, [onLoad, onImpression, onError]);
 
   // Keep adRef in sync with ad state
   useEffect(() => {
@@ -163,8 +167,13 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     if (ad?.html && assetsLoaded) {
       setIsLoaded(true);
       setIsLoading(false);
+      // Fire onLoad callback once
+      if (!loadCalledRef.current && onLoadRef.current) {
+        loadCalledRef.current = true;
+        onLoadRef.current(ad);
+      }
     }
-  }, [ad?.html, assetsLoaded]);
+  }, [ad, assetsLoaded]);
 
   // Viewability and impression tracking (using refs, no re-renders)
   useEffect(() => {
@@ -549,6 +558,11 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           setTimeout(() => {
             setIsLoaded(true);
             setIsLoading(false);
+            // Fire onLoad callback once
+            if (!loadCalledRef.current && onLoadRef.current) {
+              loadCalledRef.current = true;
+              onLoadRef.current(ad);
+            }
           }, 50);
         }}
       />

@@ -296,7 +296,7 @@ export const validateNativeContext = (context: any): void => {
  * Throws descriptive errors for invalid props
  */
 export const validateNativeBannerProps = (props: any): void => {
-  const validProps = ['slot', 'width', 'position', 'context', 'onImpression', 'onError', 'loadingComponent'];
+  const validProps = ['slot', 'width', 'position', 'context', 'loadingComponent', 'onLoad', 'onImpression', 'onError'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -366,6 +366,10 @@ export const validateNativeBannerProps = (props: any): void => {
   validateNativeContext(props.context);
 
   // Validate callbacks (optional)
+  if (props.onLoad !== undefined && typeof props.onLoad !== 'function') {
+    throw new Error(`Invalid "onLoad" prop type: "${typeof props.onLoad}". Must be a function`);
+  }
+
   if (props.onImpression !== undefined && typeof props.onImpression !== 'function') {
     throw new Error(`Invalid "onImpression" prop type: "${typeof props.onImpression}". Must be a function`);
   }

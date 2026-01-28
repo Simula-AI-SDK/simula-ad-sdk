@@ -202,13 +202,11 @@ export interface NativeBannerProps {
    * - number >= 1: pixels (e.g., 500 = 500px)
    * - string with %: percentage (e.g., "10%" = 10%)
    * - string with number: pixels (e.g., "500" = 500px)
-   * - "auto" or null: fills container width (min 200px)
+   * - "auto" or null: fills container width (min 130px)
    */
   width?: number | string | null;
   position: number;
   context: NativeContext;
-  onImpression?: (ad: AdData) => void;
-  onError?: (error: Error) => void;
   /**
    * Custom loading component to display while the ad is loading.
    * - undefined: uses the default RadialLinesSpinner
@@ -216,4 +214,10 @@ export interface NativeBannerProps {
    * - React.ComponentType: renders your custom component
    */
   loadingComponent?: React.ComponentType | null;
+  /** Called when the ad content has finished loading and is ready to display */
+  onLoad?: (ad: AdData) => void;
+  /** Called when the ad has been viewable for 1 second (MRC standard) */
+  onImpression?: (ad: AdData) => void;
+  /** Called when an error occurs fetching or loading the ad */
+  onError?: (error: Error) => void;
 }
