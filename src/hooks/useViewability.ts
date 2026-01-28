@@ -23,14 +23,20 @@ export const useViewability = (options: ViewabilityOptions = {}): ViewabilityRes
         const now = Date.now();
         
         if (viewable) {
-          if (viewableStartTime === null) {
-            setViewableStartTime(now);
-          }
+          setViewableStartTime((prev) => {
+            if (prev === null) {
+              return now;
+            }
+            return prev;
+          });
           setIsViewable(true);
           
-          if (!hasBeenViewed) {
-            setHasBeenViewed(true);
-          }
+          setHasBeenViewed((prev) => {
+            if (!prev) {
+              return true;
+            }
+            return prev;
+          });
         } else {
           setViewableStartTime(null);
           setIsViewable(false);
@@ -45,7 +51,7 @@ export const useViewability = (options: ViewabilityOptions = {}): ViewabilityRes
 
     observer.observe(elementRef.current);
     return () => observer.disconnect();
-  }, [threshold, hasBeenViewed, viewableStartTime]);
+  }, [threshold]);
 
   // Duration tracking effect
   useEffect(() => {
