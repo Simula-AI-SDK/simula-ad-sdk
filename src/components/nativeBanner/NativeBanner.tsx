@@ -49,16 +49,6 @@ const parseWidth = (width: WidthInput): { type: 'fill' | 'percentage' | 'pixels'
   return { type: 'fill' };
 };
 
-const isPercentageWidth = (width: WidthInput): boolean => {
-  const parsed = parseWidth(width);
-  return parsed.type === 'percentage';
-};
-
-const isPixelWidth = (width: WidthInput): boolean => {
-  const parsed = parseWidth(width);
-  return parsed.type === 'pixels';
-};
-
 const needsWidthMeasurement = (width: WidthInput): boolean => {
   const parsed = parseWidth(width);
   return parsed.type === 'fill' || parsed.type === 'percentage';
@@ -106,7 +96,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const viewableStartTimeRef = useRef<number | null>(null);
   const hasMetDurationRef = useRef(false);
   const wasInViewportRef = useRef(false);
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const adIdRef = useRef<string | null>(null);
   const adRef = useRef<AdData | null>(null);
   const onImpressionRef = useRef(onImpression);
@@ -128,9 +117,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
   // Detect when HTML content images have finished loading
   const hookEnabled = !!ad?.html && isLoading;
-  console.log('[NativeBanner] useAssetLoadDetection params - ad?.html:', !!ad?.html, 'isLoading:', isLoading, 'enabled:', hookEnabled);
   const { isLoaded: assetsLoaded } = useAssetLoadDetection(htmlContentRef, hookEnabled);
-  console.log('[NativeBanner] assetsLoaded:', assetsLoaded);
 
   // Measure width once (only if needed)
   useEffect(() => {
@@ -143,7 +130,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
       if (entry && !hasMeasured) {
         hasMeasured = true;
         const measuredW = Math.round(entry.contentRect.width);
-        const finalWidth = (width == null || width === 0 || width === 1) ? Math.max(measuredW, 200) : measuredW;
+        const finalWidth = (width == null || width === 0 || width === 1) ? Math.max(measuredW, 130) : measuredW;
         setMeasuredWidth(finalWidth);
         resizeObserver.disconnect();
       }
@@ -173,9 +160,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
   // Mark HTML as loaded when assets (images) have finished loading
   useEffect(() => {
-    console.log('[NativeBanner] Loading effect - ad?.html:', !!ad?.html, 'assetsLoaded:', assetsLoaded);
     if (ad?.html && assetsLoaded) {
-      console.log('[NativeBanner] Setting isLoaded=true, isLoading=false');
       setIsLoaded(true);
       setIsLoading(false);
     }
@@ -197,13 +182,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         if (viewable) {
           if (viewableStartTimeRef.current === null) {
             viewableStartTimeRef.current = now;
-            console.log('[NativeBanner] Ad became viewable, starting duration timer');
           }
         } else {
-          // Reset when not viewable
-          if (viewableStartTimeRef.current !== null) {
-            console.log('[NativeBanner] Ad no longer viewable, resetting timer');
-          }
           viewableStartTimeRef.current = null;
           hasMetDurationRef.current = false;
         }
@@ -215,7 +195,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     );
 
     observer.observe(elementRef.current);
-    observerRef.current = observer;
 
     // Check periodically for duration
     const intervalId = setInterval(() => {
@@ -225,7 +204,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           hasMetDurationRef.current = true;
           if (!impressionTrackedRef.current && currentAdId) {
             impressionTrackedRef.current = true;
-            console.log('[NativeBanner] Tracking impression for ad:', currentAdId);
             trackImpression(currentAdId, apiKey);
             // Use ref to get current ad value (avoid stale closure)
             const currentAd = adRef.current;
@@ -239,7 +217,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
     return () => {
       observer.disconnect();
-      observerRef.current = null;
       clearInterval(intervalId);
     };
   }, [ad, isBot, apiKey]);
@@ -256,11 +233,9 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         
         if (inViewport && !wasInViewportRef.current) {
           wasInViewportRef.current = true;
-          console.log('[NativeBanner] Ad entered viewport, tracking entry:', currentAdId);
           trackViewportEntry(currentAdId, apiKey);
         } else if (!inViewport && wasInViewportRef.current) {
           wasInViewportRef.current = false;
-          console.log('[NativeBanner] Ad exited viewport, tracking exit:', currentAdId);
           trackViewportExit(currentAdId, apiKey);
         }
       },
@@ -293,9 +268,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     // Check cache first
     const cachedAd = getCachedAd(slot, position);
     if (cachedAd) {
-      // Set ad ID ref BEFORE setting ad state
       adIdRef.current = cachedAd.id;
-      console.log('[NativeBanner] Using cached ad, ID:', cachedAd.id);
       setAd(cachedAd);
       hasFetchedRef.current = true;
       return;
@@ -343,11 +316,11 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     let widthValue: number | undefined;
     
     if (parsedWidth.type === 'fill') {
-      widthValue = measuredWidth !== null ? Math.max(measuredWidth, 200) : undefined;
+      widthValue = measuredWidth !== null ? Math.max(measuredWidth, 130) : undefined;
     } else if (parsedWidth.type === 'percentage' && parsedWidth.value !== undefined) {
-      widthValue = measuredWidth !== null ? Math.max(Math.round(measuredWidth * parsedWidth.value), 200) : undefined;
+      widthValue = measuredWidth !== null ? Math.max(Math.round(measuredWidth * parsedWidth.value), 130) : undefined;
     } else if (parsedWidth.type === 'pixels' && parsedWidth.value !== undefined) {
-      widthValue = Math.max(Math.round(parsedWidth.value), 200);
+      widthValue = Math.max(Math.round(parsedWidth.value), 130);
     }
 
     if (needsMeasurement && widthValue === undefined) {
@@ -376,14 +349,10 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           }
         }
       } else if (result.ad) {
-        // Reset error handling flag on successful fetch
         errorHandledRef.current = false;
-        // Set ad ID ref BEFORE setting ad state to ensure tracking works
         adIdRef.current = result.ad.id;
-        console.log('[NativeBanner] Ad fetched, ID:', result.ad.id);
         setAd(result.ad);
         cacheAd(slot, position, result.ad);
-        // Keep loading state until content is ready
         setIsLoading(true);
         setIsLoaded(false);
       } else {
@@ -419,7 +388,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     } else if (parsedWidth.type === 'percentage' && parsedWidth.value !== undefined) {
       return `${parsedWidth.value * 100}%`;
     } else if (parsedWidth.type === 'pixels' && parsedWidth.value !== undefined) {
-      return `${Math.max(Math.round(parsedWidth.value), 200)}px`;
+      return `${Math.max(Math.round(parsedWidth.value), 130)}px`;
     }
     return '100%';
   }, [width]);
@@ -445,7 +414,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         style={{
           display: 'block',
           width: containerWidth,
-          minWidth: '200px',
+          minWidth: '130px',
           height: '0px',
           overflow: 'hidden',
         }}
@@ -472,8 +441,9 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         style={{
           display: 'block',
           width: containerWidth,
-          minWidth: '200px',
-          height: 'fit-content',
+          minWidth: '130px',
+          height: isLoaded ? 'fit-content' : 'auto',
+          minHeight: isLoading ? '60px' : undefined,
           overflow: 'hidden',
           position: 'relative',
         }}
@@ -511,6 +481,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
             width: '100%',
             height: 'fit-content',
             opacity: isLoaded ? 1 : 0,
+            visibility: isLoaded ? 'visible' : 'hidden',
             transition: 'opacity 0.4s ease-out',
           }}
         />
@@ -526,8 +497,9 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
       style={{
         display: 'block',
         width: containerWidth,
-        minWidth: '200px',
+        minWidth: '130px',
         height: containerHeight,
+        minHeight: isLoading ? '60px' : undefined,
         overflow: 'hidden',
         position: 'relative',
       }}
@@ -568,6 +540,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           width: '100%',
           height: measuredHeight ? `${measuredHeight}px` : '200px',
           opacity: isLoaded ? 1 : 0,
+          visibility: isLoaded ? 'visible' : 'hidden',
           transition: 'opacity 0.4s ease-out',
         }}
         sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
