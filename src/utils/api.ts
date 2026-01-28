@@ -414,7 +414,7 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
       'ngrok-skip-browser-warning': '1',
     };
 
-    const response = await fetch(`${API_BASE_URL}/render_ad/ssp/native`, {
+    const response = await fetch(`${API_BASE_URL}/render_ad/ssp/native/komiko`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
@@ -423,6 +423,26 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
+    // Check if response is HTML
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      const html = await response.text();
+      console.log(`HTML is ${html}`);
+      // Extract ad_id from response headers or generate a temporary one
+      // For now, we'll use a timestamp-based ID since HTML responses don't include JSON metadata
+      const adId = response.headers.get('x-ad-id') || `html-ad-${Date.now()}`;
+      const adFormat = response.headers.get('x-ad-format') || 'html';
+      
+      return {
+        ad: {
+          id: adId,
+          format: adFormat,
+          html: html
+        }
+      };
+    }
+
+    // Handle JSON response (legacy)
     const data = await response.json();
     console.log(`Data is ${JSON.stringify(data)}`);
     if (data) {

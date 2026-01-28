@@ -141,6 +141,12 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
   // Listen for postMessage from iframe to get dynamic height
   // Only process messages from this component's own iframe to prevent cross-contamination
   useEffect(() => {
+    // If ad has HTML, mark as loaded immediately (no iframe needed)
+    if (ad?.html) {
+      setIframeLoaded(true);
+      return;
+    }
+
     const handleMessage = (event: MessageEvent) => {
       // Only process messages if iframe ref is available
       if (!iframeRef.current?.contentWindow) {
@@ -164,7 +170,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [ad]);
 
   // Measure actual width once when element is ready (needed for null/0/1 or percentage widths)
   useEffect(() => {
@@ -378,10 +384,98 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
       return null;
     }
 
-    if (!ad || !ad.iframeUrl) {
+    if (!ad || (!ad.iframeUrl && !ad.html)) {
       return null;
     }
 
+    // Render HTML directly if available
+    if (ad.html) {
+      return (
+        <div
+          className="simula-native-banner-content"
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: 'fit-content',
+          }}
+        >
+          <div
+            className="simula-native-banner-html"
+            dangerouslySetInnerHTML={{ __html: ad.html }}
+            style={{
+              display: 'block',
+              width: '100%',
+              height: 'fit-content',
+            }}
+          />
+          {showInfoModal && (
+            <div
+              className="simula-native-banner-modal-overlay"
+              onClick={() => setShowInfoModal(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+              }}
+            >
+              <div
+                className="simula-native-banner-modal-content"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  maxWidth: '300px',
+                  textAlign: 'center',
+                  position: 'relative',
+                }}
+              >
+                <button
+                  className="simula-native-banner-modal-close"
+                  onClick={() => setShowInfoModal(false)}
+                  aria-label="Close"
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    width: '24px',
+                    height: '24px',
+                    padding: 0,
+                    border: 'none',
+                    background: 'none',
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    color: '#666',
+                  }}
+                >
+                  ×
+                </button>
+                <p style={{ margin: 0, color: '#333', fontSize: '14px' }}>
+                  Powered by{' '}
+                  <a
+                    href="https://simula.ad"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#3b82f6', textDecoration: 'none' }}
+                  >
+                    Simula
+                  </a>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Render iframe (legacy)
     return (
       <div
         className="simula-native-banner-content"
@@ -495,6 +589,15 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
     );
   };
 
+  // Use fit-content for HTML rendering, measured height for iframe
+  const containerHeight = useMemo(() => {
+    if (!ad) return '0px';
+    if (ad.html) {
+      return 'fit-content';
+    }
+    return measuredHeight ? `${measuredHeight}px` : '200px';
+  }, [ad, measuredHeight]);
+
   return (
     <div
       ref={elementRef}
@@ -503,7 +606,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = (props) => {
         display: error ? 'none' : 'block',
         width: containerWidth,
         minWidth: '200px', // Enforce minimum 200px for all width types
-        height: !ad ? '0px' : (measuredHeight ? `${measuredHeight}px` : '200px'),
+        height: containerHeight,
         overflow: 'hidden',
       }}
     >

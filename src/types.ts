@@ -42,6 +42,7 @@ export interface AdData {
   id: string;
   format: string;
   iframeUrl?: string;
+  html?: string; // Direct HTML content for rendering (alternative to iframeUrl)
 }
 
 export interface InChatAdSlotProps {
