@@ -83,15 +83,12 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const [ad, setAd] = useState<AdData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
-  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [minHeightActive, setMinHeightActive] = useState(true);
 
   // Refs for tracking (no re-renders)
   const elementRef = useRef<HTMLDivElement>(null);
   const htmlContentRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const hasFetchedRef = useRef(false);
   const lastFetchTimeRef = useRef<number>(0);
   const impressionTrackedRef = useRef(false);
@@ -145,45 +142,17 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     return () => resizeObserver.disconnect();
   }, [width, measuredWidth]);
 
-  // Listen for height messages from iframe
-  useEffect(() => {
-    if (!ad?.iframeUrl) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      if (!iframeRef.current?.contentWindow || event.source !== iframeRef.current.contentWindow) {
-        return;
-      }
-      
-      if (event.data?.type === 'AD_HEIGHT' && typeof event.data.height === 'number' && event.data.height > 0) {
-        setMeasuredHeight(event.data.height);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [ad?.iframeUrl]);
-
   // Mark HTML as loaded when assets (images) have finished loading
   useEffect(() => {
     if (ad?.html && assetsLoaded) {
       setIsLoaded(true);
       setIsLoading(false);
-      // Fire onLoad callback once
       if (!loadCalledRef.current && onLoadRef.current) {
         loadCalledRef.current = true;
         onLoadRef.current(ad);
       }
     }
   }, [ad, assetsLoaded]);
-
-  // Delay minHeight removal to let content paint at full size
-  useEffect(() => {
-    if (!isLoaded) return;
-    const timeoutId = setTimeout(() => {
-      setMinHeightActive(false);
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [isLoaded]);
 
   // Viewability and impression tracking (using refs, no re-renders)
   useEffect(() => {
@@ -315,15 +284,11 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
     // Wait for width measurement if needed
     const needsMeasurement = needsWidthMeasurement(width);
-    if (needsMeasurement && measuredWidth === null) {
-      return;
-    }
+    if (needsMeasurement && measuredWidth === null) return;
 
     // Rate limiting
     const now = Date.now();
-    if (now - lastFetchTimeRef.current < MIN_FETCH_INTERVAL_MS) {
-      return;
-    }
+    if (now - lastFetchTimeRef.current < MIN_FETCH_INTERVAL_MS) return;
 
     hasFetchedRef.current = true;
     lastFetchTimeRef.current = now;
@@ -349,7 +314,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
     // Fetch ad
     const filteredContext = filterContextForPrivacy(context, hasPrivacyConsent);
-    
+
     fetchNativeBannerAd({
       sessionId,
       slot,
@@ -413,9 +378,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   }, [width]);
 
   // Render once, never changes
-  if (error) {
-    return null;
-  }
+  if (error) return null;
 
   if (!ad) {
     return (
@@ -443,7 +406,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     return <RadialLinesSpinner />;
   };
 
-  // Render HTML directly
+  // Render HTML ad
   if (ad.html) {
     return (
       <div
@@ -453,7 +416,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           display: 'block',
           width: containerWidth,
           minWidth: '130px',
-          minHeight: minHeightActive ? '350px' : undefined,
+          height: 'fit-content',
+          minHeight: '60px',
           overflow: 'hidden',
           position: 'relative',
         }}
@@ -498,76 +462,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     );
   }
 
-  // Render iframe (legacy)
-  return (
-    <div
-      ref={elementRef}
-      className="simula-native-banner"
-      style={{
-        display: 'block',
-        width: containerWidth,
-        minWidth: '130px',
-        height: measuredHeight ? `${measuredHeight}px` : '200px',
-        minHeight: minHeightActive ? '350px' : undefined,
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    >
-      {/* Loading overlay */}
-      {isLoading && LoadingComponent !== null && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'transparent',
-            zIndex: 2,
-            opacity: isLoaded ? 0 : 1,
-            transition: 'opacity 0.3s ease-out',
-            pointerEvents: 'none',
-          }}
-        >
-          {renderLoader()}
-        </div>
-      )}
-      
-      {/* Iframe with fade-in animation */}
-      <iframe
-        ref={iframeRef}
-        src={ad.iframeUrl}
-        className="simula-native-banner-frame"
-        style={{
-          display: 'block',
-          border: 0,
-          margin: 0,
-          padding: 0,
-          width: '100%',
-          height: measuredHeight ? `${measuredHeight}px` : '200px',
-          opacity: isLoaded ? 1 : 0,
-          visibility: isLoaded ? 'visible' : 'hidden',
-          transition: 'opacity 0.4s ease-out',
-        }}
-        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-        title={`Native Banner: ${ad.id}`}
-        onLoad={() => {
-          setTimeout(() => {
-            setIsLoaded(true);
-            setIsLoading(false);
-            // Fire onLoad callback once
-            if (!loadCalledRef.current && onLoadRef.current) {
-              loadCalledRef.current = true;
-              onLoadRef.current(ad);
-            }
-          }, 50);
-        }}
-      />
-    </div>
-  );
+  return null;
 });
 
 NativeBanner.displayName = 'NativeBanner';

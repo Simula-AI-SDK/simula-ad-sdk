@@ -76,7 +76,6 @@ export function useAssetLoadDetection(
       if (!hasScannedAfterRender) return;
 
       const total = trackedImages.size;
-
       if (total === 0 || loadedCount >= total) {
         startLayoutStabilityCheck();
       }
