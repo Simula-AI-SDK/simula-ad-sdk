@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSimula } from '../../SimulaProvider';
 import { useBotDetection } from '../../hooks/useBotDetection';
-import { useAssetLoadDetection } from '../../hooks/useAssetLoadDetection';
 import { fetchNativeBannerAd, trackImpression, trackViewportEntry, trackViewportExit } from '../../utils/api';
 import { validateNativeBannerProps } from '../../utils/validation';
 import { NativeBannerProps, AdData, filterContextForPrivacy } from '../../types';
-import { RadialLinesSpinner } from './RadialLinesSpinner';
 
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
@@ -63,10 +61,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     width,
     position,
     context,
-    onLoad,
     onImpression,
     onError,
-    loadingComponent: LoadingComponent,
   } = props;
 
   const { 
@@ -83,12 +79,9 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const [ad, setAd] = useState<AdData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   // Refs for tracking (no re-renders)
   const elementRef = useRef<HTMLDivElement>(null);
-  const htmlContentRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
   const lastFetchTimeRef = useRef<number>(0);
   const impressionTrackedRef = useRef(false);
@@ -97,18 +90,15 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const wasInViewportRef = useRef(false);
   const adIdRef = useRef<string | null>(null);
   const adRef = useRef<AdData | null>(null);
-  const onLoadRef = useRef(onLoad);
   const onImpressionRef = useRef(onImpression);
   const onErrorRef = useRef(onError);
   const errorHandledRef = useRef(false);
-  const loadCalledRef = useRef(false);
 
   // Keep refs in sync with props
   useEffect(() => {
-    onLoadRef.current = onLoad;
     onImpressionRef.current = onImpression;
     onErrorRef.current = onError;
-  }, [onLoad, onImpression, onError]);
+  }, [onImpression, onError]);
 
   // Keep adRef in sync with ad state
   useEffect(() => {
@@ -116,10 +106,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   }, [ad]);
 
   const { isBot } = useBotDetection();
-
-  // Detect when HTML content images have finished loading
-  const hookEnabled = !!ad?.html && isLoading;
-  const { isLoaded: assetsLoaded } = useAssetLoadDetection(htmlContentRef, hookEnabled);
 
   // Measure width once (only if needed)
   useEffect(() => {
@@ -141,18 +127,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     resizeObserver.observe(elementRef.current);
     return () => resizeObserver.disconnect();
   }, [width, measuredWidth]);
-
-  // Mark HTML as loaded when assets (images) have finished loading
-  useEffect(() => {
-    if (ad?.html && assetsLoaded) {
-      setIsLoaded(true);
-      setIsLoading(false);
-      if (!loadCalledRef.current && onLoadRef.current) {
-        loadCalledRef.current = true;
-        onLoadRef.current(ad);
-      }
-    }
-  }, [ad, assetsLoaded]);
 
   // Viewability and impression tracking (using refs, no re-renders)
   useEffect(() => {
@@ -337,8 +311,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         adIdRef.current = result.ad.id;
         setAd(result.ad);
         cacheAd(slot, position, result.ad);
-        setIsLoading(true);
-        setIsLoaded(false);
       } else {
         if (!errorHandledRef.current) {
           errorHandledRef.current = true;
@@ -396,16 +368,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     );
   }
 
-  // Helper to render the loading component
-  const renderLoader = () => {
-    // null = explicitly disabled
-    if (LoadingComponent === null) return null;
-    // Custom component provided
-    if (LoadingComponent) return <LoadingComponent />;
-    // Default spinner
-    return <RadialLinesSpinner />;
-  };
-
   // Render HTML ad
   if (ad.html) {
     return (
@@ -419,43 +381,14 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           height: 'fit-content',
           minHeight: '60px',
           overflow: 'hidden',
-          position: 'relative',
         }}
       >
-        {/* Loading overlay */}
-        {isLoading && LoadingComponent !== null && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'transparent',
-              zIndex: 2,
-              opacity: isLoaded ? 0 : 1,
-              transition: 'opacity 0.3s ease-out',
-              pointerEvents: 'none',
-            }}
-          >
-            {renderLoader()}
-          </div>
-        )}
-
-        {/* Ad content with fade-in animation */}
         <div
-          ref={htmlContentRef}
           className="simula-native-banner-html"
           dangerouslySetInnerHTML={{ __html: ad.html }}
           style={{
             display: 'block',
             width: '100%',
-            opacity: isLoaded ? 1 : 0,
-            visibility: isLoaded ? 'visible' : 'hidden',
-            transition: 'opacity 0.4s ease-out',
           }}
         />
       </div>
