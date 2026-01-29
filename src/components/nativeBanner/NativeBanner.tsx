@@ -120,25 +120,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
   const { isBot } = useBotDetection();
 
-  // Imperatively inject ad HTML once to avoid re-render re-injection
-  useEffect(() => {
-    if (!ad?.html || !htmlContentRef.current) return;
-
-    const container = htmlContentRef.current;
-    container.innerHTML = ad.html;
-
-    // Extract and execute script tags (innerHTML doesn't execute them)
-    const scripts = container.querySelectorAll('script');
-    scripts.forEach((oldScript) => {
-      const newScript = document.createElement('script');
-      Array.from(oldScript.attributes).forEach((attr) => {
-        newScript.setAttribute(attr.name, attr.value);
-      });
-      newScript.textContent = oldScript.textContent;
-      oldScript.parentNode?.replaceChild(newScript, oldScript);
-    });
-  }, [ad?.html]);
-
   // Detect when HTML content images have finished loading
   const hookEnabled = !!ad?.html && isLoading;
   const { isLoaded: assetsLoaded } = useAssetLoadDetection(htmlContentRef, hookEnabled);
@@ -504,6 +485,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         <div
           ref={htmlContentRef}
           className="simula-native-banner-html"
+          dangerouslySetInnerHTML={{ __html: ad.html }}
           style={{
             display: 'block',
             width: '100%',
