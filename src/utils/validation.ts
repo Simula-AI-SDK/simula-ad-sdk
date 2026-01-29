@@ -1,4 +1,4 @@
-import { SimulaTheme } from '../types';
+import { InChatTheme, NativeContext } from '../types';
 
 // Helper functions for width validation
 const isAutoWidth = (width: any): boolean => width === 'auto';
@@ -10,7 +10,7 @@ const isPixelWidth = (width: any): boolean => typeof width === 'string' && /^\d+
  * Throws descriptive errors for invalid props
  */
 export const validateSimulaProviderProps = (props: any): void => {
-  const validProps = ['apiKey', 'children', 'devMode', 'primaryUserID'];
+  const validProps = ['apiKey', 'children', 'devMode', 'primaryUserID', 'hasPrivacyConsent'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -38,6 +38,10 @@ export const validateSimulaProviderProps = (props: any): void => {
 
   if (props.primaryUserID !== undefined && typeof props.primaryUserID !== 'string') {
     throw new Error(`Invalid "primaryUserID" prop type: "${typeof props.primaryUserID}". Must be a string`);
+  }
+
+  if (props.hasPrivacyConsent !== undefined && typeof props.hasPrivacyConsent !== 'boolean') {
+    throw new Error(`Invalid "hasPrivacyConsent" prop type: "${typeof props.hasPrivacyConsent}". Must be a boolean`);
   }
 };
 
@@ -120,7 +124,7 @@ export const validateInChatAdSlotProps = (props: any): void => {
  * Validates theme object
  * Throws descriptive errors for invalid theme properties
  */
-export const validateTheme = (theme?: SimulaTheme): void => {
+export const validateTheme = (theme?: InChatTheme): void => {
   if (!theme || typeof theme !== 'object') {
     throw new Error('Invalid "theme": must be an object');
   }
@@ -187,5 +191,190 @@ export const validateTheme = (theme?: SimulaTheme): void => {
   // Validate cornerRadius
   if (theme.cornerRadius !== undefined && typeof theme.cornerRadius !== 'number') {
     throw new Error(`Invalid cornerRadius type "${typeof theme.cornerRadius}". Must be a number`);
+  }
+};
+
+/**
+ * Validates NativeContext object
+ * Throws descriptive errors for invalid context properties
+ */
+export const validateNativeContext = (context: any): void => {
+  if (!context || typeof context !== 'object') {
+    throw new Error('Invalid "context": must be an object');
+  }
+
+  const validKeys = ['searchTerm', 'tags', 'category', 'title', 'description', 'userProfile', 'userEmail', 'nsfw', 'customContext'];
+
+  // Check for invalid top-level keys
+  Object.keys(context).forEach(key => {
+    if (!validKeys.includes(key)) {
+      throw new Error(`Invalid context parameter "${key}". Valid parameters: ${validKeys.join(', ')}`);
+    }
+  });
+
+  // Validate searchTerm (optional string)
+  if (context.searchTerm !== undefined && typeof context.searchTerm !== 'string') {
+    throw new Error(`Invalid "searchTerm" type: "${typeof context.searchTerm}". Must be a string`);
+  }
+
+  // Validate tags (optional array of strings, max 10)
+  if (context.tags !== undefined) {
+    if (!Array.isArray(context.tags)) {
+      throw new Error(`Invalid "tags" type: "${typeof context.tags}". Must be an array of strings`);
+    }
+    if (context.tags.length > 10) {
+      throw new Error(`"tags" array exceeds maximum length of 10 (received ${context.tags.length})`);
+    }
+    context.tags.forEach((tag: any, i: number) => {
+      if (typeof tag !== 'string') {
+        throw new Error(`Invalid tag at index ${i}: "${typeof tag}". Must be a string`);
+      }
+      if (tag.startsWith('#')) {
+        throw new Error(`Invalid tag at index ${i}: "${tag}". Tags should not include # prefix`);
+      }
+    });
+  }
+
+  // Validate category (optional string)
+  if (context.category !== undefined && typeof context.category !== 'string') {
+    throw new Error(`Invalid "category" type: "${typeof context.category}". Must be a string`);
+  }
+
+  // Validate title (optional string)
+  if (context.title !== undefined && typeof context.title !== 'string') {
+    throw new Error(`Invalid "title" type: "${typeof context.title}". Must be a string`);
+  }
+
+  // Validate description (optional string)
+  if (context.description !== undefined && typeof context.description !== 'string') {
+    throw new Error(`Invalid "description" type: "${typeof context.description}". Must be a string`);
+  }
+
+  // Validate userProfile (optional string)
+  if (context.userProfile !== undefined && typeof context.userProfile !== 'string') {
+    throw new Error(`Invalid "userProfile" type: "${typeof context.userProfile}". Must be a string`);
+  }
+
+  // Validate userEmail (optional string)
+  if (context.userEmail !== undefined && typeof context.userEmail !== 'string') {
+    throw new Error(`Invalid "userEmail" type: "${typeof context.userEmail}". Must be a string`);
+  }
+
+  // Validate nsfw (optional boolean)
+  if (context.nsfw !== undefined && typeof context.nsfw !== 'boolean') {
+    throw new Error(`Invalid "nsfw" type: "${typeof context.nsfw}". Must be a boolean`);
+  }
+
+  // Validate customContext (optional object with max 10 keys)
+  if (context.customContext !== undefined) {
+    if (typeof context.customContext !== 'object' || context.customContext === null || Array.isArray(context.customContext)) {
+      throw new Error(`Invalid "customContext" type: must be an object with string or string[] values`);
+    }
+    const keys = Object.keys(context.customContext);
+    if (keys.length > 10) {
+      throw new Error(`"customContext" exceeds maximum of 10 keys (received ${keys.length})`);
+    }
+    keys.forEach(key => {
+      const value = context.customContext[key];
+      if (typeof value === 'string') {
+        // Valid
+      } else if (Array.isArray(value)) {
+        value.forEach((v: any, i: number) => {
+          if (typeof v !== 'string') {
+            throw new Error(`Invalid customContext["${key}"][${i}]: "${typeof v}". Must be a string`);
+          }
+        });
+      } else {
+        throw new Error(`Invalid customContext["${key}"]: "${typeof value}". Must be a string or string[]`);
+      }
+    });
+  }
+};
+
+/**
+ * Validates NativeBanner props
+ * Throws descriptive errors for invalid props
+ */
+export const validateNativeBannerProps = (props: any): void => {
+  const validProps = ['slot', 'width', 'position', 'context', 'loadingComponent', 'onLoad', 'onImpression', 'onError'];
+  const receivedProps = Object.keys(props);
+
+  // Check for unknown props
+  const unknownProps = receivedProps.filter(prop => !validProps.includes(prop));
+  if (unknownProps.length > 0) {
+    throw new Error(
+      `Invalid prop${unknownProps.length > 1 ? 's' : ''} passed to NativeBanner: ${unknownProps.map(p => `"${p}"`).join(', ')}. ` +
+      `Valid props are: ${validProps.join(', ')}`
+    );
+  }
+
+  // Validate slot (required)
+  if (props.slot === undefined) {
+    throw new Error('NativeBanner requires a "slot" prop (placement identifier string, e.g., "feed", "explore")');
+  }
+  if (typeof props.slot !== 'string') {
+    throw new Error(`Invalid "slot" prop type: "${typeof props.slot}". Must be a string`);
+  }
+  if (props.slot.trim() === '') {
+    throw new Error('NativeBanner "slot" prop cannot be an empty string');
+  }
+
+  // Validate width (optional)
+  if (props.width !== undefined && props.width !== null) {
+    const width = props.width;
+    // Allow number, string, "auto", or null
+    if (typeof width !== 'number' && typeof width !== 'string') {
+      throw new Error(`Invalid "width" prop type: "${typeof width}". Must be a number, string (e.g., "10%", "500", "auto"), or null`);
+    }
+    // Validate number width
+    if (typeof width === 'number' && width < 0) {
+      throw new Error(`Invalid "width" prop value: "${width}". Must be a non-negative number`);
+    }
+    // Validate string width formats
+    if (typeof width === 'string' && width !== 'auto' && width !== '') {
+      // Check if it's a percentage string
+      if (width.endsWith('%')) {
+        const percentValue = parseFloat(width);
+        if (isNaN(percentValue) || percentValue <= 0 || percentValue > 100) {
+          throw new Error(`Invalid "width" prop value: "${width}". Percentage must be between 0 and 100`);
+        }
+      } else {
+        // Check if it's a pixel string
+        const pixelValue = parseFloat(width);
+        if (isNaN(pixelValue) || pixelValue <= 0) {
+          throw new Error(`Invalid "width" prop value: "${width}". Must be a valid number, percentage (e.g., "10%"), or "auto"`);
+        }
+      }
+    }
+  }
+
+  // Validate position (required, non-negative number)
+  if (props.position === undefined) {
+    throw new Error('NativeBanner requires a "position" prop (non-negative number)');
+  }
+  if (typeof props.position !== 'number') {
+    throw new Error(`Invalid "position" prop type: "${typeof props.position}". Must be a number`);
+  }
+  if (props.position < 0) {
+    throw new Error(`Invalid "position" prop value: "${props.position}". Must be a non-negative number`);
+  }
+
+  // Validate context (required)
+  if (props.context === undefined) {
+    throw new Error('NativeBanner requires a "context" prop (NativeContext object)');
+  }
+  validateNativeContext(props.context);
+
+  // Validate callbacks (optional)
+  if (props.onLoad !== undefined && typeof props.onLoad !== 'function') {
+    throw new Error(`Invalid "onLoad" prop type: "${typeof props.onLoad}". Must be a function`);
+  }
+
+  if (props.onImpression !== undefined && typeof props.onImpression !== 'function') {
+    throw new Error(`Invalid "onImpression" prop type: "${typeof props.onImpression}". Must be a function`);
+  }
+
+  if (props.onError !== undefined && typeof props.onError !== 'function') {
+    throw new Error(`Invalid "onError" prop type: "${typeof props.onError}". Must be a function`);
   }
 };

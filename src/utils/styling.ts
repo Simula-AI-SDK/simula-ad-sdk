@@ -1,4 +1,4 @@
-import { SimulaTheme, AccentOption, FontOption } from '../types';
+import { InChatTheme, AccentOption, FontOption } from '../types';
 import { 
   getColorTheme, 
   getFontStyles, 
@@ -7,7 +7,7 @@ import {
   getShadow
 } from './colorThemes';
 
-export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSProperties => {
+export const getResponsiveStyles = (theme: InChatTheme = {}): React.CSSProperties => {
   // Backward compatibility: prefer 'mode' over 'theme', but support both
   const themeMode = theme.mode ?? (theme as any).theme ?? 'light';
   const {
@@ -33,7 +33,7 @@ export const getResponsiveStyles = (theme: SimulaTheme = {}): React.CSSPropertie
   } as React.CSSProperties;
 };
 
-export const createInChatAdSlotCSS = (theme: SimulaTheme = {}) => {
+export const createInChatAdSlotCSS = (theme: InChatTheme = {}) => {
   // Backward compatibility: prefer 'mode' over 'theme', but support both
   const themeMode = theme.mode ?? (theme as any).theme ?? 'light';
   const {
