@@ -86,6 +86,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [minHeightActive, setMinHeightActive] = useState(true);
 
   // Refs for tracking (no re-renders)
   const elementRef = useRef<HTMLDivElement>(null);
@@ -118,6 +119,25 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   }, [ad]);
 
   const { isBot } = useBotDetection();
+
+  // Imperatively inject ad HTML once to avoid re-render re-injection
+  useEffect(() => {
+    if (!ad?.html || !htmlContentRef.current) return;
+
+    const container = htmlContentRef.current;
+    container.innerHTML = ad.html;
+
+    // Extract and execute script tags (innerHTML doesn't execute them)
+    const scripts = container.querySelectorAll('script');
+    scripts.forEach((oldScript) => {
+      const newScript = document.createElement('script');
+      Array.from(oldScript.attributes).forEach((attr) => {
+        newScript.setAttribute(attr.name, attr.value);
+      });
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode?.replaceChild(newScript, oldScript);
+    });
+  }, [ad?.html]);
 
   // Detect when HTML content images have finished loading
   const hookEnabled = !!ad?.html && isLoading;
@@ -174,6 +194,15 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
       }
     }
   }, [ad, assetsLoaded]);
+
+  // Delay minHeight removal to let content paint at full size
+  useEffect(() => {
+    if (!isLoaded) return;
+    const timeoutId = setTimeout(() => {
+      setMinHeightActive(false);
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [isLoaded]);
 
   // Viewability and impression tracking (using refs, no re-renders)
   useEffect(() => {
@@ -443,7 +472,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
           display: 'block',
           width: containerWidth,
           minWidth: '130px',
-          minHeight: isLoading ? '60px' : undefined,
+          minHeight: minHeightActive ? '350px' : undefined,
           overflow: 'hidden',
           position: 'relative',
         }}
@@ -475,7 +504,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         <div
           ref={htmlContentRef}
           className="simula-native-banner-html"
-          dangerouslySetInnerHTML={{ __html: ad.html }}
           style={{
             display: 'block',
             width: '100%',
@@ -498,7 +526,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         width: containerWidth,
         minWidth: '130px',
         height: measuredHeight ? `${measuredHeight}px` : '200px',
-        minHeight: isLoading ? '60px' : undefined,
+        minHeight: minHeightActive ? '350px' : undefined,
         overflow: 'hidden',
         position: 'relative',
       }}
