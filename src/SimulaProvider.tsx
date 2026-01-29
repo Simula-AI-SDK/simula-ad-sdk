@@ -38,25 +38,15 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     let cancelled = false;
 
     async function ensureSession() {
-      // Only send primaryUserID if privacy consent is granted
       const effectiveUserID = hasPrivacyConsent ? primaryUserID : undefined;
-      console.log('[SimulaProvider] Creating session with:', { apiKey: apiKey?.substring(0, 10) + '...', devMode, primaryUserID: effectiveUserID, hasPrivacyConsent });
       const id = await createSession(apiKey, devMode, effectiveUserID);
       if (!cancelled && id) {
-        console.log('[SimulaProvider] Session created and set:', id);
         setSessionId(id);
-      } else if (cancelled) {
-        console.log('[SimulaProvider] Session creation cancelled');
-      } else {
-        console.warn('[SimulaProvider] Session creation returned undefined');
       }
     }
 
     ensureSession();
-    return () => { 
-      console.log('[SimulaProvider] Cleaning up session creation');
-      cancelled = true; 
-    };
+    return () => { cancelled = true; };
   }, [apiKey, devMode, primaryUserID, hasPrivacyConsent]);
 
   // Cache management functions
@@ -103,13 +93,6 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     hasNoFill,
     markNoFill,
   }), [apiKey, devMode, sessionId, hasPrivacyConsent, getCachedAd, cacheAd, getCachedHeight, cacheHeight, hasNoFill, markNoFill]);
-
-  // Log when sessionId changes
-  useEffect(() => {
-    if (sessionId) {
-      console.log('[SimulaProvider] Context sessionId updated to:', sessionId);
-    }
-  }, [sessionId]);
 
   return (
     <SimulaContext.Provider value={value}>

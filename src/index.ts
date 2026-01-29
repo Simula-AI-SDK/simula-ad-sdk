@@ -23,8 +23,6 @@ export {
 // Privacy utilities
 export { filterContextForPrivacy } from './types';
 
-// Test utilities (removed)
-
 export type {
   InChatTheme,
   Message,

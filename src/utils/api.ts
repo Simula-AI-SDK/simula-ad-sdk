@@ -1,9 +1,6 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext } from '../types';
 
-// Production API URL
 const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-// const API_BASE_URL = "https://lace-compressed-symphony-scout.trycloudflare.com"
-// const API_BASE_URL = "https://simula-dev-ad.ngrok.app"
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -143,7 +140,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
 
     return { error: 'Unexpected response from ad server' };
   } catch (error) {
-    console.error('❌ API Request failed:', error);
+    console.error('API Request failed:', error);
     return {
       error: error instanceof Error ? error.message : 'Failed to fetch ad'
     };
@@ -429,7 +426,6 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
       const html = await response.text();
       // Extract ad_id from response headers (FastAPI sends it as "aid" header)
       const adId = response.headers.get('aid');
-      console.log(`Got aid ${adId}`);
       return {
         ad: {
           id: adId ?? '',
@@ -447,29 +443,9 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
         }
       };
   } catch (error) {
-    console.error('❌ NativeBanner API Request failed:', error);
+    console.error('NativeBanner API Request failed:', error);
     return {
       error: error instanceof Error ? error.message : 'Failed to fetch native banner ad'
     };
   }
 };
-
-/* Not used for now, used when we are also mediation layer
-export const trackClick = async (adId: string, apiKey: string): Promise<void> => {
-  try {
-    await fetch(`${API_BASE_URL}/track_click`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        ad_id: adId,
-        timestamp: new Date().toISOString(),
-      }),
-    });
-  } catch (error) {
-    console.error('Failed to track click:', error);
-  }
-};
-*/
