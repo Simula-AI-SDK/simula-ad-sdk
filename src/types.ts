@@ -166,6 +166,82 @@ export interface MiniGameMenuProps {
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
 }
 
+// MiniGameInvitation types
+export type MiniGameInvitationAnimation = 'auto' | 'slideDown' | 'fadeIn' | 'slideUp' | 'none';
+
+export interface MiniGameInvitationTrigger {
+  /** Show after user is idle for this many ms. */
+  onIdle?: number;
+  /** Show after this many ms from mount. */
+  afterDelay?: number;
+  /** Show when user scrolls past this percentage of the page (0-100). */
+  onScrollPercent?: number;
+}
+
+export interface MiniGameInvitationTheme {
+  cornerRadius?: number;
+  primaryColor?: string;
+  secondaryColor?: string;
+  textColor?: string;
+  ctaColor?: string;
+  charImageCornerRadius?: number;
+}
+
+export interface MiniGameInvitationProps {
+  titleText?: string;
+  subText?: string;
+  ctaText?: string;
+  charImage: string;
+  animation?: MiniGameInvitationAnimation;
+  theme?: MiniGameInvitationTheme;
+  /** When provided, the component manages its own visibility based on user behavior. Overrides isOpen. */
+  trigger?: MiniGameInvitationTrigger;
+  isOpen?: boolean;
+  /** Milliseconds before auto-close. undefined = no auto-close. */
+  autoCloseDuration?: number;
+  /** CTA button click handler. */
+  onClick: () => void;
+  /** Optional callback when the invitation closes (dismiss, auto-close, or after CTA click). Component closes itself internally regardless. */
+  onClose?: () => void;
+}
+
+// MiniGameButton types
+export interface MiniGameButtonTheme {
+  cornerRadius?: number;
+  primaryColor?: string;
+  fontColor?: string;
+  padding?: string | number;
+}
+
+export interface MiniGameButtonProps {
+  text?: string;
+  showPulsate?: boolean;
+  showBadge?: boolean;
+  theme?: MiniGameButtonTheme;
+  onClick: () => void;
+}
+
+// MiniGameInterstitial types
+export interface MiniGameInterstitialTheme {
+  cornerRadius?: number;
+  characterSize?: number;
+  textColor?: string;
+  textSize?: number;
+}
+
+export interface MiniGameInterstitialProps {
+  charImage: string;
+  invitationText?: string;
+  ctaText?: string;
+  backgroundImage?: string;
+  theme?: MiniGameInterstitialTheme;
+  isOpen: boolean;
+  /** CTA button click handler. */
+  onClick: () => void;
+  /** Optional callback when the interstitial closes (backdrop, ESC, "Not now", or after CTA click). Component closes itself internally regardless. */
+  onClose?: () => void;
+}
+
 // NativeBanner types
 export interface NativeContext {
   searchTerm?: string;
