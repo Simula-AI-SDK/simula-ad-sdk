@@ -17,7 +17,7 @@ Individual imports also available: `import { MiniGameInvitation, MiniGameButton,
 
 ## MiniGameInvitation
 
-Inline card with character image, text, and a CTA button. Supports smart triggers for automatic display.
+Compact fixed-height card with character image, text, and a full-width CTA button. Defaults to a dark frosted-glass look (`backdrop-filter: blur`) for a modern aesthetic.
 
 ### Props
 
@@ -28,51 +28,37 @@ Inline card with character image, text, and a CTA button. Supports smart trigger
 | `subText` | `string` | `'Take a break and challenge yourself!'` | Secondary text |
 | `ctaText` | `string` | `'Play a Game'` | CTA button label |
 | `animation` | `'auto' \| 'slideDown' \| 'slideUp' \| 'fadeIn' \| 'none'` | `'auto'` | Entry/exit animation. `auto` = slideDown |
-| `isOpen` | `boolean` | `false` | Controls visibility. Ignored when `trigger` is set |
-| `trigger` | `MiniGameInvitationTrigger` | — | Auto-show based on user behavior (see below) |
+| `isOpen` | `boolean` | `false` | Controls visibility |
 | `autoCloseDuration` | `number` | — | Ms before auto-close. Omit to stay open |
+| `width` | `number \| string \| null` | — | Component width. `< 1` = percentage, `>= 1` = px, `"80%"` = percentage, `"500"` = px, omit = 100% |
+| `top` | `number \| string` | `0.05` (5%) | Distance from top of viewport. `< 1` = percentage, `>= 1` = px, `"5%"` = percentage. Always fixed + centered |
 | `onClick` | `() => void` | **required** | CTA button click handler |
 | `onClose` | `() => void` | — | Optional callback when the invitation closes (dismiss, auto-close, CTA). Component closes itself internally regardless. ✕ button always shown |
 | `theme` | `MiniGameInvitationTheme` | — | See theme table |
-
-### Trigger
-
-When `trigger` is provided, the component manages its own visibility — no need to control `isOpen`.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `onIdle` | `number` | Show after user is idle for this many ms |
-| `afterDelay` | `number` | Show after this many ms from mount |
-| `onScrollPercent` | `number` | Show when user scrolls past this % of the page (0–100) |
 
 ### Theme
 
 | Field | Type | Default |
 |-------|------|---------|
 | `cornerRadius` | `number` | `16` |
-| `primaryColor` | `string` | `'#FFFFFF'` |
-| `secondaryColor` | `string` | `'#F3F4F6'` |
-| `textColor` | `string` | `'#1F2937'` |
+| `backgroundColor` | `string` | `'rgba(0, 0, 0, 0.65)'` |
+| `textColor` | `string` | `'#FFFFFF'` |
 | `ctaColor` | `string` | `'#3B82F6'` |
 | `charImageCornerRadius` | `number` | `12` |
+| `charImageAnchor` | `'left' \| 'right'` | `'left'` |
+| `borderWidth` | `number` | `1` |
+| `borderColor` | `string` | `'rgba(255, 255, 255, 0.1)'` |
+| `fontSize` | `number` | `16` |
 
 ### Usage
 
 ```tsx
-// Manual control
 <MiniGameInviteKit.Invitation
   isOpen={showInvite}
   charImage="/natsuki.png"
   onClick={() => setShowMenu(true)}
   onClose={() => setShowInvite(false)}
   autoCloseDuration={8000}
-/>
-
-// Smart trigger — shows after 10s idle, no state management needed
-<MiniGameInviteKit.Invitation
-  trigger={{ onIdle: 10000 }}
-  charImage="/natsuki.png"
-  onClick={() => setShowMenu(true)}
 />
 ```
 
@@ -89,6 +75,7 @@ Styled button with optional pulsate animation and notification badge.
 | `text` | `string` | `'🎮 Play a Game'` | Button label |
 | `showPulsate` | `boolean` | `false` | Pulsating glow animation |
 | `showBadge` | `boolean` | `false` | Red notification dot |
+| `width` | `number \| string \| null` | — | Button width. `< 1` = percentage, `>= 1` = px, `"80%"` = percentage, `"500"` = px, omit = content-sized |
 | `onClick` | `() => void` | **required** | Click handler |
 | `theme` | `MiniGameButtonTheme` | — | See theme table |
 
@@ -97,9 +84,14 @@ Styled button with optional pulsate animation and notification badge.
 | Field | Type | Default |
 |-------|------|---------|
 | `cornerRadius` | `number` | `8` |
-| `primaryColor` | `string` | `'#3B82F6'` |
-| `fontColor` | `string` | `'#FFFFFF'` |
+| `backgroundColor` | `string` | `'#3B82F6'` |
+| `textColor` | `string` | `'#FFFFFF'` |
+| `fontSize` | `number` | `14` |
 | `padding` | `string \| number` | `'10px 20px'` |
+| `borderWidth` | `number` | `0` |
+| `borderColor` | `string` | `'transparent'` |
+| `pulsateColor` | `string` | backgroundColor |
+| `badgeColor` | `string` | `'#EF4444'` |
 
 ### Usage
 
@@ -113,7 +105,7 @@ Styled button with optional pulsate animation and notification badge.
 <MiniGameInviteKit.Button
   text="Challenge Me"
   onClick={() => setShowMenu(true)}
-  theme={{ primaryColor: '#8B5CF6' }}
+  theme={{ backgroundColor: '#8B5CF6' }}
 />
 ```
 
@@ -143,7 +135,8 @@ Fullscreen overlay with character image in a circle, invitation text, and CTA. S
 | `cornerRadius` | `number` | `16` |
 | `characterSize` | `number` | `120` |
 | `textColor` | `string` | `'#FFFFFF'` |
-| `textSize` | `number` | `24` |
+| `fontSize` | `number` | `24` |
+| `ctaColor` | `string` | `'#3B82F6'` |
 
 ### Usage
 
@@ -173,9 +166,9 @@ function App() {
 
   return (
     <>
-      {/* Auto-shows after 10s idle, auto-closes after 8s */}
+      {/* Invitation card, auto-closes after 8s */}
       <MiniGameInviteKit.Invitation
-        trigger={{ onIdle: 10000 }}
+        isOpen={!showMenu}
         autoCloseDuration={8000}
         charImage="/natsuki.png"
         onClick={() => setShowMenu(true)}

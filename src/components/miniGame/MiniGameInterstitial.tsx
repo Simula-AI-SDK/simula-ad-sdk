@@ -6,7 +6,8 @@ const defaultTheme: Required<MiniGameInterstitialTheme> = {
   cornerRadius: 16,
   characterSize: 120,
   textColor: '#FFFFFF',
-  textSize: 24,
+  fontSize: 24,
+  ctaColor: '#3B82F6',
 };
 
 export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
@@ -73,15 +74,6 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isVisible, handleClose]);
 
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
-        handleClose();
-      }
-    },
-    [handleClose],
-  );
-
   if (!isVisible) return null;
 
   const bgImage = backgroundImage ?? defaultBackgroundImage;
@@ -93,7 +85,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
 
   return (
     <div
-      onClick={handleBackdropClick}
+      onClick={handleCtaClick}
       style={{
         position: 'fixed',
         top: 0,
@@ -105,6 +97,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        cursor: 'pointer',
         animation: 'miniGameInterstitialFadeIn 0.3s ease-in',
         fontFamily: 'Inter, system-ui, sans-serif',
         ...backdropStyle,
@@ -165,7 +158,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
         <div
           style={{
             color: appliedTheme.textColor,
-            fontSize: `${appliedTheme.textSize}px`,
+            fontSize: `${appliedTheme.fontSize}px`,
             fontWeight: 700,
             textAlign: 'center',
             maxWidth: '320px',
@@ -179,7 +172,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
         <button
           onClick={handleCtaClick}
           style={{
-            backgroundColor: '#3B82F6',
+            backgroundColor: appliedTheme.ctaColor,
             color: '#FFFFFF',
             border: 'none',
             borderRadius: `${appliedTheme.cornerRadius}px`,
@@ -211,30 +204,40 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
           {ctaText}
         </button>
 
-        {/* Close link */}
-        <button
-          onClick={handleClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: appliedTheme.textColor,
-            opacity: 0.6,
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            padding: '4px 8px',
-            transition: 'opacity 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '0.6';
-          }}
-        >
-          Not now
-        </button>
       </div>
+
+      {/* Close button — top right */}
+      <button
+        onClick={(e) => { e.stopPropagation(); handleClose(); }}
+        aria-label="Close"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          width: '32px',
+          height: '32px',
+          border: 'none',
+          background: 'rgba(0, 0, 0, 0.3)',
+          borderRadius: '50%',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 0,
+          color: appliedTheme.textColor,
+          fontSize: '16px',
+          lineHeight: 1,
+          transition: 'background 0.2s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)';
+        }}
+      >
+        &#10005;
+      </button>
     </div>
   );
 };

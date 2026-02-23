@@ -169,22 +169,17 @@ export interface MiniGameMenuProps {
 // MiniGameInvitation types
 export type MiniGameInvitationAnimation = 'auto' | 'slideDown' | 'fadeIn' | 'slideUp' | 'none';
 
-export interface MiniGameInvitationTrigger {
-  /** Show after user is idle for this many ms. */
-  onIdle?: number;
-  /** Show after this many ms from mount. */
-  afterDelay?: number;
-  /** Show when user scrolls past this percentage of the page (0-100). */
-  onScrollPercent?: number;
-}
-
 export interface MiniGameInvitationTheme {
   cornerRadius?: number;
-  primaryColor?: string;
-  secondaryColor?: string;
+  backgroundColor?: string;
   textColor?: string;
   ctaColor?: string;
   charImageCornerRadius?: number;
+  /** Which side the character image appears on. Default: 'left'. */
+  charImageAnchor?: 'left' | 'right';
+  borderWidth?: number;
+  borderColor?: string;
+  fontSize?: number;
 }
 
 export interface MiniGameInvitationProps {
@@ -194,11 +189,27 @@ export interface MiniGameInvitationProps {
   charImage: string;
   animation?: MiniGameInvitationAnimation;
   theme?: MiniGameInvitationTheme;
-  /** When provided, the component manages its own visibility based on user behavior. Overrides isOpen. */
-  trigger?: MiniGameInvitationTrigger;
   isOpen?: boolean;
   /** Milliseconds before auto-close. undefined = no auto-close. */
   autoCloseDuration?: number;
+  /**
+   * Component width. Supports multiple formats:
+   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
+   * - number >= 1: pixels (e.g., 500 = 500px)
+   * - string with %: percentage (e.g., "80%" = 80%)
+   * - string with number: pixels (e.g., "500" = 500px)
+   * - null/undefined: fills container width (100%)
+   */
+  width?: number | string | null;
+  /**
+   * Distance from top of viewport. The invitation is always fixed and horizontally centered.
+   * - number < 1: percentage (e.g., 0.05 = 5%)
+   * - number >= 1: pixels (e.g., 20 = 20px)
+   * - string with %: percentage (e.g., "5%")
+   * - string with number: pixels (e.g., "20")
+   * Defaults to 0.05 (5% from top).
+   */
+  top?: number | string;
   /** CTA button click handler. */
   onClick: () => void;
   /** Optional callback when the invitation closes (dismiss, auto-close, or after CTA click). Component closes itself internally regardless. */
@@ -208,9 +219,16 @@ export interface MiniGameInvitationProps {
 // MiniGameButton types
 export interface MiniGameButtonTheme {
   cornerRadius?: number;
-  primaryColor?: string;
-  fontColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  fontSize?: number;
   padding?: string | number;
+  borderWidth?: number;
+  borderColor?: string;
+  /** Pulsate glow color. Defaults to backgroundColor. */
+  pulsateColor?: string;
+  /** Badge dot color. Defaults to '#EF4444'. */
+  badgeColor?: string;
 }
 
 export interface MiniGameButtonProps {
@@ -218,6 +236,15 @@ export interface MiniGameButtonProps {
   showPulsate?: boolean;
   showBadge?: boolean;
   theme?: MiniGameButtonTheme;
+  /**
+   * Component width. Supports multiple formats:
+   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
+   * - number >= 1: pixels (e.g., 500 = 500px)
+   * - string with %: percentage (e.g., "80%" = 80%)
+   * - string with number: pixels (e.g., "500" = 500px)
+   * - null/undefined: content-sized (inline-flex)
+   */
+  width?: number | string | null;
   onClick: () => void;
 }
 
@@ -226,7 +253,8 @@ export interface MiniGameInterstitialTheme {
   cornerRadius?: number;
   characterSize?: number;
   textColor?: string;
-  textSize?: number;
+  fontSize?: number;
+  ctaColor?: string;
 }
 
 export interface MiniGameInterstitialProps {

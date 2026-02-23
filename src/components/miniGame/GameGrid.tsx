@@ -110,6 +110,36 @@ export const GameGrid: React.FC<GameGridProps> = ({
     animateToPage(pageIndex, direction);
   };
 
+  // Touch swipe support
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isAnimating) return;
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, [isAnimating]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current || isAnimating) return;
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+
+    // Only trigger swipe if horizontal movement is dominant and exceeds threshold
+    const SWIPE_THRESHOLD = 50;
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD || Math.abs(deltaY) > Math.abs(deltaX)) return;
+
+    if (deltaX < 0 && currentPage < totalPages - 1) {
+      // Swiped left → next page
+      animateToPage(currentPage + 1, 'left');
+    } else if (deltaX > 0 && currentPage > 0) {
+      // Swiped right → previous page
+      animateToPage(currentPage - 1, 'right');
+    }
+  }, [isAnimating, currentPage, totalPages, animateToPage]);
+
   const showPagination = totalPages > 1;
   const accentColor = theme.accentColor || '#3B82F6';
 
@@ -165,15 +195,19 @@ export const GameGrid: React.FC<GameGridProps> = ({
       `}</style>
       {/* Game Grid */}
       <div
+        ref={gridContainerRef}
         className={`game-grid-container ${
-          slideDirection === 'left' ? 'slide-left' : 
+          slideDirection === 'left' ? 'slide-left' :
           slideDirection === 'right' ? 'slide-right' : ''
         }`}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
           gap: '12px',
           width: '100%',
+          touchAction: 'pan-y',
         }}
       >
         {currentGames.map((game) => (

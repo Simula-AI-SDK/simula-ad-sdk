@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MiniGameInvitationProps, MiniGameInvitationTheme, MiniGameInvitationAnimation } from '../../types';
+import { toWidthCSS, toOffsetCSS } from '../../utils/parseWidth';
 
 const defaultTheme: Required<MiniGameInvitationTheme> = {
   cornerRadius: 16,
-  primaryColor: '#FFFFFF',
-  secondaryColor: '#F3F4F6',
-  textColor: '#1F2937',
+  backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  textColor: '#FFFFFF',
   ctaColor: '#3B82F6',
   charImageCornerRadius: 12,
+  charImageAnchor: 'left',
+  borderWidth: 1,
+  borderColor: 'rgba(255, 255, 255, 0.1)',
+  fontSize: 16,
 };
 
 const ANIMATION_DURATION = 300; // ms
@@ -51,25 +55,22 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
   charImage,
   animation = 'auto',
   theme = {},
-  trigger,
   isOpen: isOpenProp,
   autoCloseDuration,
+  width,
+  top = 0.05,
   onClick,
   onClose,
 }) => {
   const [imageError, setImageError] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
-  const [triggerFired, setTriggerFired] = useState(false);
   const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const appliedTheme = { ...defaultTheme, ...theme };
 
-  // Determine effective open state: trigger-managed or prop-managed
-  const isOpen = trigger ? triggerFired : (isOpenProp ?? false);
+  const isOpen = isOpenProp ?? false;
 
   const clearTimers = useCallback(() => {
     if (autoCloseTimerRef.current) {
@@ -81,71 +82,6 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
       closingTimerRef.current = null;
     }
   }, []);
-
-  // Trigger: afterDelay
-  useEffect(() => {
-    if (!trigger?.afterDelay || triggerFired) return;
-    triggerTimerRef.current = setTimeout(() => {
-      setTriggerFired(true);
-    }, trigger.afterDelay);
-    return () => {
-      if (triggerTimerRef.current) {
-        clearTimeout(triggerTimerRef.current);
-        triggerTimerRef.current = null;
-      }
-    };
-  }, [trigger?.afterDelay, triggerFired]);
-
-  // Trigger: onIdle
-  useEffect(() => {
-    if (!trigger?.onIdle || triggerFired) return;
-
-    const resetIdleTimer = () => {
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current);
-      }
-      idleTimerRef.current = setTimeout(() => {
-        setTriggerFired(true);
-      }, trigger.onIdle);
-    };
-
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach((event) => document.addEventListener(event, resetIdleTimer, { passive: true }));
-
-    // Start the initial idle timer
-    resetIdleTimer();
-
-    return () => {
-      events.forEach((event) => document.removeEventListener(event, resetIdleTimer));
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current);
-        idleTimerRef.current = null;
-      }
-    };
-  }, [trigger?.onIdle, triggerFired]);
-
-  // Trigger: onScrollPercent
-  useEffect(() => {
-    if (!trigger?.onScrollPercent || triggerFired) return;
-
-    const handleScroll = () => {
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-      if (docHeight <= 0) return;
-      const scrollPercent = (scrollTop / docHeight) * 100;
-      if (scrollPercent >= (trigger.onScrollPercent as number)) {
-        setTriggerFired(true);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    // Check immediately in case already scrolled past
-    handleScroll();
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [trigger?.onScrollPercent, triggerFired]);
 
   // Handle open/close state
   useEffect(() => {
@@ -178,10 +114,6 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
   const handleCloseInternal = useCallback(
     (additionalCallback?: () => void) => {
       clearTimers();
-      // If trigger-managed, mark as no longer fired so it doesn't re-show
-      if (trigger) {
-        setTriggerFired(false);
-      }
       if (animation === 'none') {
         onClose?.();
         additionalCallback?.();
@@ -195,7 +127,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
         additionalCallback?.();
       }, ANIMATION_DURATION);
     },
-    [animation, clearTimers, trigger, onClose],
+    [animation, clearTimers, onClose],
   );
 
   const handleCtaClick = useCallback(() => {
@@ -220,14 +152,26 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
     <div
       style={{
         borderRadius: `${appliedTheme.cornerRadius}px`,
-        backgroundColor: appliedTheme.primaryColor,
+        backgroundColor: appliedTheme.backgroundColor,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: `${appliedTheme.borderWidth}px solid ${appliedTheme.borderColor}`,
         boxShadow: '0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08)',
         overflow: 'hidden',
+        height: '120px',
         animation: animationStyle,
         display: 'flex',
+        flexDirection: appliedTheme.charImageAnchor === 'right' ? 'row' : 'row-reverse',
         alignItems: 'stretch',
         fontFamily: 'Inter, system-ui, sans-serif',
-        position: 'relative',
+        position: 'fixed',
+        width: toWidthCSS(width),
+        zIndex: 9999,
+        top: toOffsetCSS(top),
+        left: '0',
+        right: '0',
+        marginLeft: 'auto',
+        marginRight: 'auto',
       }}
     >
       <style>{`
@@ -261,7 +205,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
       <div
         style={{
           flex: 1,
-          padding: '20px',
+          padding: '14px 16px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -271,7 +215,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
       >
         <div
           style={{
-            fontSize: '16px',
+            fontSize: `${appliedTheme.fontSize}px`,
             fontWeight: 700,
             color: appliedTheme.textColor,
             lineHeight: '1.3',
@@ -286,7 +230,10 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
             color: appliedTheme.textColor,
             opacity: 0.65,
             lineHeight: '1.4',
-            marginBottom: '12px',
+            marginBottom: '6px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
           {subText}
@@ -298,15 +245,16 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
             color: '#FFFFFF',
             border: 'none',
             borderRadius: '8px',
-            padding: '8px 16px',
+            padding: '6px 16px',
             fontSize: '13px',
             fontWeight: 600,
             fontFamily: 'Inter, system-ui, sans-serif',
             cursor: 'pointer',
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '6px',
-            alignSelf: 'flex-start',
+            width: '100%',
             transition: 'opacity 0.2s ease',
           }}
           onMouseEnter={(e) => {
@@ -321,14 +269,14 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
         </button>
       </div>
 
-      {/* Right side: character image */}
+      {/* Character image — square, padded */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '16px 20px 16px 0',
           flexShrink: 0,
+          padding: appliedTheme.charImageAnchor === 'right' ? '0 16px 0 0' : '0 0 0 16px',
         }}
       >
         {!imageError ? (
@@ -340,6 +288,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
               width: '88px',
               height: '88px',
               objectFit: 'cover',
+              display: 'block',
               borderRadius: `${appliedTheme.charImageCornerRadius}px`,
             }}
           />
@@ -349,7 +298,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
               width: '88px',
               height: '88px',
               borderRadius: `${appliedTheme.charImageCornerRadius}px`,
-              backgroundColor: appliedTheme.secondaryColor,
+              backgroundColor: '#F3F4F6',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
