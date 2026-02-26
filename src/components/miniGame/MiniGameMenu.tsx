@@ -349,23 +349,65 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   position: 'absolute',
                   top: '16px',
                   right: '16px',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  borderRadius: '50%',
                   width: '44px',
                   height: '44px',
                   minWidth: '44px',
                   minHeight: '44px',
-                  fontSize: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                   zIndex: 10000,
-                  color: '#1F2937',
-                  fontWeight: 'bold',
                 }}
                 aria-label={`Ad closes in ${adCountdown} seconds`}
               >
-                {adCountdown}
+                <style>{`
+                  @keyframes simula-countdown-ring {
+                    from { stroke-dashoffset: 0; }
+                    to { stroke-dashoffset: 113.1; }
+                  }
+                `}</style>
+                <svg
+                  viewBox="0 0 44 44"
+                  width="44"
+                  height="44"
+                  style={{ transform: 'rotate(90deg) scaleX(-1)' }}
+                >
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="18"
+                    fill="rgba(0, 0, 0, 0.4)"
+                    stroke="none"
+                  />
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="18"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="3"
+                    strokeDasharray="113.1"
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    style={{
+                      animation: 'simula-countdown-ring 5s linear forwards',
+                    }}
+                  />
+                </svg>
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '16px',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {adCountdown}
+                </span>
               </div>
             ) : (
               <button
