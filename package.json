@@ -1,6 +1,6 @@
 {
   "name": "@simula/ads",
-  "version": "1.3.0-23",
+  "version": "1.3.0-26",
   "description": "React SDK for integrating contextual AI ads with Simula",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@fingerprintjs/botd": "^1.9.1",
+    "@simula/ads": "file:simula-ads-1.3.0-26.tgz",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
