@@ -34,6 +34,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     debounceMs = 0,
     charDesc,
     onFill,
+    onRender,
     onImpression,
     onClick,
     onError,
@@ -340,6 +341,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
             onLoad={() => {
               // Iframe loaded - now impressions can be tracked
               setIframeLoaded(true);
+              onRender?.(ad);
             }}
         />
         <button

@@ -50,7 +50,7 @@ export const validateSimulaProviderProps = (props: any): void => {
  * Throws descriptive errors for invalid props
  */
 export const validateInChatAdSlotProps = (props: any): void => {
-  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'charDesc', 'onImpression', 'onClick', 'onError', 'onFill'];
+  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'charDesc', 'onFill', 'onRender', 'onImpression', 'onClick', 'onError'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -110,6 +110,14 @@ export const validateInChatAdSlotProps = (props: any): void => {
 
   if (props.onClick !== undefined && typeof props.onClick !== 'function') {
     throw new Error(`Invalid "onClick" prop type: "${typeof props.onClick}". Must be a function`);
+  }
+
+  if (props.onFill !== undefined && typeof props.onFill !== 'function') {
+    throw new Error(`Invalid "onFill" prop type: "${typeof props.onFill}". Must be a function`);
+  }
+
+  if (props.onRender !== undefined && typeof props.onRender !== 'function') {
+    throw new Error(`Invalid "onRender" prop type: "${typeof props.onRender}". Must be a function`);
   }
 
   if (props.onError !== undefined && typeof props.onError !== 'function') {

@@ -53,6 +53,7 @@ export interface InChatAdSlotProps {
   debounceMs?: number;
   charDesc?: string;
   onFill?: (ad: AdData) => void;
+  onRender?: (ad: AdData) => void;
   onImpression?: (ad: AdData) => void;
   onClick?: (ad: AdData) => void;
   onError?: (error: Error) => void;
