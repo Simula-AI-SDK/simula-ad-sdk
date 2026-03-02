@@ -50,7 +50,7 @@ export const validateSimulaProviderProps = (props: any): void => {
  * Throws descriptive errors for invalid props
  */
 export const validateInChatAdSlotProps = (props: any): void => {
-  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'charDesc', 'onImpression', 'onClick', 'onError'];
+  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'charDesc', 'onImpression', 'onClick', 'onError', 'onFill'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props

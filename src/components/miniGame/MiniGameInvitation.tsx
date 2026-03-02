@@ -6,6 +6,9 @@ const defaultTheme: Required<MiniGameInvitationTheme> = {
   cornerRadius: 16,
   backgroundColor: 'rgba(0, 0, 0, 0.65)',
   textColor: '#FFFFFF',
+  titleTextColor: '#FFFFFF',
+  subtitleTextColor: '#FFFFFF',
+  ctaTextColor: '#FFFFFF',
   ctaColor: '#3B82F6',
   charImageCornerRadius: 12,
   charImageAnchor: 'left',
@@ -217,7 +220,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
           style={{
             fontSize: '16px',
             fontWeight: 700,
-            color: appliedTheme.textColor,
+            color: appliedTheme.titleTextColor || appliedTheme.textColor,
             lineHeight: '1.3',
           }}
         >
@@ -227,8 +230,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
           style={{
             fontSize: '13px',
             fontWeight: 400,
-            color: appliedTheme.textColor,
-            opacity: 0.65,
+            color: appliedTheme.subtitleTextColor || appliedTheme.textColor,
             lineHeight: '1.4',
             marginBottom: '6px',
             whiteSpace: 'nowrap',
@@ -242,7 +244,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
           onClick={handleCtaClick}
           style={{
             backgroundColor: appliedTheme.ctaColor,
-            color: '#FFFFFF',
+            color: appliedTheme.ctaTextColor || '#FFFFFF',
             border: 'none',
             borderRadius: '8px',
             padding: '6px 16px',

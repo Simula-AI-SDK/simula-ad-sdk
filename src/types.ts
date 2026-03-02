@@ -174,6 +174,9 @@ export interface MiniGameInvitationTheme {
   cornerRadius?: number;
   backgroundColor?: string;
   textColor?: string;
+  titleTextColor?: string;
+  subtitleTextColor?: string;
+  ctaTextColor?: string;
   ctaColor?: string;
   charImageCornerRadius?: number;
   /** Which side the character image appears on. Default: 'left'. */
