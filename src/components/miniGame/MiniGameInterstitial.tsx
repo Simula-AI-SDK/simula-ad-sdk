@@ -3,11 +3,14 @@ import { MiniGameInterstitialProps, MiniGameInterstitialTheme } from '../../type
 import defaultBackgroundImage from '../../assets/minigame_interstitial_background.png';
 
 const defaultTheme: Required<MiniGameInterstitialTheme> = {
-  cornerRadius: 16,
+  ctaCornerRadius: 16,
   characterSize: 120,
-  textColor: '#FFFFFF',
-  fontSize: 24,
+  titleTextColor: '#FFFFFF',
+  titleFontSize: 24,
+  ctaTextColor: '#FFFFFF',
+  ctaFontSize: 16,
   ctaColor: '#3B82F6',
+  fontFamily: 'Inter, system-ui, sans-serif',
 };
 
 export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
@@ -99,7 +102,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
         justifyContent: 'center',
         cursor: 'pointer',
         animation: 'miniGameInterstitialFadeIn 0.3s ease-in',
-        fontFamily: 'Inter, system-ui, sans-serif',
+        fontFamily: appliedTheme.fontFamily,
         ...backdropStyle,
       }}
       role="dialog"
@@ -157,8 +160,8 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
         {/* Invitation text */}
         <div
           style={{
-            color: appliedTheme.textColor,
-            fontSize: `${appliedTheme.fontSize}px`,
+            color: appliedTheme.titleTextColor,
+            fontSize: `${appliedTheme.titleFontSize}px`,
             fontWeight: 700,
             textAlign: 'center',
             maxWidth: '320px',
@@ -173,13 +176,13 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
           onClick={handleCtaClick}
           style={{
             backgroundColor: appliedTheme.ctaColor,
-            color: '#FFFFFF',
+            color: appliedTheme.ctaTextColor,
             border: 'none',
-            borderRadius: `${appliedTheme.cornerRadius}px`,
+            borderRadius: `${appliedTheme.ctaCornerRadius}px`,
             padding: '14px 32px',
-            fontSize: '16px',
+            fontSize: `${appliedTheme.ctaFontSize}px`,
             fontWeight: 600,
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: appliedTheme.fontFamily,
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
@@ -224,7 +227,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           padding: 0,
-          color: appliedTheme.textColor,
+          color: '#FFFFFF',
           fontSize: '16px',
           lineHeight: 1,
           transition: 'background 0.2s ease',

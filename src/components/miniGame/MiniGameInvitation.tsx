@@ -11,7 +11,7 @@ const defaultTheme: Required<MiniGameInvitationTheme> = {
   charImageAnchor: 'left',
   borderWidth: 1,
   borderColor: 'rgba(255, 255, 255, 0.1)',
-  fontSize: 16,
+  fontFamily: 'Inter, system-ui, sans-serif',
 };
 
 const ANIMATION_DURATION = 300; // ms
@@ -163,10 +163,10 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
         display: 'flex',
         flexDirection: appliedTheme.charImageAnchor === 'right' ? 'row' : 'row-reverse',
         alignItems: 'stretch',
-        fontFamily: 'Inter, system-ui, sans-serif',
+        fontFamily: appliedTheme.fontFamily,
         position: 'fixed',
         width: toWidthCSS(width),
-        zIndex: 9999,
+        zIndex: 9997,
         top: toOffsetCSS(top),
         left: '0',
         right: '0',
@@ -215,7 +215,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
       >
         <div
           style={{
-            fontSize: `${appliedTheme.fontSize}px`,
+            fontSize: '16px',
             fontWeight: 700,
             color: appliedTheme.textColor,
             lineHeight: '1.3',
@@ -248,7 +248,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
             padding: '6px 16px',
             fontSize: '13px',
             fontWeight: 600,
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: appliedTheme.fontFamily,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',

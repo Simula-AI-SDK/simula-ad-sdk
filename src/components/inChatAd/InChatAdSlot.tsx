@@ -33,6 +33,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     theme = {},
     debounceMs = 0,
     charDesc,
+    onFill,
     onImpression,
     onClick,
     onError,
@@ -209,6 +210,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
         onError?.(new Error(result.error));
       } else if (result.ad) {
         setAd(result.ad);
+        onFill?.(result.ad);
         // Mark as triggered - this AdSlot will never fetch again
         setHasTriggered(true);
       } else {
@@ -223,7 +225,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     } finally {
       setLoading(false);
     }
-  }, [hasBeenViewed, loading, hasTriggered, error, messages, apiKey, slotId, theme, onError, isBot, reasons, sessionId, measuredWidth]);
+  }, [hasBeenViewed, loading, hasTriggered, error, messages, apiKey, slotId, theme, onFill, onError, isBot, reasons, sessionId, measuredWidth]);
 
   useDebounce(
     () => {

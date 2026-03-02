@@ -48,7 +48,7 @@ Compact fixed-height card with character image, text, and a full-width CTA butto
 | `charImageAnchor` | `'left' \| 'right'` | `'left'` |
 | `borderWidth` | `number` | `1` |
 | `borderColor` | `string` | `'rgba(255, 255, 255, 0.1)'` |
-| `fontSize` | `number` | `16` |
+| `fontFamily` | `string` | `'Inter, system-ui, sans-serif'` |
 
 ### Usage
 
@@ -132,11 +132,14 @@ Fullscreen overlay with character image in a circle, invitation text, and CTA. S
 
 | Field | Type | Default |
 |-------|------|---------|
-| `cornerRadius` | `number` | `16` |
+| `ctaCornerRadius` | `number` | `16` |
 | `characterSize` | `number` | `120` |
-| `textColor` | `string` | `'#FFFFFF'` |
-| `fontSize` | `number` | `24` |
+| `titleTextColor` | `string` | `'#FFFFFF'` |
+| `titleFontSize` | `number` | `24` |
+| `ctaTextColor` | `string` | `'#FFFFFF'` |
+| `ctaFontSize` | `number` | `16` |
 | `ctaColor` | `string` | `'#3B82F6'` |
+| `fontFamily` | `string` | `'Inter, system-ui, sans-serif'` |
 
 ### Usage
 

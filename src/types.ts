@@ -1,5 +1,5 @@
 export type AccentOption = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan' | 'transparent' | 'image';
-export type FontOption = 'san-serif' | 'serif' | 'monospace';
+export type FontOption = 'sans-serif' | 'serif' | 'monospace';
 
 export interface InChatTheme {
   mode?: 'light' | 'dark' | 'auto';
@@ -52,6 +52,7 @@ export interface InChatAdSlotProps {
   theme?: InChatTheme;
   debounceMs?: number;
   charDesc?: string;
+  onFill?: (ad: AdData) => void;
   onImpression?: (ad: AdData) => void;
   onClick?: (ad: AdData) => void;
   onError?: (error: Error) => void;
@@ -179,7 +180,7 @@ export interface MiniGameInvitationTheme {
   charImageAnchor?: 'left' | 'right';
   borderWidth?: number;
   borderColor?: string;
-  fontSize?: number;
+  fontFamily?: string;
 }
 
 export interface MiniGameInvitationProps {
@@ -250,11 +251,14 @@ export interface MiniGameButtonProps {
 
 // MiniGameInterstitial types
 export interface MiniGameInterstitialTheme {
-  cornerRadius?: number;
+  ctaCornerRadius?: number;
   characterSize?: number;
-  textColor?: string;
-  fontSize?: number;
+  titleTextColor?: string;
+  titleFontSize?: number;
+  ctaTextColor?: string;
+  ctaFontSize?: number;
   ctaColor?: string;
+  fontFamily?: string;
 }
 
 export interface MiniGameInterstitialProps {

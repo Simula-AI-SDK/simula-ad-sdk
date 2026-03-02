@@ -131,7 +131,7 @@ export const validateTheme = (theme?: InChatTheme): void => {
 
   const validModeOptions = ['light', 'dark', 'auto'];
   const validAccentOptions = ['blue', 'red', 'green', 'yellow', 'purple', 'pink', 'orange', 'neutral', 'gray', 'tan', 'transparent', 'image'];
-  const validFontOptions = ['san-serif', 'serif', 'monospace'];
+  const validFontOptions = ['sans-serif', 'serif', 'monospace'];
   const validKeys = ['mode', 'theme', 'accent', 'font', 'width', 'cornerRadius']; // 'theme' kept for backward compatibility
 
   // Check for invalid top-level keys
