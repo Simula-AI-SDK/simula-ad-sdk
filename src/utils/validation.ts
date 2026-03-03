@@ -50,7 +50,7 @@ export const validateSimulaProviderProps = (props: any): void => {
  * Throws descriptive errors for invalid props
  */
 export const validateInChatAdSlotProps = (props: any): void => {
-  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'charDesc', 'onImpression', 'onClick', 'onError'];
+  const validProps = ['messages', 'trigger', 'formats', 'theme', 'debounceMs', 'charDesc', 'onFill', 'onRender', 'onImpression', 'onClick', 'onError'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -112,6 +112,14 @@ export const validateInChatAdSlotProps = (props: any): void => {
     throw new Error(`Invalid "onClick" prop type: "${typeof props.onClick}". Must be a function`);
   }
 
+  if (props.onFill !== undefined && typeof props.onFill !== 'function') {
+    throw new Error(`Invalid "onFill" prop type: "${typeof props.onFill}". Must be a function`);
+  }
+
+  if (props.onRender !== undefined && typeof props.onRender !== 'function') {
+    throw new Error(`Invalid "onRender" prop type: "${typeof props.onRender}". Must be a function`);
+  }
+
   if (props.onError !== undefined && typeof props.onError !== 'function') {
     throw new Error(`Invalid "onError" prop type: "${typeof props.onError}". Must be a function`);
   }
@@ -131,7 +139,7 @@ export const validateTheme = (theme?: InChatTheme): void => {
 
   const validModeOptions = ['light', 'dark', 'auto'];
   const validAccentOptions = ['blue', 'red', 'green', 'yellow', 'purple', 'pink', 'orange', 'neutral', 'gray', 'tan', 'transparent', 'image'];
-  const validFontOptions = ['san-serif', 'serif', 'monospace'];
+  const validFontOptions = ['sans-serif', 'serif', 'monospace'];
   const validKeys = ['mode', 'theme', 'accent', 'font', 'width', 'cornerRadius']; // 'theme' kept for backward compatibility
 
   // Check for invalid top-level keys

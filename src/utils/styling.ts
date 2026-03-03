@@ -12,7 +12,7 @@ export const getResponsiveStyles = (theme: InChatTheme = {}): React.CSSPropertie
   const themeMode = theme.mode ?? (theme as any).theme ?? 'light';
   const {
     accent = 'blue',
-    font = 'san-serif',
+    font = 'sans-serif',
     width = 'auto',
   } = theme;
 
@@ -38,7 +38,7 @@ export const createInChatAdSlotCSS = (theme: InChatTheme = {}) => {
   const themeMode = theme.mode ?? (theme as any).theme ?? 'light';
   const {
     accent = 'blue',
-    font = 'san-serif',
+    font = 'sans-serif',
     width = 'auto',
   } = theme;
 

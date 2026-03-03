@@ -1,5 +1,5 @@
 export type AccentOption = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan' | 'transparent' | 'image';
-export type FontOption = 'san-serif' | 'serif' | 'monospace';
+export type FontOption = 'sans-serif' | 'serif' | 'monospace';
 
 export interface InChatTheme {
   mode?: 'light' | 'dark' | 'auto';
@@ -52,6 +52,8 @@ export interface InChatAdSlotProps {
   theme?: InChatTheme;
   debounceMs?: number;
   charDesc?: string;
+  onFill?: (ad: AdData) => void;
+  onRender?: (ad: AdData) => void;
   onImpression?: (ad: AdData) => void;
   onClick?: (ad: AdData) => void;
   onError?: (error: Error) => void;
@@ -164,6 +166,116 @@ export interface MiniGameMenuProps {
   maxGamesToShow?: 3 | 6 | 9;
   theme?: MiniGameTheme;
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
+}
+
+// MiniGameInvitation types
+export type MiniGameInvitationAnimation = 'auto' | 'slideDown' | 'fadeIn' | 'slideUp' | 'none';
+
+export interface MiniGameInvitationTheme {
+  cornerRadius?: number;
+  backgroundColor?: string;
+  textColor?: string;
+  titleTextColor?: string;
+  subTextColor?: string;
+  ctaTextColor?: string;
+  ctaColor?: string;
+  charImageCornerRadius?: number;
+  /** Which side the character image appears on. Default: 'left'. */
+  charImageAnchor?: 'left' | 'right';
+  borderWidth?: number;
+  borderColor?: string;
+  fontFamily?: string;
+}
+
+export interface MiniGameInvitationProps {
+  titleText?: string;
+  subText?: string;
+  ctaText?: string;
+  charImage: string;
+  animation?: MiniGameInvitationAnimation;
+  theme?: MiniGameInvitationTheme;
+  isOpen?: boolean;
+  /** Milliseconds before auto-close. undefined = no auto-close. */
+  autoCloseDuration?: number;
+  /**
+   * Component width. Supports multiple formats:
+   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
+   * - number >= 1: pixels (e.g., 500 = 500px)
+   * - string with %: percentage (e.g., "80%" = 80%)
+   * - string with number: pixels (e.g., "500" = 500px)
+   * - null/undefined: fills container width (100%)
+   */
+  width?: number | string | null;
+  /**
+   * Distance from top of viewport. The invitation is always fixed and horizontally centered.
+   * - number < 1: percentage (e.g., 0.05 = 5%)
+   * - number >= 1: pixels (e.g., 20 = 20px)
+   * - string with %: percentage (e.g., "5%")
+   * - string with number: pixels (e.g., "20")
+   * Defaults to 0.05 (5% from top).
+   */
+  top?: number | string;
+  /** CTA button click handler. */
+  onClick: () => void;
+  /** Optional callback when the invitation closes (dismiss, auto-close, or after CTA click). Component closes itself internally regardless. */
+  onClose?: () => void;
+}
+
+// MiniGameButton types
+export interface MiniGameButtonTheme {
+  cornerRadius?: number;
+  backgroundColor?: string;
+  textColor?: string;
+  fontSize?: number;
+  padding?: string | number;
+  borderWidth?: number;
+  borderColor?: string;
+  /** Pulsate glow color. Defaults to backgroundColor. */
+  pulsateColor?: string;
+  /** Badge dot color. Defaults to '#EF4444'. */
+  badgeColor?: string;
+}
+
+export interface MiniGameButtonProps {
+  text?: string;
+  showPulsate?: boolean;
+  showBadge?: boolean;
+  theme?: MiniGameButtonTheme;
+  /**
+   * Component width. Supports multiple formats:
+   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
+   * - number >= 1: pixels (e.g., 500 = 500px)
+   * - string with %: percentage (e.g., "80%" = 80%)
+   * - string with number: pixels (e.g., "500" = 500px)
+   * - null/undefined: content-sized (inline-flex)
+   */
+  width?: number | string | null;
+  onClick: () => void;
+}
+
+// MiniGameInterstitial types
+export interface MiniGameInterstitialTheme {
+  ctaCornerRadius?: number;
+  characterSize?: number;
+  titleTextColor?: string;
+  titleFontSize?: number;
+  ctaTextColor?: string;
+  ctaFontSize?: number;
+  ctaColor?: string;
+  fontFamily?: string;
+}
+
+export interface MiniGameInterstitialProps {
+  charImage: string;
+  invitationText?: string;
+  ctaText?: string;
+  backgroundImage?: string;
+  theme?: MiniGameInterstitialTheme;
+  isOpen: boolean;
+  /** CTA button click handler. */
+  onClick: () => void;
+  /** Optional callback when the interstitial is dismissed (close button or ESC). Not called on CTA/backdrop click — use onClick for that. */
+  onClose?: () => void;
 }
 
 // NativeBanner types

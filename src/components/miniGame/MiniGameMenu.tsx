@@ -40,6 +40,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const [adFetched, setAdFetched] = useState(false);
   const [adIframeUrl, setAdIframeUrl] = useState<string | null>(null);
   const [currentAdId, setCurrentAdId] = useState<string | null>(null);
+  const [adCountdown, setAdCountdown] = useState<number | null>(null);
+  const adCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -61,6 +63,37 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       setIsSearchFocused(false);
     }
   }, [isOpen]);
+
+  // Ad countdown timer
+  useEffect(() => {
+    if (adIframeUrl) {
+      setAdCountdown(5);
+      adCountdownRef.current = setInterval(() => {
+        setAdCountdown((prev) => {
+          if (prev !== null && prev <= 1) {
+            if (adCountdownRef.current) {
+              clearInterval(adCountdownRef.current);
+              adCountdownRef.current = null;
+            }
+            return 0;
+          }
+          return prev !== null ? prev - 1 : null;
+        });
+      }, 1000);
+    } else {
+      setAdCountdown(null);
+      if (adCountdownRef.current) {
+        clearInterval(adCountdownRef.current);
+        adCountdownRef.current = null;
+      }
+    }
+    return () => {
+      if (adCountdownRef.current) {
+        clearInterval(adCountdownRef.current);
+        adCountdownRef.current = null;
+      }
+    };
+  }, [adIframeUrl]);
 
   // Merge theme with defaults
   const appliedTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
@@ -249,7 +282,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   };
 
   const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === adOverlayRef.current) {
+    if (e.target === adOverlayRef.current && (adCountdown === null || adCountdown === 0)) {
       handleAdIframeClose();
     }
   };
@@ -310,39 +343,107 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
               justifyContent: 'center',
             }}
           >
-            <button
-              onClick={handleAdIframeClose}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'rgba(255, 255, 255, 0.9)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '44px',
-                height: '44px',
-                minWidth: '44px',
-                minHeight: '44px',
-                fontSize: '24px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10000,
-                color: '#1F2937',
-                fontWeight: 'bold',
-                transition: 'background-color 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-              }}
-              aria-label="Close ad"
-            >
-              ×
-            </button>
+            {adCountdown !== null && adCountdown > 0 ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  zIndex: 10000,
+                }}
+                aria-label={`Ad closes in ${adCountdown} seconds`}
+              >
+                <style>{`
+                  @keyframes simula-countdown-ring {
+                    from { stroke-dashoffset: 0; }
+                    to { stroke-dashoffset: 113.1; }
+                  }
+                `}</style>
+                <svg
+                  viewBox="0 0 44 44"
+                  width="44"
+                  height="44"
+                  style={{ transform: 'rotate(90deg) scaleX(-1)' }}
+                >
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="18"
+                    fill="rgba(0, 0, 0, 0.4)"
+                    stroke="none"
+                  />
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="18"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="3"
+                    strokeDasharray="113.1"
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    style={{
+                      animation: 'simula-countdown-ring 5s linear forwards',
+                    }}
+                  />
+                </svg>
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '16px',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {adCountdown}
+                </span>
+              </div>
+            ) : (
+              <button
+                onClick={handleAdIframeClose}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10000,
+                  color: '#1F2937',
+                  fontWeight: 'bold',
+                  transition: 'background-color 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                }}
+                aria-label="Close ad"
+              >
+                ×
+              </button>
+            )}
             <iframe
               src={adIframeUrl}
               style={{

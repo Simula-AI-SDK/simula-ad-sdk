@@ -20,7 +20,7 @@ export interface FontPalette {
 
 // Font definitions
 export const fonts: Record<string, FontPalette> = {
-  'san-serif': {
+  'sans-serif': {
     primary: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     secondary: 'system-ui, -apple-system, sans-serif'
   },
@@ -93,6 +93,6 @@ export const getShadow = (colors: ColorPalette): string => {
   return 'rgba(0, 0, 0, 0.1)';
 };
 
-export const getFontStyles = (font: string = 'san-serif'): FontPalette => {
-  return fonts[font] || fonts['san-serif'];
+export const getFontStyles = (font: string = 'sans-serif'): FontPalette => {
+  return fonts[font] || fonts['sans-serif'];
 };

@@ -4,53 +4,11 @@ import { useBotDetection } from '../../hooks/useBotDetection';
 import { fetchNativeBannerAd, trackImpression, trackViewportEntry, trackViewportExit } from '../../utils/api';
 import { validateNativeBannerProps } from '../../utils/validation';
 import { NativeBannerProps, AdData, filterContextForPrivacy } from '../../types';
+import { RadialLinesSpinner } from './RadialLinesSpinner';
+import { parseWidth, needsWidthMeasurement } from '../../utils/parseWidth';
 
 // Internal constant to prevent API abuse
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
-
-// Helper functions for dimension validation and parsing
-type WidthInput = number | string | null | undefined;
-
-const parseWidth = (width: WidthInput): { type: 'fill' | 'percentage' | 'pixels'; value?: number } => {
-  // Handle null, undefined, "auto"
-  if (width == null || width === 'auto' || width === '') {
-    return { type: 'fill' };
-  }
-
-  // Handle string percentages (e.g., "10%")
-  if (typeof width === 'string' && width.endsWith('%')) {
-    const percentValue = parseFloat(width);
-    if (!isNaN(percentValue) && percentValue > 0 && percentValue <= 100) {
-      return { type: 'percentage', value: percentValue / 100 };
-    }
-  }
-
-  // Handle string pixels (e.g., "500")
-  if (typeof width === 'string') {
-    const pixelValue = parseFloat(width);
-    if (!isNaN(pixelValue) && pixelValue > 0) {
-      return { type: 'pixels', value: pixelValue };
-    }
-  }
-
-  // Handle number < 1 as percentage (e.g., 0.8 = 80%)
-  if (typeof width === 'number' && width > 0 && width < 1) {
-    return { type: 'percentage', value: width };
-  }
-
-  // Handle number >= 1 as pixels (e.g., 500 = 500px)
-  if (typeof width === 'number' && width >= 1) {
-    return { type: 'pixels', value: width };
-  }
-
-  // Default to fill
-  return { type: 'fill' };
-};
-
-const needsWidthMeasurement = (width: WidthInput): boolean => {
-  const parsed = parseWidth(width);
-  return parsed.type === 'fill' || parsed.type === 'percentage';
-};
 
 export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   // Validate props early
