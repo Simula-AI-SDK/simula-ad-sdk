@@ -43,6 +43,9 @@ Compact fixed-height card with character image, text, and a full-width CTA butto
 | `cornerRadius` | `number` | `16` |
 | `backgroundColor` | `string` | `'rgba(0, 0, 0, 0.65)'` |
 | `textColor` | `string` | `'#FFFFFF'` |
+| `titleTextColor` | `string` | `'#FFFFFF'` |
+| `subTextColor` | `string` | `'#FFFFFF'` |
+| `ctaTextColor` | `string` | `'#FFFFFF'` |
 | `ctaColor` | `string` | `'#3B82F6'` |
 | `charImageCornerRadius` | `number` | `12` |
 | `charImageAnchor` | `'left' \| 'right'` | `'left'` |

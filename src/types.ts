@@ -176,7 +176,7 @@ export interface MiniGameInvitationTheme {
   backgroundColor?: string;
   textColor?: string;
   titleTextColor?: string;
-  subtitleTextColor?: string;
+  subTextColor?: string;
   ctaTextColor?: string;
   ctaColor?: string;
   charImageCornerRadius?: number;
@@ -274,7 +274,7 @@ export interface MiniGameInterstitialProps {
   isOpen: boolean;
   /** CTA button click handler. */
   onClick: () => void;
-  /** Optional callback when the interstitial closes (backdrop, ESC, "Not now", or after CTA click). Component closes itself internally regardless. */
+  /** Optional callback when the interstitial is dismissed (close button or ESC). Not called on CTA/backdrop click — use onClick for that. */
   onClose?: () => void;
 }
 

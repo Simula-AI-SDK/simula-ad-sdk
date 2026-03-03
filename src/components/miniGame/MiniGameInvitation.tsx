@@ -7,7 +7,7 @@ const defaultTheme: Required<MiniGameInvitationTheme> = {
   backgroundColor: 'rgba(0, 0, 0, 0.65)',
   textColor: '#FFFFFF',
   titleTextColor: '#FFFFFF',
-  subtitleTextColor: '#FFFFFF',
+  subTextColor: '#FFFFFF',
   ctaTextColor: '#FFFFFF',
   ctaColor: '#3B82F6',
   charImageCornerRadius: 12,
@@ -230,7 +230,7 @@ export const MiniGameInvitation: React.FC<MiniGameInvitationProps> = ({
           style={{
             fontSize: '13px',
             fontWeight: 400,
-            color: appliedTheme.subtitleTextColor || appliedTheme.textColor,
+            color: appliedTheme.subTextColor || appliedTheme.textColor,
             lineHeight: '1.4',
             marginBottom: '6px',
             whiteSpace: 'nowrap',

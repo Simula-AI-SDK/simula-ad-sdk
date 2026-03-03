@@ -49,9 +49,8 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
 
   const handleCtaClick = useCallback(() => {
     setClosedInternally(true);
-    onClose?.();
     onClick();
-  }, [onClose, onClick]);
+  }, [onClick]);
 
   // Prevent body scroll when visible
   useEffect(() => {
