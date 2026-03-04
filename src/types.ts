@@ -227,6 +227,7 @@ export interface MiniGameButtonTheme {
   backgroundColor?: string;
   textColor?: string;
   fontSize?: number;
+  fontFamily?: string;
   padding?: string | number;
   borderWidth?: number;
   borderColor?: string;

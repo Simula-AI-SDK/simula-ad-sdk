@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { getMinigame } from '../../utils/api';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
+
+const MIN_PLAYABLE_HEIGHT = 500;
 
 interface GameIframeProps {
   gameId: string;
@@ -20,16 +22,16 @@ interface GameIframeProps {
   playableBorderColor?: string;
 }
 
-export const GameIframe: React.FC<GameIframeProps> = ({ 
-  gameId, 
-  charID, 
-  charName, 
-  charImage, 
+export const GameIframe: React.FC<GameIframeProps> = ({
+  gameId,
+  charID,
+  charName,
+  charImage,
   messages = [],
   delegateChar = true,
-  onClose, 
+  onClose,
   onAdIdReceived,
-  charDesc, 
+  charDesc,
   menuId,
   playableHeight,
   playableBorderColor = '#262626',
@@ -42,6 +44,12 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const currentRequestRef = useRef<Promise<void> | null>(null);
   const initKeyRef = useRef<string | null>(null);
+
+  // Drag-to-resize state
+  const [resizedHeight, setResizedHeight] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartY = useRef<number>(0);
+  const dragStartHeight = useRef<number>(0);
 
   // Keep ref in sync with sessionId
   useEffect(() => {
@@ -59,7 +67,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
 
     // Create a unique key for this initialization based on the actual parameters
     const initKey = `${gameId}-${charID}-${sessionId}`;
-    
+
     // Prevent multiple initializations with the same key
     if (currentRequestRef.current && initKeyRef.current === initKey) {
       console.log('[GameIframe] Initialization already in progress for key:', initKey);
@@ -110,7 +118,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           delegate_char: delegateChar,
           menuId: menuId ?? undefined,
         });
-        
+
         // Only process response if this is still the current request
         if (initKeyRef.current !== initKey) {
           console.log('[GameIframe] Response received but parameters changed, ignoring');
@@ -177,24 +185,109 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     }
   };
 
-  // Calculate effective height for bottom sheet mode
-  const getIframeHeight = useMemo(() => {
-    if (!playableHeight) return '100%';
-    
+  // Calculate container height based on playableHeight prop (matches RN SDK logic)
+  const { containerHeight, isBottomSheet } = useMemo(() => {
+    if (playableHeight === undefined || playableHeight === null) {
+      return { containerHeight: null, isBottomSheet: false };
+    }
+
+    const screenHeight = window.innerHeight;
+
     if (typeof playableHeight === 'number') {
-      const minHeight = 500;
-      return `${Math.max(playableHeight, minHeight)}px`;
+      // Treat values between 0 and 1 (exclusive) as percentages (e.g., 0.8 = 80%)
+      if (playableHeight > 0 && playableHeight < 1) {
+        if (playableHeight >= 0.95) {
+          return { containerHeight: null, isBottomSheet: false };
+        }
+        const computed = Math.max(Math.min(screenHeight * playableHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
+        return { containerHeight: computed, isBottomSheet: true };
+      }
+      const clamped = Math.max(Math.min(playableHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
+      if (clamped >= screenHeight * 0.95) {
+        return { containerHeight: null, isBottomSheet: false };
+      }
+      return { containerHeight: clamped, isBottomSheet: true };
     }
-    
-    if (typeof playableHeight === 'string' && playableHeight.includes('%')) {
-      // For percentage, we'll handle it in CSS
-      return playableHeight;
+
+    if (typeof playableHeight === 'string') {
+      if (playableHeight.toLowerCase() === 'auto') {
+        return { containerHeight: null, isBottomSheet: false };
+      }
+
+      if (playableHeight.includes('%')) {
+        const pct = parseFloat(playableHeight) / 100;
+        if (!isNaN(pct)) {
+          if (pct >= 0.95) {
+            return { containerHeight: null, isBottomSheet: false };
+          }
+          const computed = Math.max(Math.min(screenHeight * pct, screenHeight), MIN_PLAYABLE_HEIGHT);
+          return { containerHeight: computed, isBottomSheet: true };
+        }
+      }
+
+      // Numeric string without % (e.g., "600")
+      const parsed = parseFloat(playableHeight);
+      if (!isNaN(parsed)) {
+        const clamped = Math.max(Math.min(parsed, screenHeight), MIN_PLAYABLE_HEIGHT);
+        if (clamped >= screenHeight * 0.95) {
+          return { containerHeight: null, isBottomSheet: false };
+        }
+        return { containerHeight: clamped, isBottomSheet: true };
+      }
     }
-    
-    return '100%';
+
+    return { containerHeight: null, isBottomSheet: false };
   }, [playableHeight]);
 
-  const isBottomSheetMode = !!playableHeight;
+  // Effective height: user-resized overrides calculated
+  const effectiveHeight = resizedHeight ?? containerHeight;
+
+  // Re-clamp resizedHeight on window resize
+  useEffect(() => {
+    if (resizedHeight === null) return;
+
+    const handleResize = () => {
+      const screenHeight = window.innerHeight;
+      const clamped = Math.max(Math.min(resizedHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
+      if (clamped >= screenHeight * 0.95) {
+        setResizedHeight(screenHeight);
+      } else if (clamped !== resizedHeight) {
+        setResizedHeight(clamped);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [resizedHeight]);
+
+  // Drag-to-resize handlers (Pointer Events for unified mouse+touch)
+  const handleDragStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    const currentHeight = effectiveHeight ?? window.innerHeight;
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = currentHeight;
+    setIsDragging(true);
+  }, [effectiveHeight]);
+
+  const handleDragMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const deltaY = dragStartY.current - e.clientY; // up = positive = taller
+    const screenHeight = window.innerHeight;
+    const newHeight = Math.max(Math.min(dragStartHeight.current + deltaY, screenHeight), MIN_PLAYABLE_HEIGHT);
+    setResizedHeight(newHeight);
+  }, [isDragging]);
+
+  const handleDragEnd = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    setIsDragging(false);
+
+    // Snap to fullscreen if >= 95% of screen height
+    if (resizedHeight !== null && resizedHeight >= window.innerHeight * 0.95) {
+      setResizedHeight(window.innerHeight);
+    }
+  }, [isDragging, resizedHeight]);
 
   return (
     <div
@@ -209,7 +302,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         zIndex: 9999,
         display: 'flex',
-        alignItems: isBottomSheetMode ? 'flex-end' : 'center',
+        alignItems: isBottomSheet ? 'flex-end' : 'center',
         justifyContent: 'center',
         animation: 'fadeIn 0.2s ease-in',
       }}
@@ -239,20 +332,25 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         style={{
           position: 'relative',
           width: '100%',
-          height: isBottomSheetMode ? getIframeHeight : '100%',
+          height: effectiveHeight !== null ? `${effectiveHeight}px` : '100%',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: isBottomSheetMode ? 'flex-end' : 'center',
+          justifyContent: isBottomSheet ? 'flex-end' : 'center',
           pointerEvents: 'none',
-          ...(isBottomSheetMode ? {
+          transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          ...(isBottomSheet ? {
             animation: 'slideUp 0.3s ease-out',
           } : {}),
         }}
       >
-        {/* Bottom sheet header with drag handle */}
-        {isBottomSheetMode && (
+        {/* Bottom sheet header with draggable handle */}
+        {isBottomSheet && (
           <div
+            onPointerDown={handleDragStart}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+            onPointerCancel={handleDragEnd}
             style={{
               width: '100%',
               backgroundColor: playableBorderColor,
@@ -263,19 +361,22 @@ export const GameIframe: React.FC<GameIframeProps> = ({
               justifyContent: 'center',
               alignItems: 'center',
               pointerEvents: 'auto',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
             }}
           >
             <div
               style={{
-                width: '40px',
+                width: '36px',
                 height: '4px',
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
                 borderRadius: '2px',
               }}
             />
           </div>
         )}
-        
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -286,7 +387,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           }}
           style={{
             position: 'absolute',
-            top: isBottomSheetMode ? '4px' : 'max(16px, env(safe-area-inset-top, 16px))',
+            top: isBottomSheet ? '4px' : 'max(16px, env(safe-area-inset-top, 16px))',
             right: 'max(16px, env(safe-area-inset-right, 16px))',
             background: 'rgba(255, 255, 255, 0.9)',
             border: 'none',
@@ -369,4 +470,3 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     </div>
   );
 };
-
