@@ -12,6 +12,7 @@ const defaultTheme: Required<MiniGameButtonTheme> = {
   borderColor: 'transparent',
   pulsateColor: '',
   badgeColor: '#EF4444',
+  fontFamily: 'Inter, system-ui, sans-serif',
 };
 
 export const MiniGameButton: React.FC<MiniGameButtonProps> = ({
