@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MiniGameInterstitialProps, MiniGameInterstitialTheme } from '../../types';
 import defaultBackgroundImage from '../../assets/minigame_interstitial_background.png';
 
+
 const defaultTheme: Required<MiniGameInterstitialTheme> = {
   ctaCornerRadius: 16,
   characterSize: 120,

@@ -11,6 +11,7 @@ The Simula Ad SDK enables React developers to monetize conversational AI applica
 - **Native Banner Ads** - Flexible ad placements for feeds and content surfaces
 - **MRC-Compliant Viewability** - Industry-standard impression tracking
 - **Built-in A/B Testing** - Optimize ad performance automatically
+- **Mini Games** - Playable mini game experiences with ad monetization
 
 ---
 
@@ -78,6 +79,22 @@ import { NativeBanner } from "@simula/ads";
 />
 ```
 
+**Mini Games:**
+```tsx
+import { MiniGameMenu } from "@simula/ads";
+
+<MiniGameMenu
+  isOpen={isMenuOpen}
+  onClose={() => setIsMenuOpen(false)}
+  charName="Luna"
+  charID="char-123"
+  charImage="https://example.com/luna.png"
+  messages={messages}
+  maxGamesToShow={6}
+  navigationType="dot"
+/>
+```
+
 ---
 
 ## Documentation
@@ -86,6 +103,7 @@ For complete API reference, integration guides, and examples:
 
 - **[InChatAdSlot Documentation](https://simula-ad.notion.site/?pvs=73)**
 - **[NativeBanner Documentation](https://simula-ad.notion.site/Komiko-Simula-Integration-2cbaf70f6f0d80338ddcd2efbbe5d3d7?source=copy_link)**
+- **[Mini Games Documentation](https://simula-ad.notion.site/Simula-x-Moescape-Mini-Games-SDK-Overview-309af70f6f0d8059908cc05be297f271?source=copy_link)**
 
 ---
 

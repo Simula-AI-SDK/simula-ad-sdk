@@ -14,6 +14,7 @@ interface GameGridProps {
   theme: MiniGameTheme;
   onGameSelect: (gameId: string, gameName: string) => void;
   menuId?: string | null;
+  navigationType?: 'dot' | 'arrow' | 'pagination';
 }
 
 const calculateVisibleDots = (currentPage: number, totalPages: number) => {
@@ -65,10 +66,12 @@ export const GameGrid: React.FC<GameGridProps> = ({
   theme,
   onGameSelect,
   menuId,
+  navigationType = 'dot',
 }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [hoveredArrow, setHoveredArrow] = useState<'left' | 'right' | null>(null);
 
   const totalPages = useMemo(() => {
     return Math.ceil(games.length / maxGamesToShow);
@@ -139,6 +142,18 @@ export const GameGrid: React.FC<GameGridProps> = ({
       animateToPage(currentPage - 1, 'right');
     }
   }, [isAnimating, currentPage, totalPages, animateToPage]);
+
+  const handlePrevPage = useCallback(() => {
+    if (currentPage > 0 && !isAnimating) {
+      animateToPage(currentPage - 1, 'right');
+    }
+  }, [currentPage, isAnimating, animateToPage]);
+
+  const handleNextPage = useCallback(() => {
+    if (currentPage < totalPages - 1 && !isAnimating) {
+      animateToPage(currentPage + 1, 'left');
+    }
+  }, [currentPage, totalPages, isAnimating, animateToPage]);
 
   const showPagination = totalPages > 1;
   const accentColor = theme.accentColor || '#3B82F6';
@@ -222,8 +237,8 @@ export const GameGrid: React.FC<GameGridProps> = ({
         ))}
       </div>
 
-      {/* Dot Pagination */}
-      {showPagination && (
+      {/* Pagination */}
+      {showPagination && navigationType === 'dot' && (
         <div
           style={{
             display: 'flex',
@@ -270,6 +285,148 @@ export const GameGrid: React.FC<GameGridProps> = ({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {showPagination && navigationType === 'arrow' && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            marginTop: '4px',
+            minHeight: '16px',
+          }}
+        >
+          <button
+            onClick={handlePrevPage}
+            onMouseEnter={() => setHoveredArrow('left')}
+            onMouseLeave={() => setHoveredArrow(null)}
+            disabled={currentPage === 0}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: currentPage === 0 ? 'default' : 'pointer',
+              opacity: currentPage === 0 ? 0.3 : hoveredArrow === 'left' ? 1 : 0.7,
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'opacity 0.2s ease',
+            }}
+            aria-label="Previous page"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button
+            onClick={handleNextPage}
+            onMouseEnter={() => setHoveredArrow('right')}
+            onMouseLeave={() => setHoveredArrow(null)}
+            disabled={currentPage === totalPages - 1}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: currentPage === totalPages - 1 ? 'default' : 'pointer',
+              opacity: currentPage === totalPages - 1 ? 0.3 : hoveredArrow === 'right' ? 1 : 0.7,
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'opacity 0.2s ease',
+            }}
+            aria-label="Next page"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {showPagination && navigationType === 'pagination' && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginTop: '4px',
+            minHeight: '16px',
+            fontFamily: theme.secondaryFont || 'Inter, system-ui, sans-serif',
+            fontSize: '13px',
+          }}
+        >
+          <button
+            onClick={handlePrevPage}
+            onMouseEnter={() => setHoveredArrow('left')}
+            onMouseLeave={() => setHoveredArrow(null)}
+            disabled={currentPage === 0}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: currentPage === 0 ? 'default' : 'pointer',
+              opacity: currentPage === 0 ? 0.3 : hoveredArrow === 'left' ? 1 : 0.7,
+              color: accentColor,
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              fontWeight: 500,
+              padding: '4px 2px',
+              transition: 'opacity 0.2s ease',
+            }}
+            aria-label="Previous page"
+          >
+            Prev
+          </button>
+          <span
+            style={{
+              color: theme.secondaryFontColor || '#6B7280',
+              userSelect: 'none',
+            }}
+          >
+            |
+          </span>
+          <span
+            style={{
+              color: theme.secondaryFontColor || '#6B7280',
+              userSelect: 'none',
+            }}
+          >
+            {currentPage + 1} / {totalPages}
+          </span>
+          <span
+            style={{
+              color: theme.secondaryFontColor || '#6B7280',
+              userSelect: 'none',
+            }}
+          >
+            |
+          </span>
+          <button
+            onClick={handleNextPage}
+            onMouseEnter={() => setHoveredArrow('right')}
+            onMouseLeave={() => setHoveredArrow(null)}
+            disabled={currentPage === totalPages - 1}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: currentPage === totalPages - 1 ? 'default' : 'pointer',
+              opacity: currentPage === totalPages - 1 ? 0.3 : hoveredArrow === 'right' ? 1 : 0.7,
+              color: accentColor,
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              fontWeight: 500,
+              padding: '4px 2px',
+              transition: 'opacity 0.2s ease',
+            }}
+            aria-label="Next page"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>
