@@ -108,7 +108,7 @@ export const createInChatAdSlotCSS = (theme: InChatTheme = {}) => {
       padding: 6px;
       border-radius: 50%;
       transition: all 0.2s ease;
-      z-index: 10;
+      z-index: 10001;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -129,7 +129,7 @@ export const createInChatAdSlotCSS = (theme: InChatTheme = {}) => {
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 10000;
     }
 
     .simula-modal-content {

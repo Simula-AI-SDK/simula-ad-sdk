@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { getMinigame } from '../../utils/api';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
+import { CloseButton } from './CloseButton';
 
 const MIN_PLAYABLE_HEIGHT = 500;
 
@@ -377,49 +378,17 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           </div>
         )}
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          onTouchStart={(e) => {
-            e.stopPropagation();
-          }}
+        <CloseButton
+          onClick={onClose}
+          ariaLabel="Close game"
           style={{
             position: 'absolute',
-            top: isBottomSheet ? '4px' : 'max(16px, env(safe-area-inset-top, 16px))',
+            top: isBottomSheet ? '44px' : 'max(16px, env(safe-area-inset-top, 16px))',
             right: 'max(16px, env(safe-area-inset-right, 16px))',
-            background: 'rgba(255, 255, 255, 0.9)',
-            border: 'none',
-            borderRadius: '50%',
-            width: '48px',
-            height: '48px',
-            minWidth: '48px',
-            minHeight: '48px',
-            fontSize: '24px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             zIndex: 10000,
-            color: '#1F2937',
-            fontWeight: 'bold',
-            transition: 'background-color 0.2s ease',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
-            userSelect: 'none',
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-          }}
-          aria-label="Close game"
-        >
-          ×
-        </button>
+        />
 
         {loading && (
           <div style={{

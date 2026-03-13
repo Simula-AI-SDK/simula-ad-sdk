@@ -5,6 +5,7 @@ import { GameIframe } from './GameIframe';
 import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick } from '../../utils/api';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import { useSimula } from '../../SimulaProvider';
+import { CloseButton } from './CloseButton';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -350,10 +351,10 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   position: 'absolute',
                   top: '16px',
                   right: '16px',
-                  width: '44px',
-                  height: '44px',
-                  minWidth: '44px',
-                  minHeight: '44px',
+                  width: '32px',
+                  height: '32px',
+                  minWidth: '32px',
+                  minHeight: '32px',
                   zIndex: 10000,
                 }}
                 aria-label={`Ad closes in ${adCountdown} seconds`}
@@ -361,30 +362,30 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 <style>{`
                   @keyframes simula-countdown-ring {
                     from { stroke-dashoffset: 0; }
-                    to { stroke-dashoffset: 113.1; }
+                    to { stroke-dashoffset: 81.68; }
                   }
                 `}</style>
                 <svg
-                  viewBox="0 0 44 44"
-                  width="44"
-                  height="44"
+                  viewBox="0 0 32 32"
+                  width="32"
+                  height="32"
                   style={{ transform: 'rotate(90deg) scaleX(-1)' }}
                 >
                   <circle
-                    cx="22"
-                    cy="22"
-                    r="18"
+                    cx="16"
+                    cy="16"
+                    r="13"
                     fill="rgba(0, 0, 0, 0.4)"
                     stroke="none"
                   />
                   <circle
-                    cx="22"
-                    cy="22"
-                    r="18"
+                    cx="16"
+                    cy="16"
+                    r="13"
                     fill="none"
                     stroke="#ffffff"
                     strokeWidth="3"
-                    strokeDasharray="113.1"
+                    strokeDasharray="81.68"
                     strokeDashoffset="0"
                     strokeLinecap="round"
                     style={{
@@ -402,48 +403,20 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '16px',
+                    fontSize: '14px',
                     color: '#ffffff',
-                    fontWeight: 'bold',
+                    fontWeight: '600',
                   }}
                 >
                   {adCountdown}
                 </span>
               </div>
             ) : (
-              <button
+              <CloseButton
                 onClick={handleAdIframeClose}
-                style={{
-                  position: 'absolute',
-                  top: '16px',
-                  right: '16px',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '44px',
-                  height: '44px',
-                  minWidth: '44px',
-                  minHeight: '44px',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10000,
-                  color: '#1F2937',
-                  fontWeight: 'bold',
-                  transition: 'background-color 0.2s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                }}
-                aria-label="Close ad"
-              >
-                ×
-              </button>
+                ariaLabel="Close ad"
+                style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10000 }}
+              />
             )}
             <iframe
               src={adIframeUrl}

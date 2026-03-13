@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MiniGameInvitationProps, MiniGameInvitationTheme, MiniGameInvitationAnimation } from '../../types';
 import { toWidthCSS, toOffsetCSS } from '../../utils/parseWidth';
 
+
 const defaultTheme: Required<MiniGameInvitationTheme> = {
   cornerRadius: 16,
   backgroundColor: 'rgba(0, 0, 0, 0.65)',
