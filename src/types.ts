@@ -166,7 +166,11 @@ export interface MiniGameMenuProps {
   maxGamesToShow?: 3 | 6 | 9;
   theme?: MiniGameTheme;
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
+  /** Navigation style for the game grid. Default: 'dot'. */
+  navigationType?: MiniGameNavigationType;
 }
+
+export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';
 
 // MiniGameInvitation types
 export type MiniGameInvitationAnimation = 'auto' | 'slideDown' | 'fadeIn' | 'slideUp' | 'none';

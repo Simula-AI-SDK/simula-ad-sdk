@@ -57,6 +57,7 @@ export type {
   MiniGameInvitationTheme,
   MiniGameInvitationProps,
   MiniGameInvitationAnimation,
+  MiniGameNavigationType,
   MiniGameButtonTheme,
   MiniGameButtonProps,
   MiniGameInterstitialTheme,

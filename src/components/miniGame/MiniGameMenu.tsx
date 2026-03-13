@@ -27,6 +27,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   maxGamesToShow = 6,
   theme = {},
   delegateChar = true,
+  navigationType = 'dot',
 }) => {
   const { apiKey } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -824,6 +825,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                       theme={appliedTheme}
                       onGameSelect={handleGameSelect}
                       menuId={menuId}
+                      navigationType={navigationType}
                     />
                   )}
                 </>
