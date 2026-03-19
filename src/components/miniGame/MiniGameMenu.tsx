@@ -107,6 +107,22 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         const catalogResponse = await fetchCatalog();
         setGames(catalogResponse.games);
         setMenuId(catalogResponse.menuId || null);
+
+        const imageUrls = catalogResponse.games
+          .map((g: GameData) => g.gifCover || g.iconUrl)
+          .filter(Boolean) as string[];
+
+        await Promise.all(
+          imageUrls.map(
+            (url) =>
+              new Promise<void>((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                img.src = url;
+              })
+          )
+        );
       } catch (error) {
         console.error('Failed to load game catalog:', error);
         setCatalogError(true);
