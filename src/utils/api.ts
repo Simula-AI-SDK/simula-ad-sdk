@@ -1,6 +1,7 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext } from '../types';
 
 const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
 
 export interface FetchAdRequest {
   messages: Message[];
@@ -279,6 +280,7 @@ export const fetchCatalog = async (): Promise<CatalogResponse> => {
             iconUrl: game.icon, // API returns 'icon', we use 'iconUrl'
             description: game.description ?? '',
             iconFallback: game.iconFallback,
+            gifCover: game.gif_cover,
         }));
         
         return { menuId, games };

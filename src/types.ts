@@ -153,6 +153,7 @@ export interface GameData {
   iconUrl: string;
   description: string;
   iconFallback?: string; // Optional fallback emoji (defaults to 🎮)
+  gifCover?: string; // GIF cover image URL for card display
 }
 
 export interface MiniGameMenuProps {

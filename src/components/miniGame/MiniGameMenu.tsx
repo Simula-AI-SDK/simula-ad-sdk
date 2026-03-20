@@ -4,17 +4,19 @@ import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
 import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick } from '../../utils/api';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
+import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
   secondaryFont: 'Inter, system-ui, sans-serif',
-  titleFontColor: '#1F2937',
-  secondaryFontColor: '#6B7280',
+  titleFontColor: '#ffffff',
+  secondaryFontColor: 'rgba(255, 255, 255, 0.75)',
   iconCornerRadius: 8,
-  borderColor: 'rgba(0, 0, 0, 0.08)',
+  borderColor: 'rgba(255, 255, 255, 0.06)',
   accentColor: '#3B82F6',
+  backgroundColor: '#0b0b0f',
 };
 
 export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
@@ -34,8 +36,6 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [games, setGames] = useState<GameData[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
@@ -47,24 +47,6 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Filter games based on search query
-  const filteredGames = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return games;
-    }
-    const query = searchQuery.toLowerCase().trim();
-    return games.filter((game) => game.name.toLowerCase().includes(query));
-  }, [games, searchQuery]);
-
-  // Reset search when menu closes
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery('');
-      setIsSearchFocused(false);
-    }
-  }, [isOpen]);
 
   // Ad countdown timer
   useEffect(() => {
@@ -113,16 +95,6 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       .slice(0, 2);
   };
 
-  // Handle search input change
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  }, []);
-
-  // Clear search
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-    searchInputRef.current?.focus();
-  }, []);
 
   // Fetch catalog when menu opens
   useEffect(() => {
@@ -135,6 +107,22 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         const catalogResponse = await fetchCatalog();
         setGames(catalogResponse.games);
         setMenuId(catalogResponse.menuId || null);
+
+        const imageUrls = catalogResponse.games
+          .map((g: GameData) => g.gifCover || g.iconUrl)
+          .filter(Boolean) as string[];
+
+        await Promise.all(
+          imageUrls.map(
+            (url) =>
+              new Promise<void>((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                img.src = url;
+              })
+          )
+        );
       } catch (error) {
         console.error('Failed to load game catalog:', error);
         setCatalogError(true);
@@ -449,7 +437,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px',
+            padding: '0',
             animation: 'fadeIn 0.2s ease-in',
           }}
           role="dialog"
@@ -458,85 +446,160 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         >
           <style>{`
             @keyframes fadeIn {
-              from {
-                opacity: 0;
-              }
-              to {
-                opacity: 1;
-              }
+              from { opacity: 0; }
+              to { opacity: 1; }
             }
             @keyframes slideUp {
-              from {
-                transform: translateY(20px);
-                opacity: 0;
-              }
-              to {
-                transform: translateY(0);
-                opacity: 1;
-              }
+              from { transform: translateY(20px); opacity: 0; }
+              to { transform: translateY(0); opacity: 1; }
             }
             @keyframes slideDown {
-              from {
-                transform: translateY(0);
-                opacity: 1;
-              }
-              to {
-                transform: translateY(20px);
-                opacity: 0;
-              }
+              from { transform: translateY(0); opacity: 1; }
+              to { transform: translateY(20px); opacity: 0; }
             }
-            .modal-content {
+            .simula-modal-content {
               animation: slideUp 0.3s ease-out;
             }
-            .modal-content.closing {
+            .simula-modal-content.closing {
               animation: slideDown 0.3s ease-out;
+            }
+            .simula-mobile-footer-spacer {
+              display: none;
+            }
+            @media (max-width: 767px) {
+              .simula-mobile-footer-spacer {
+                display: block !important;
+                flex-shrink: 0;
+                height: 8px;
+              }
+              .simula-modal-content {
+                width: 92vw !important;
+                height: 85vh !important;
+                gap: 12px !important;
+                padding-top: 12px !important;
+                padding-bottom: 16px !important;
+              }
+              .simula-menu-content {
+                padding-top: 14px !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                margin-left: -10px !important;
+                margin-right: -10px !important;
+                width: calc(100% + 20px) !important;
+                flex: 0 1 auto !important;
+                min-height: auto !important;
+              }
+              .simula-modal-header {
+                gap: 14px !important;
+                padding-top: 18px !important;
+                padding-bottom: 0 !important;
+                padding-left: 8px !important;
+              }
+              .simula-modal-header .simula-avatar {
+                width: 72px !important;
+                height: 72px !important;
+                border-radius: 16px !important;
+              }
+              .simula-modal-header .simula-title {
+                font-size: 18px !important;
+              }
+            }
+            @media (min-width: 768px) {
+              .simula-modal-content {
+                width: 95vw !important;
+                height: 90vh !important;
+                gap: 0 !important;
+                padding: 16px 20px 20px !important;
+              }
+              .simula-menu-content {
+                display: contents !important;
+                flex: 0 1 auto !important;
+                min-height: auto !important;
+              }
             }
           `}</style>
           <div
             ref={modalRef}
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
-            className="modal-content"
+            className="simula-modal-content"
             style={{
-              backgroundColor: appliedTheme.backgroundColor || '#FFFFFF',
-              borderRadius: '16px',
-              width: '100%',
-              maxWidth: '600px',
-              minWidth: '320px',
-              minHeight: '400px',
-              maxHeight: '90vh',
+              backgroundColor: appliedTheme.backgroundColor || '#0b0b0f',
+              backgroundImage: `
+                radial-gradient(520px 320px at 12% 16%, rgba(96, 165, 250, 0.11), transparent 72%),
+                radial-gradient(440px 260px at 86% 24%, rgba(59, 130, 246, 0.08), transparent 74%),
+                radial-gradient(500px 300px at 52% 88%, rgba(56, 189, 248, 0.07), transparent 76%)
+              `,
+              backgroundRepeat: 'no-repeat',
+              borderRadius: '24px',
+              width: '90vw',
+              height: '95vh',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              justifyContent: 'space-between',
+              gap: '0',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.15)',
               overflow: 'hidden',
+              position: 'relative',
+              padding: '12px 10px 16px',
             }}
           >
-            {/* Header */}
-            <div
+            {/* Close Button - absolute positioned */}
+            <button
+              onClick={handleClose}
               style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                width: '28px',
+                height: '28px',
+                borderRadius: '999px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: 'rgba(255, 255, 255, 0.92)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
-                padding: '20px',
-                borderBottom: `1px solid ${appliedTheme.borderColor}`,
+                justifyContent: 'center',
+                cursor: 'pointer',
+                zIndex: 6,
+                padding: 0,
+              }}
+              aria-label="Close menu"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"/>
+                <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"/>
+              </svg>
+            </button>
+
+            {/* Header */}
+            <div
+              className="simula-modal-header"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'auto auto 1fr',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '10px 0 0 8px',
                 position: 'relative',
                 zIndex: 1,
-                isolation: 'isolate',
-                backgroundColor: appliedTheme.headerColor,
+                flexShrink: 0,
               }}
             >
               {/* Character Avatar */}
               <div
+                className="simula-avatar"
                 style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: appliedTheme.backgroundColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '24px',
                   overflow: 'hidden',
                   flexShrink: 0,
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  boxShadow: '0 16px 34px rgba(0, 0, 0, 0.45)',
+                  border: '2px solid rgba(120, 200, 255, 0.1)',
+                  zIndex: 2,
+                  position: 'relative',
                 }}
               >
                 {!imageError && charImage ? (
@@ -548,86 +611,108 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
+                      display: 'block',
+                      pointerEvents: 'none',
                     }}
                   />
                 ) : (
-                  <span
+                  <div
                     style={{
-                      fontSize: '16px',
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '28px',
                       fontWeight: '600',
-                      color: appliedTheme.backgroundColor,
+                      color: appliedTheme.titleFontColor,
                       fontFamily: appliedTheme.titleFont,
                     }}
                   >
                     {getInitials(charName)}
-                  </span>
+                  </div>
                 )}
               </div>
 
+              {/* Game Icon */}
+              <div
+                className="simula-game-icon"
+                style={{
+                  position: 'relative',
+                  width: '56px',
+                  height: '56px',
+                  marginLeft: '-36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  zIndex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: '-12px',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(192, 132, 252, 0.22) 0%, rgba(236, 72, 153, 0.12) 50%, transparent 78%)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <img
+                  src={gameIconImage}
+                  alt=""
+                  aria-hidden="true"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    position: 'relative',
+                    zIndex: 1,
+                    pointerEvents: 'none',
+                  }}
+                />
+              </div>
+
               {/* Header Text */}
-              <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  width: '100%',
+                  minWidth: 0,
+                }}
+              >
                 <h2
+                  className="simula-title"
                   style={{
                     margin: 0,
-                    fontSize: '18px',
-                    fontWeight: '600',
+                    fontSize: '19px',
+                    fontWeight: 900,
+                    letterSpacing: '-0.3px',
                     color: appliedTheme.titleFontColor,
                     fontFamily: appliedTheme.titleFont,
                     lineHeight: '1.2',
                   }}
                 >
-                  Play a Game with {charName}
+                  <div>Play a Game with</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.78)', fontWeight: 800 }}>{charName}</div>
                 </h2>
               </div>
-
-              {/* Close Button */}
-              <button
-                onClick={handleClose}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: appliedTheme.secondaryFontColor,
-                  padding: '8px',
-                  lineHeight: '1',
-                  borderRadius: '4px',
-                  transition: 'background-color 0.2s ease, color 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: '44px',
-                  minHeight: '44px',
-                  width: '44px',
-                  height: '44px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F3F4F6';
-                  e.currentTarget.style.color = appliedTheme.titleFontColor;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = appliedTheme.secondaryFontColor;
-                }}
-                aria-label="Close menu"
-              >
-                ×
-              </button>
             </div>
 
             {/* Game Grid Content */}
             <div
               style={{
-                padding: '20px',
+                padding: '0',
                 overflowY: 'visible',
                 overflowX: 'visible',
                 flex: 1,
+                minHeight: 0,
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: catalogError || catalogLoading ? 'center' : 'stretch',
                 justifyContent: catalogError || catalogLoading ? 'center' : 'flex-start',
               }}
+              className="simula-menu-content"
             >
               {catalogLoading ? (
                 <div
@@ -646,7 +731,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                     style={{
                       width: '40px',
                       height: '40px',
-                      border: '3px solid rgba(0, 0, 0, 0.1)',
+                      border: '3px solid rgba(255, 255, 255, 0.1)',
                       borderTop: `3px solid ${appliedTheme.titleFontColor}`,
                       borderRadius: '50%',
                       animation: 'spin 1s linear infinite',
@@ -683,7 +768,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: appliedTheme.backgroundColor || '#F3F4F6',
+                      backgroundColor: appliedTheme.backgroundColor || '#0b0b0f',
                     }}
                   >
                     <img
@@ -699,111 +784,20 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   <span>No games are available to play right now. Please check back later!</span>
                 </div>
               ) : (
-                <>
-                  {/* Search Bar */}
-                  {games.length > 0 && (
-                    <div
-                      style={{
-                        marginBottom: '16px',
-                        position: 'relative',
-                      }}
-                    >
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        value={searchQuery}
-                        onChange={handleSearchChange}
-                        onFocus={() => setIsSearchFocused(true)}
-                        onBlur={() => setIsSearchFocused(false)}
-                        placeholder="Search games..."
-                        style={{
-                          width: '100%',
-                          padding: '12px 40px 12px 40px',
-                          fontSize: '14px',
-                          fontFamily: appliedTheme.secondaryFont || 'Inter, system-ui, sans-serif',
-                          color: appliedTheme.titleFontColor || '#1F2937',
-                          backgroundColor: appliedTheme.backgroundColor || '#FFFFFF',
-                          border: `1px solid ${isSearchFocused ? (appliedTheme.accentColor || '#3B82F6') : (appliedTheme.borderColor || 'rgba(0, 0, 0, 0.08)')}`,
-                          borderRadius: '8px',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          transition: 'border-color 0.2s ease',
-                        }}
-                        aria-label="Search games"
-                      />
-                      {/* Search Icon */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: '12px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: appliedTheme.secondaryFontColor || '#6B7280',
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="11" cy="11" r="8" />
-                          <path d="M21 21l-4.35-4.35" />
-                        </svg>
-                      </div>
-                      {/* Clear Button */}
-                      {searchQuery && (
-                        <button
-                          onClick={handleClearSearch}
-                          style={{
-                            position: 'absolute',
-                            right: '8px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: appliedTheme.secondaryFontColor || '#6B7280',
-                            borderRadius: '4px',
-                          }}
-                          aria-label="Clear search"
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* No Results Message */}
-                  {filteredGames.length === 0 && searchQuery ? (
-                    <div
-                      style={{
-                        textAlign: 'center',
-                        color: appliedTheme.secondaryFontColor,
-                        fontFamily: appliedTheme.secondaryFont,
-                        fontSize: '14px',
-                        padding: '24px 0',
-                      }}
-                    >
-                      No games found for "{searchQuery}"
-                    </div>
-                  ) : (
-                    <GameGrid
-                      games={filteredGames}
-                      maxGamesToShow={maxGamesToShow}
-                      charID={charID}
-                      theme={appliedTheme}
-                      onGameSelect={handleGameSelect}
-                      menuId={menuId}
-                      navigationType={navigationType}
-                    />
-                  )}
-                </>
+                <GameGrid
+                  games={games}
+                  maxGamesToShow={maxGamesToShow}
+                  charID={charID}
+                  theme={appliedTheme}
+                  onGameSelect={handleGameSelect}
+                  menuId={menuId}
+                  navigationType={navigationType}
+                />
               )}
             </div>
+
+            {/* Spacing footer (mobile only) */}
+            <div className="simula-mobile-footer-spacer" aria-hidden="true" />
           </div>
         </div>
       )}

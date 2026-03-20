@@ -90,7 +90,6 @@ import { MiniGameMenu } from "@simula/ads";
   charID="char-123"
   charImage="https://example.com/luna.png"
   messages={messages}
-  maxGamesToShow={6}
   navigationType="dot"
 />
 ```
