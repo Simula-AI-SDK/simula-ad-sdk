@@ -31,6 +31,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   theme = {},
   delegateChar = true,
   navigationType = 'dot',
+  onSessionEnd,
 }) => {
   const { apiKey } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -253,22 +254,28 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
           if (iframeUrl) {
             setAdIframeUrl(iframeUrl);
             setAdFetched(true);
+            setSelectedGameId(null);
+            return; // Ad will be shown, onSessionEnd will be called when ad closes
           }
         } catch (error) {
           console.error('Error fetching ad:', error);
           // If ad fetch fails, just close without showing ad
         }
       }
+      // No ad to show - session ends here
       setSelectedGameId(null);
+      onSessionEnd?.();
     } else {
       // If ad has already been already fetched, just close so we don't double count impressions
       setSelectedGameId(null);
+      onSessionEnd?.();
     }
   };
 
   const handleAdIframeClose = () => {
     setAdIframeUrl(null);
     // Keep adFetched as true so we don't show another ad
+    onSessionEnd?.();
   };
 
   const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -556,7 +563,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 borderRadius: '999px',
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'rgba(255, 255, 255, 0.92)',
+                color: appliedTheme.secondaryFontColor || 'rgba(255, 255, 255, 0.92)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -693,7 +700,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   }}
                 >
                   <div>Play a Game with</div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.78)', fontWeight: 800 }}>{charName}</div>
+                  <div style={{ color: appliedTheme.titleFontColor, opacity: 0.78, fontWeight: 800 }}>{charName}</div>
                 </h2>
               </div>
             </div>

@@ -169,6 +169,8 @@ export interface MiniGameMenuProps {
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
   /** Navigation style for the game grid. Default: 'dot'. */
   navigationType?: MiniGameNavigationType;
+  /** Called when the entire session ends (game iframe closed, and ad iframe closed if applicable). */
+  onSessionEnd?: () => void;
 }
 
 export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';
