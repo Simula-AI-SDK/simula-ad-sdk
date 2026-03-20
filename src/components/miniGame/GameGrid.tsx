@@ -90,7 +90,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
       const h = carousel.clientHeight;
 
       // Lock width to height-based 9:16 ratio and enforce minimum card height.
-      const ch = Math.max(450, h * 0.78);
+      const ch = Math.max(352, h * 0.78);
       const cw = (ch * 9) / 16;
       setCardWidth(cw);
       setCardHeight(ch);
@@ -237,7 +237,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
   let slideIdx = 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 auto', minHeight: 0, height: 'clamp(450px, 62vh, 640px)', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 auto', minHeight: 0, height: 'clamp(352px, 62vh, 640px)', position: 'relative' }}>
       {/* Carousel scroll container */}
       <div
         ref={carouselRef}
@@ -251,7 +251,8 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
           WebkitOverflowScrolling: 'touch',
           overscrollBehaviorX: 'contain',
           touchAction: 'pan-x',
-          display: 'block',
+          display: 'flex',
+          alignItems: 'center',
           marginTop: '4px',
         }}
         className="simula-carousel-scroll"
@@ -290,6 +291,9 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
                     justifyContent: 'center',
                     transition: 'transform 0.1s ease-out',
                     transformOrigin: 'center center',
+                    paddingTop: '24px',
+                    paddingBottom: '24px',
+                    boxSizing: 'border-box',
                   }}
                 >
                   <CoverCard
@@ -349,7 +353,7 @@ const DesktopGrid: React.FC<DesktopGridProps> = ({ games, theme, onGameSelect, n
   // Desktop card width follows card height using fixed 9:16 ratio.
   useEffect(() => {
     const measure = () => {
-      const ch = Math.max(450, window.innerHeight * 0.52);
+      const ch = Math.max(352, window.innerHeight * 0.52);
       const cwFromH = (ch * 9) / 16;
       setCardWidth(cwFromH);
     };

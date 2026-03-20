@@ -487,7 +487,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 padding-bottom: 16px !important;
               }
               .simula-menu-content {
-                padding-top: 14px !important;
+                padding-top: 0 !important;
                 padding-left: 0 !important;
                 padding-right: 0 !important;
                 margin-left: -10px !important;
@@ -535,7 +535,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
               backgroundImage: `
                 radial-gradient(520px 320px at 12% 16%, rgba(96, 165, 250, 0.11), transparent 72%),
                 radial-gradient(440px 260px at 86% 24%, rgba(59, 130, 246, 0.08), transparent 74%),
-                radial-gradient(500px 300px at 52% 88%, rgba(56, 189, 248, 0.07), transparent 76%)
+                radial-gradient(700px 500px at 52% calc(100% + 100px), rgba(56, 189, 248, 0.09), transparent 65%)
               `,
               backgroundRepeat: 'no-repeat',
               borderRadius: '24px',
