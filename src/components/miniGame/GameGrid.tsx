@@ -138,7 +138,6 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
     const setWidth = n * slideStep;
     suppressScrollWrap.current = true;
 
-    const prevSnap = carousel.style.scrollSnapType;
     carousel.style.scrollSnapType = 'none';
     carousel.scrollLeft = setWidth; // middle copy, index 0
 
@@ -149,7 +148,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
       requestAnimationFrame(() => {
         if (!carousel) return;
         carousel.scrollLeft = setWidth;
-        carousel.style.scrollSnapType = prevSnap || '';
+        carousel.style.scrollSnapType = 'x mandatory';
         updateCardTransforms();
         requestAnimationFrame(() => {
           if (!carousel) return;
@@ -191,7 +190,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
         carousel.scrollLeft = left + setWidth;
         updateCardTransforms();
         requestAnimationFrame(() => {
-          carousel.style.scrollSnapType = '';
+          carousel.style.scrollSnapType = 'x mandatory';
           suppressScrollWrap.current = false;
         });
         return;
@@ -202,7 +201,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
         carousel.scrollLeft = left - setWidth;
         updateCardTransforms();
         requestAnimationFrame(() => {
-          carousel.style.scrollSnapType = '';
+          carousel.style.scrollSnapType = 'x mandatory';
           suppressScrollWrap.current = false;
         });
         return;
@@ -247,7 +246,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
           overflowX: 'auto',
           overflowY: 'hidden',
           scrollSnapType: 'x mandatory',
-          scrollBehavior: 'auto',
+          scrollSnapStop: 'always',
           WebkitOverflowScrolling: 'touch',
           overscrollBehaviorX: 'contain',
           touchAction: 'pan-x',
