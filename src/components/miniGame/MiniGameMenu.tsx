@@ -493,8 +493,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 margin-left: -10px !important;
                 margin-right: -10px !important;
                 width: calc(100% + 20px) !important;
-                flex: 0 1 auto !important;
-                min-height: auto !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
               }
               .simula-modal-header {
                 gap: 14px !important;
@@ -519,9 +519,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 padding: 16px 20px 20px !important;
               }
               .simula-menu-content {
-                display: contents !important;
-                flex: 0 1 auto !important;
-                min-height: auto !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
               }
             }
           `}</style>
@@ -717,7 +716,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: catalogError || catalogLoading ? 'center' : 'stretch',
-                justifyContent: catalogError || catalogLoading ? 'center' : 'flex-start',
+                justifyContent: 'center',
               }}
               className="simula-menu-content"
             >

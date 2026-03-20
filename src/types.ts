@@ -214,6 +214,15 @@ export interface MiniGameInvitationProps {
    */
   width?: number | string | null;
   /**
+   * Maximum component width. Supports multiple formats:
+   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
+   * - number >= 1: pixels (e.g., 500 = 500px)
+   * - string with %: percentage (e.g., "80%" = 80%)
+   * - string with number: pixels (e.g., "500" = 500px)
+   * - null/undefined: no max width constraint
+   */
+  maxWidth?: number | string | null;
+  /**
    * Distance from top of viewport. The invitation is always fixed and horizontally centered.
    * - number < 1: percentage (e.g., 0.05 = 5%)
    * - number >= 1: pixels (e.g., 20 = 20px)
