@@ -31,7 +31,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   theme = {},
   delegateChar = true,
   navigationType = 'dot',
-  onSessionEnd,
+  onGameOpen,
+  onGameClose,
 }) => {
   const { apiKey } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -239,6 +240,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     // Reset ad tracking when a new game is selected
     setAdFetched(false);
     setCurrentAdId(null);
+    onGameOpen?.();
   };
 
   const handleAdIdReceived = (adId: string) => {
@@ -255,27 +257,27 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             setAdIframeUrl(iframeUrl);
             setAdFetched(true);
             setSelectedGameId(null);
-            return; // Ad will be shown, onSessionEnd will be called when ad closes
+            return; // Ad will be shown, onGameClose will be called when ad closes
           }
         } catch (error) {
           console.error('Error fetching ad:', error);
           // If ad fetch fails, just close without showing ad
         }
       }
-      // No ad to show - session ends here
+      // No ad to show - game closes here
       setSelectedGameId(null);
-      onSessionEnd?.();
+      onGameClose?.();
     } else {
       // If ad has already been already fetched, just close so we don't double count impressions
       setSelectedGameId(null);
-      onSessionEnd?.();
+      onGameClose?.();
     }
   };
 
   const handleAdIframeClose = () => {
     setAdIframeUrl(null);
     // Keep adFetched as true so we don't show another ad
-    onSessionEnd?.();
+    onGameClose?.();
   };
 
   const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
