@@ -164,15 +164,19 @@ export interface MiniGameMenuProps {
   charImage: string;
   messages?: Message[];
   charDesc?: string;
+  /** Conversation ID for tracking which conversation triggered the minigame. */
+  convId?: string;
+  /** Entry point describing how the user reached the minigame (e.g., 'button', 'invitation', 'interstitial'). */
+  entryPoint?: string;
   maxGamesToShow?: 3 | 6 | 9;
   theme?: MiniGameTheme;
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
   /** Navigation style for the game grid. Default: 'dot'. */
   navigationType?: MiniGameNavigationType;
-  /** Called when a game is opened (user selects a game from the menu). */
-  onGameOpen?: () => void;
-  /** Called when the game closes (game iframe closed, and ad iframe closed if applicable). */
-  onGameClose?: () => void;
+  /** Called when a game is opened (user selects a game from the menu). Receives the game name. */
+  onGameOpen?: (gameName: string) => void;
+  /** Called when the game closes (game iframe closed, and ad iframe closed if applicable). Receives the game name. */
+  onGameClose?: (gameName: string) => void;
 }
 
 export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';
