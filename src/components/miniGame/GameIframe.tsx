@@ -16,6 +16,8 @@ interface GameIframeProps {
   onClose: () => void;
   onAdIdReceived?: (adId: string) => void;
   charDesc?: string;
+  convId?: string;
+  entryPoint?: string;
   menuId?: string | null;
   /** Controls the height of the game iframe (px, percentage, or null for fullscreen) */
   playableHeight?: number | string;
@@ -33,6 +35,8 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   onClose,
   onAdIdReceived,
   charDesc,
+  convId,
+  entryPoint,
   menuId,
   playableHeight,
   playableBorderColor = '#262626',
@@ -108,6 +112,8 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         const response = await getMinigame({
           gameType: gameId,
           sessionId: currentSessionId,
+          convId: convId,
+          entryPoint: entryPoint,
           currencyMode: false,
           w: window.innerWidth,
           h: window.innerHeight,

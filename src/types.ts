@@ -164,11 +164,19 @@ export interface MiniGameMenuProps {
   charImage: string;
   messages?: Message[];
   charDesc?: string;
+  /** Conversation ID for tracking which conversation triggered the minigame. */
+  convId?: string;
+  /** Entry point describing how the user reached the minigame (e.g., 'button', 'invitation', 'interstitial'). */
+  entryPoint?: string;
   maxGamesToShow?: 3 | 6 | 9;
   theme?: MiniGameTheme;
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
   /** Navigation style for the game grid. Default: 'dot'. */
   navigationType?: MiniGameNavigationType;
+  /** Called when a game is opened (user selects a game from the menu). Receives the game name. */
+  onGameOpen?: (gameName: string) => void;
+  /** Called when the game closes (game iframe closed, and ad iframe closed if applicable). Receives the game name. */
+  onGameClose?: (gameName: string) => void;
 }
 
 export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';
@@ -211,6 +219,15 @@ export interface MiniGameInvitationProps {
    * - null/undefined: fills container width (100%)
    */
   width?: number | string | null;
+  /**
+   * Maximum component width. Supports multiple formats:
+   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
+   * - number >= 1: pixels (e.g., 500 = 500px)
+   * - string with %: percentage (e.g., "80%" = 80%)
+   * - string with number: pixels (e.g., "500" = 500px)
+   * - null/undefined: no max width constraint
+   */
+  maxWidth?: number | string | null;
   /**
    * Distance from top of viewport. The invitation is always fixed and horizontally centered.
    * - number < 1: percentage (e.g., 0.05 = 5%)

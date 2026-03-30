@@ -39,12 +39,12 @@ export const CoverCard: React.FC<CoverCardProps> = ({ game, onGameSelect, style 
         overflow: 'hidden',
         background: 'rgba(255, 255, 255, 0.06)',
         aspectRatio: '9 / 16',
-        minHeight: '450px',
+        minHeight: '302px',
         cursor: 'pointer',
         userSelect: 'none',
         WebkitUserSelect: 'none',
         border: '2px solid rgba(120, 200, 255, 0.1)',
-        boxShadow: '0 14px 30px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
         ...style,
       }}
       role="button"

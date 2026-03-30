@@ -27,13 +27,18 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   charImage,
   messages = [],
   charDesc,
+  convId,
+  entryPoint,
   maxGamesToShow = 6,
   theme = {},
   delegateChar = true,
   navigationType = 'dot',
+  onGameOpen,
+  onGameClose,
 }) => {
   const { apiKey } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [selectedGameName, setSelectedGameName] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [games, setGames] = useState<GameData[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -44,6 +49,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const [currentAdId, setCurrentAdId] = useState<string | null>(null);
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
   const adCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const adFetchingRef = useRef(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -235,9 +241,12 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     
     handleClose();
     setSelectedGameId(gameId);
+    setSelectedGameName(gameName);
     // Reset ad tracking when a new game is selected
     setAdFetched(false);
     setCurrentAdId(null);
+    adFetchingRef.current = false;
+    onGameOpen?.(gameName);
   };
 
   const handleAdIdReceived = (adId: string) => {
@@ -245,30 +254,45 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   };
 
   const handleIframeClose = async () => {
+    // Prevent multiple simultaneous ad fetches (e.g., from spam clicking close)
+    if (adFetchingRef.current) {
+      return;
+    }
+    
     if (!adFetched) {
       // Make API request and fetch / display ad.html here
       if (currentAdId) {
+        adFetchingRef.current = true;
         try {
           const iframeUrl = await fetchAdForMinigame(currentAdId);
           if (iframeUrl) {
             setAdIframeUrl(iframeUrl);
             setAdFetched(true);
+            setSelectedGameId(null);
+            adFetchingRef.current = false;
+            return; // Ad will be shown, onGameClose will be called when ad closes
           }
         } catch (error) {
           console.error('Error fetching ad:', error);
           // If ad fetch fails, just close without showing ad
         }
+        adFetchingRef.current = false;
       }
+      // No ad to show - game closes here
       setSelectedGameId(null);
+      onGameClose?.(selectedGameName ?? '');
     } else {
       // If ad has already been already fetched, just close so we don't double count impressions
       setSelectedGameId(null);
+      onGameClose?.(selectedGameName ?? '');
     }
   };
 
   const handleAdIframeClose = () => {
     setAdIframeUrl(null);
     // Keep adFetched as true so we don't show another ad
+    onGameClose?.(selectedGameName ?? '');
+    setSelectedGameName(null);
   };
 
   const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -285,12 +309,14 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     <>
       {/* Game Iframe */}
       {selectedGameId && (
-        <GameIframe 
-            gameId={selectedGameId} 
+        <GameIframe
+            gameId={selectedGameId}
             charID={charID}
             charName={charName}
             charImage={charImage}
             charDesc={charDesc}
+            convId={convId}
+            entryPoint={entryPoint}
             messages={messages}
             delegateChar={delegateChar}
             onClose={handleIframeClose}
@@ -480,14 +506,14 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 padding-bottom: 16px !important;
               }
               .simula-menu-content {
-                padding-top: 14px !important;
+                padding-top: 0 !important;
                 padding-left: 0 !important;
                 padding-right: 0 !important;
                 margin-left: -10px !important;
                 margin-right: -10px !important;
                 width: calc(100% + 20px) !important;
-                flex: 0 1 auto !important;
-                min-height: auto !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
               }
               .simula-modal-header {
                 gap: 14px !important;
@@ -512,9 +538,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 padding: 16px 20px 20px !important;
               }
               .simula-menu-content {
-                display: contents !important;
-                flex: 0 1 auto !important;
-                min-height: auto !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
               }
             }
           `}</style>
@@ -528,7 +553,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
               backgroundImage: `
                 radial-gradient(520px 320px at 12% 16%, rgba(96, 165, 250, 0.11), transparent 72%),
                 radial-gradient(440px 260px at 86% 24%, rgba(59, 130, 246, 0.08), transparent 74%),
-                radial-gradient(500px 300px at 52% 88%, rgba(56, 189, 248, 0.07), transparent 76%)
+                radial-gradient(700px 500px at 52% calc(100% + 100px), rgba(56, 189, 248, 0.09), transparent 65%)
               `,
               backgroundRepeat: 'no-repeat',
               borderRadius: '24px',
@@ -556,7 +581,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 borderRadius: '999px',
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'rgba(255, 255, 255, 0.92)',
+                color: appliedTheme.secondaryFontColor || 'rgba(255, 255, 255, 0.92)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -693,7 +718,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   }}
                 >
                   <div>Play a Game with</div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.78)', fontWeight: 800 }}>{charName}</div>
+                  <div style={{ color: appliedTheme.titleFontColor, opacity: 0.78, fontWeight: 800 }}>{charName}</div>
                 </h2>
               </div>
             </div>
@@ -710,7 +735,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: catalogError || catalogLoading ? 'center' : 'stretch',
-                justifyContent: catalogError || catalogLoading ? 'center' : 'flex-start',
+                justifyContent: 'center',
               }}
               className="simula-menu-content"
             >

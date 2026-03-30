@@ -294,6 +294,7 @@ export interface InitMinigameRequest {
     gameType: string;
     sessionId: string;
     convId?: string | null;
+    entryPoint?: string;
     currencyMode?: boolean;
     w: number;
     h: number;
@@ -321,6 +322,7 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
             game_type: params.gameType,
             session_id: params.sessionId,
             conv_id: params.convId ?? null,
+            entry_point: params.entryPoint ?? null,
             currency_mode: params.currencyMode ?? false,
             w: params.w,
             h: params.h,
