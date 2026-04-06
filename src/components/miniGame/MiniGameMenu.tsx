@@ -38,7 +38,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   onGameClose,
   showBanner = true,
 }) => {
-  const { apiKey, devMode, aditudeReady, aditudeConfig } = useSimula();
+  const { apiKey, sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedGameName, setSelectedGameName] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -52,6 +52,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
   const adCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adFetchingRef = useRef(false);
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const modalRef = useRef<HTMLDivElement>(null);
   const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -309,7 +311,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       if (currentAdId) {
         adFetchingRef.current = true;
         try {
-          const iframeUrl = await fetchAdForMinigame(currentAdId);
+          const iframeUrl = await fetchAdForMinigame(currentAdId, sessionIdRef.current!);
           if (iframeUrl) {
             setAdIframeUrl(iframeUrl);
             setAdFetched(true);
