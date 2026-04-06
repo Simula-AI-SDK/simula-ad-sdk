@@ -7,6 +7,7 @@ import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
+import { AditudeSlot } from './AditudeSlot';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -36,7 +37,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   onGameOpen,
   onGameClose,
 }) => {
-  const { apiKey } = useSimula();
+  const { apiKey, aditudeReady } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedGameName, setSelectedGameName] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -53,6 +54,42 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  // aditude
+  const [shouldFetchAditude, setShouldFetchAditude] = useState<boolean>(false);
+  const [aditudeCountdown, setAditudeCountdown] = useState<number | null>(null);
+  const aditudeCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Aditude countdown timer
+  useEffect(() => {
+    if (shouldFetchAditude) {
+      setAditudeCountdown(5);
+      aditudeCountdownRef.current = setInterval(() => {
+        setAditudeCountdown((prev) => {
+          if (prev !== null && prev <= 1) {
+            if (aditudeCountdownRef.current) {
+              clearInterval(aditudeCountdownRef.current);
+              aditudeCountdownRef.current = null;
+            }
+            return 0;
+          }
+          return prev !== null ? prev - 1 : null;
+        });
+      }, 1000);
+    } else {
+      setAditudeCountdown(null);
+      if (aditudeCountdownRef.current) {
+        clearInterval(aditudeCountdownRef.current);
+        aditudeCountdownRef.current = null;
+      }
+    }
+    return () => {
+      if (aditudeCountdownRef.current) {
+        clearInterval(aditudeCountdownRef.current);
+        aditudeCountdownRef.current = null;
+      }
+    };
+  }, [shouldFetchAditude]);
 
   // Ad countdown timer
   useEffect(() => {
@@ -274,11 +311,16 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
           }
         } catch (error) {
           console.error('Error fetching ad:', error);
-          // If ad fetch fails, just close without showing ad
         }
         adFetchingRef.current = false;
       }
-      // No ad to show - game closes here
+      // If ad fetch fails or no ad ID, try aditude as fallback
+      if (aditudeReady) {
+        setShouldFetchAditude(true);
+        setAdFetched(true);
+        return;
+      }
+      // No ad available at all — close without showing ad
       setSelectedGameId(null);
       onGameClose?.(selectedGameName ?? '');
     } else {
@@ -293,6 +335,13 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     // Keep adFetched as true so we don't show another ad
     onGameClose?.(selectedGameName ?? '');
     setSelectedGameName(null);
+  };
+
+  const handleAditudeClose = () => {
+    setShouldFetchAditude(false);
+    onGameClose?.(selectedGameName ?? '');
+    setSelectedGameName(null);
+    setSelectedGameId(null);
   };
 
   const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -445,6 +494,106 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
               sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
             />
           </div>
+        </div>
+      )}
+
+      {/* Aditude Interstitial */}
+      {shouldFetchAditude && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Advertisement"
+        >
+          {aditudeCountdown !== null && aditudeCountdown > 0 ? (
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                width: '32px',
+                height: '32px',
+                minWidth: '32px',
+                minHeight: '32px',
+                zIndex: 10000,
+              }}
+              aria-label={`Ad closes in ${aditudeCountdown} seconds`}
+            >
+              <style>{`
+                @keyframes simula-aditude-countdown-ring {
+                  from { stroke-dashoffset: 0; }
+                  to { stroke-dashoffset: 81.68; }
+                }
+              `}</style>
+              <svg
+                viewBox="0 0 32 32"
+                width="32"
+                height="32"
+                style={{ transform: 'rotate(90deg) scaleX(-1)' }}
+              >
+                <circle cx="16" cy="16" r="13" fill="rgba(0, 0, 0, 0.4)" stroke="none" />
+                <circle
+                  cx="16"
+                  cy="16"
+                  r="13"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="3"
+                  strokeDasharray="81.68"
+                  strokeDashoffset="0"
+                  strokeLinecap="round"
+                  style={{ animation: 'simula-aditude-countdown-ring 5s linear forwards' }}
+                />
+              </svg>
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  color: '#ffffff',
+                  fontWeight: '600',
+                }}
+              >
+                {aditudeCountdown}
+              </span>
+            </div>
+          ) : (
+            <CloseButton
+              onClick={handleAditudeClose}
+              ariaLabel="Close ad"
+              style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10000 }}
+            />
+          )}
+          <span
+            style={{
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: '11px',
+              letterSpacing: '0.5px',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+            }}
+          >
+            Ad
+          </span>
+          <AditudeSlot baseDivId=".htlad-medrec" width={300} height={250} label="medrec" />
         </div>
       )}
 
