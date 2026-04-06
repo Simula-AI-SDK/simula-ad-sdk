@@ -298,6 +298,13 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
     
     if (!adFetched) {
+      // In devMode, skip real ad fetch and go straight to aditude placeholder
+      if (devMode) {
+        setShouldFetchAditude(true);
+        setAdFetched(true);
+        setSelectedGameId(null);
+        return;
+      }
       // Make API request and fetch / display ad.html here
       if (currentAdId) {
         adFetchingRef.current = true;
@@ -315,8 +322,9 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         }
         adFetchingRef.current = false;
       }
-      // If ad fetch fails or no ad ID, try aditude as fallback (never in devMode)
-      if (!devMode && aditudeReady && aditudeConfig?.enabled) {
+      // If ad fetch fails or no ad ID, try aditude as fallback
+      // In devMode, show placeholder; in prod, show real ad
+      if (devMode || (aditudeReady && aditudeConfig?.enabled)) {
         setShouldFetchAditude(true);
         setAdFetched(true);
         return;
