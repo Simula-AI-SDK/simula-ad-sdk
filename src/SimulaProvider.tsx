@@ -29,6 +29,10 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
   } = props;
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
 
+  // aditude
+  const [aditudeReady, setAditudeReady] = useState<boolean>(false);
+  const [aditudeConfig, setAditudeConfig] = useState<any | undefined>(undefined);
+
   // Ad caching infrastructure (matching Flutter SDK)
   const adCacheRef = useRef<Map<string, AdData>>(new Map());
   const heightCacheRef = useRef<Map<string, number>>(new Map());
@@ -66,6 +70,30 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
       console.error('Failed to update session PPID:', err);
     });
   }, [primaryUserID, hasPrivacyConsent, sessionId]);
+
+  // Effect 3: Load Aditude config
+  useEffect(() => {
+    const aditudeExists = document.querySelector("link[href='https://www.googletagservices.com/tag/js/gpt.js']")
+    if (aditudeExists == null) {
+        const preload = document.createElement('link');
+        preload.rel = 'preload';
+        preload.as = 'script';
+        preload.href = 'https://www.googletagservices.com/tag/js/gpt.js';
+        document.head.prepend(preload);
+
+        const tudeScript = document.createElement('script');
+        tudeScript.textContent = 'window.tude = window.tude || { cmd: [] };';
+        document.head.prepend(tudeScript);
+
+        const htlbidScript = document.createElement('script');
+        htlbidScript.async = true;
+        htlbidScript.src = 'https://htlbid.com/v3/wsup.ai/htlbid.js';
+        document.head.prepend(htlbidScript);
+    }
+    setAditudeReady(true);
+    console.log("Aditude configured!")
+    // setAditudeConfig();
+  })
 
   // Cache management functions
   const getCachedAd = useCallback((slot: string, position: number): AdData | null => {
@@ -110,6 +138,8 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     cacheHeight,
     hasNoFill,
     markNoFill,
+    aditudeConfig,
+    aditudeReady,
   }), [apiKey, devMode, sessionId, hasPrivacyConsent, getCachedAd, cacheAd, getCachedHeight, cacheHeight, hasNoFill, markNoFill]);
 
   return (

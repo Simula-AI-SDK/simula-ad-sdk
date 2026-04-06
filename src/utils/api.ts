@@ -1,7 +1,8 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext } from '../types';
 
-const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
+const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
 export interface FetchAdRequest {
   messages: Message[];
