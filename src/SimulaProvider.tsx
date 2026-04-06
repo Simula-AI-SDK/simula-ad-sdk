@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { SimulaProviderProps, SimulaContextValue, AdData } from './types';
-import { createSession } from './utils/api';
+import { createSession, updateSessionPpid } from './utils/api';
 import { validateSimulaProviderProps } from './utils/validation';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
@@ -34,6 +34,10 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
   const heightCacheRef = useRef<Map<string, number>>(new Map());
   const noFillSetRef = useRef<Set<string>>(new Set());
 
+  // Track previous primaryUserID for change detection
+  const prevPrimaryUserIDRef = useRef<string | undefined>(primaryUserID);
+
+  // Effect 1: Create session on mount (or when apiKey/devMode change)
   useEffect(() => {
     let cancelled = false;
 
@@ -47,7 +51,21 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
 
     ensureSession();
     return () => { cancelled = true; };
-  }, [apiKey, devMode, primaryUserID, hasPrivacyConsent]);
+  }, [apiKey, devMode]);
+
+  // Effect 2: PATCH existing session when primaryUserID changes
+  useEffect(() => {
+    const effectiveUserID = hasPrivacyConsent ? primaryUserID : undefined;
+    const prev = prevPrimaryUserIDRef.current;
+    prevPrimaryUserIDRef.current = primaryUserID;
+
+    // Skip if no session yet, value hasn't actually changed, or no consent/value
+    if (!sessionId || effectiveUserID === prev || !effectiveUserID) return;
+
+    updateSessionPpid(sessionId, effectiveUserID).catch((err) => {
+      console.error('Failed to update session PPID:', err);
+    });
+  }, [primaryUserID, hasPrivacyConsent, sessionId]);
 
   // Cache management functions
   const getCachedAd = useCallback((slot: string, position: number): AdData | null => {
