@@ -55,6 +55,16 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   const currentRequestRef = useRef<Promise<void> | null>(null);
   const initKeyRef = useRef<string | null>(null);
 
+  // Desktop detection for phone-case layout
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isDesktop = viewportWidth >= 768;
+  const showBothRails = viewportWidth >= 1100;
+
   // Drag-to-resize state
   const [resizedHeight, setResizedHeight] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -307,6 +317,124 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     }
   }, [isDragging, resizedHeight]);
 
+  const gameContent = (
+    <>
+      {/* Bottom sheet header with draggable handle */}
+      {isBottomSheet && !isDesktop && (
+        <div
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={handleDragEnd}
+          onPointerCancel={handleDragEnd}
+          style={{
+            width: '100%',
+            backgroundColor: playableBorderColor,
+            borderTopLeftRadius: '16px',
+            borderTopRightRadius: '16px',
+            padding: '12px 0',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            pointerEvents: 'auto',
+            cursor: isDragging ? 'grabbing' : 'grab',
+            touchAction: 'none',
+            userSelect: 'none',
+          }}
+        >
+          <div
+            style={{
+              width: '36px',
+              height: '4px',
+              backgroundColor: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '2px',
+            }}
+          />
+        </div>
+      )}
+
+      <CloseButton
+        onClick={onClose}
+        ariaLabel="Close game"
+        style={{
+          position: 'absolute',
+          top: isBottomSheet && !isDesktop ? '44px' : 'max(16px, env(safe-area-inset-top, 16px))',
+          right: 'max(16px, env(safe-area-inset-right, 16px))',
+          zIndex: 10002,
+          pointerEvents: 'auto',
+        }}
+      />
+
+      {loading && (
+        <div style={{
+          color: '#FFFFFF',
+          fontSize: '18px',
+          fontWeight: '500',
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          Loading game...
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          color: '#FFFFFF',
+          fontSize: '18px',
+          fontWeight: '500',
+          textAlign: 'center',
+          padding: '20px',
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Banner ad */}
+      {bannerEnabled && !loading && !error && iframeUrl && (
+        <div
+          style={{
+            width: '100%',
+            height: `${bannerHeight}px`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            pointerEvents: 'auto',
+            ...(isFullscreen && !isDesktop ? {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              zIndex: 10001,
+            } : {}),
+          }}
+        >
+          <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
+        </div>
+      )}
+
+      {!loading && !error && iframeUrl && (
+        <iframe
+          src={iframeUrl}
+          style={{
+            width: '100%',
+            flex: 1,
+            border: 'none',
+            display: 'block',
+            pointerEvents: 'auto',
+          }}
+          title={`Game: ${gameId}`}
+          allow="fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
+        />
+      )}
+    </>
+  );
+
   return (
     <div
       ref={overlayRef}
@@ -320,7 +448,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         zIndex: 9999,
         display: 'flex',
-        alignItems: isBottomSheet ? 'flex-end' : 'center',
+        alignItems: isDesktop ? 'center' : (isBottomSheet ? 'flex-end' : 'center'),
         justifyContent: 'center',
         animation: 'fadeIn 0.2s ease-in',
       }}
@@ -330,152 +458,81 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     >
       <style>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         @keyframes slideUp {
-          from {
-            transform: translateY(100%);
-          }
-          to {
-            transform: translateY(0);
-          }
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
         }
       `}</style>
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: effectiveHeight !== null ? `${effectiveHeight}px` : '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: isBottomSheet ? 'flex-end' : 'center',
-          pointerEvents: 'none',
-          transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-          ...(isBottomSheet ? {
-            animation: 'slideUp 0.3s ease-out',
-          } : {}),
-        }}
-      >
-        {/* Bottom sheet header with draggable handle */}
-        {isBottomSheet && (
-          <div
-            onPointerDown={handleDragStart}
-            onPointerMove={handleDragMove}
-            onPointerUp={handleDragEnd}
-            onPointerCancel={handleDragEnd}
-            style={{
-              width: '100%',
-              backgroundColor: playableBorderColor,
-              borderTopLeftRadius: '16px',
-              borderTopRightRadius: '16px',
-              padding: '12px 0',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              pointerEvents: 'auto',
-              cursor: isDragging ? 'grabbing' : 'grab',
-              touchAction: 'none',
-              userSelect: 'none',
-            }}
-          >
-            <div
-              style={{
-                width: '36px',
-                height: '4px',
-                backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                borderRadius: '2px',
-              }}
-            />
-          </div>
-        )}
 
-        <CloseButton
-          onClick={onClose}
-          ariaLabel="Close game"
+      {isDesktop ? (
+        /* Desktop: flex row with optional left rail, phone case, right rail */
+        <div
           style={{
-            position: 'absolute',
-            top: isBottomSheet ? '44px' : 'max(16px, env(safe-area-inset-top, 16px))',
-            right: 'max(16px, env(safe-area-inset-right, 16px))',
-            zIndex: 10002,
-            pointerEvents: 'auto',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '24px',
+            height: '100%',
+            pointerEvents: 'none',
           }}
-        />
+        >
+          {/* Left rail — only at wide viewports */}
+          {showBothRails && (
+            <div style={{ pointerEvents: 'auto', flexShrink: 0 }}>
+              <AditudeSlot baseDivId=".htlad-rightrail" width={300} height={600} label="Right Rail Ad" />
+            </div>
+          )}
 
-        {loading && (
-          <div style={{
-            color: '#FFFFFF',
-            fontSize: '18px',
-            fontWeight: '500',
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            Loading game...
-          </div>
-        )}
-
-        {error && (
-          <div style={{
-            color: '#FFFFFF',
-            fontSize: '18px',
-            fontWeight: '500',
-            textAlign: 'center',
-            padding: '20px',
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* Banner ad */}
-        {bannerEnabled && !loading && !error && iframeUrl && (
+          {/* Phone case */}
           <div
             style={{
+              position: 'relative',
               width: '100%',
-              height: `${bannerHeight}px`,
+              maxWidth: '430px',
+              height: 'min(932px, 90vh)',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.9)',
-              pointerEvents: 'auto',
-              ...(isFullscreen ? {
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                zIndex: 10001,
-              } : {}),
+              flexDirection: 'column',
+              borderRadius: '40px',
+              border: '2px solid rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+              overflow: 'hidden',
+              pointerEvents: 'none',
+              backgroundColor: '#000',
             }}
           >
-            <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
+            {gameContent}
           </div>
-        )}
 
-        {!loading && !error && iframeUrl && (
-          <iframe
-            src={iframeUrl}
-            style={{
-              width: '100%',
-              flex: 1,
-              border: 'none',
-              display: 'block',
-              pointerEvents: 'auto',
-            }}
-            title={`Game: ${gameId}`}
-            allow="fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
-          />
-        )}
-      </div>
+          {/* Right rail */}
+          <div style={{ pointerEvents: 'auto', flexShrink: 0 }}>
+            <AditudeSlot baseDivId=".htlad-rightrail" width={300} height={600} label="Right Rail Ad" />
+          </div>
+        </div>
+      ) : (
+        /* Mobile: existing behavior */
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: effectiveHeight !== null ? `${effectiveHeight}px` : '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: isBottomSheet ? 'flex-end' : 'center',
+            pointerEvents: 'none',
+            transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            ...(isBottomSheet ? {
+              animation: 'slideUp 0.3s ease-out',
+            } : {}),
+          }}
+        >
+          {gameContent}
+        </div>
+      )}
     </div>
   );
 };
