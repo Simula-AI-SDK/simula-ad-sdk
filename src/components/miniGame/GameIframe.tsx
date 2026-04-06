@@ -3,7 +3,7 @@ import { getMinigame } from '../../utils/api';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
-import { AditudeSlot } from './AditudeSlot';
+import { AditudeSlot } from '../aditude/AditudeSlot';
 
 const MIN_PLAYABLE_HEIGHT = 500;
 

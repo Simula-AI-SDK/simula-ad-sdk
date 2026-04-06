@@ -1,22 +1,9 @@
-import { Message, AdData, InChatTheme, GameData, NativeContext } from '../types';
+import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse } from '../types';
 
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
 const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
-export interface FetchAdRequest {
-  messages: Message[];
-  apiKey: string;
-  slotId?: string;
-  theme?: InChatTheme;
-  sessionId?: string;
-  charDesc?: string;
-}
-
-export interface FetchAdResponse {
-  ad?: AdData;
-  error?: string;
-}
 
 // Create a server session and return its id
 export async function createSession(apiKey: string, devMode?: boolean, primaryUserID?: string): Promise<string | undefined> {
@@ -250,11 +237,6 @@ export const trackViewportExit = async (adId: string, apiKey: string): Promise<v
   }
 };
 
-export interface CatalogResponse {
-    menuId: string;
-    games: GameData[];
-}
-
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
     try {
         const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2`, {
@@ -308,32 +290,6 @@ export const fetchCatalog = async (): Promise<CatalogResponse> => {
         console.error('Failed to fetch catalog:', error);
         throw error;
     }
-}
-
-export interface InitMinigameRequest {
-    gameType: string;
-    sessionId: string;
-    convId?: string | null;
-    entryPoint?: string;
-    currencyMode?: boolean;
-    w: number;
-    h: number;
-    char_id?: string;
-    char_name?: string;
-    char_image?: string;
-    char_desc?: string;
-    messages?: Message[];
-    delegate_char?: boolean;
-    menuId?: string;
-}
-
-export interface MinigameResponse {
-    adType: 'minigame';
-    adInserted: boolean;
-    adResponse: {
-        ad_id: string;
-        iframe_url: string;
-    };
 }
 
 export const getMinigame = async (params: InitMinigameRequest): Promise<MinigameResponse> => {
@@ -407,20 +363,6 @@ export const fetchAdForMinigame = async (aid: string): Promise<string | null> =>
 };
 
 // Aditude API
-export interface AditudeSlotMapping {
-  div_id: string;
-  devices: string[];
-  ad_unit_path: string;
-  sizes: Record<string, number[][]>;
-}
-
-export interface AditudeConfig {
-  domain: string;
-  enabled: boolean;
-  script_url: string;
-  mappings: AditudeSlotMapping[];
-}
-
 export const fetchAditudeConfig = async (domain: string): Promise<AditudeConfig | null> => {
   try {
     const response = await fetch(`${API_BASE_URL}/aditude/config?domain=${encodeURIComponent(domain)}`, {
@@ -466,19 +408,6 @@ export const fetchAllAditudeConfigs = async (): Promise<AditudeConfig[]> => {
 };
 
 // NativeBanner API
-export interface FetchNativeBannerRequest {
-  sessionId: string;
-  slot: string;
-  position: number;
-  context: NativeContext;
-  width?: number;
-}
-
-export interface FetchNativeAdResponse {
-    ad?: AdData;
-    error?: string;
-}
-
 export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Promise<FetchNativeAdResponse> => {
   try {
     const requestBody = {

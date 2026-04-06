@@ -7,7 +7,7 @@ import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
-import { AditudeSlot } from './AditudeSlot';
+import { AditudeSlot } from '../aditude/AditudeSlot';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -359,7 +359,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
   };
 
-  if (!isOpen && !selectedGameId && !adIframeUrl) {
+  if (!isOpen && !selectedGameId && !adIframeUrl && !shouldFetchAditude) {
     return null;
   }
 
