@@ -86,6 +86,10 @@ export interface SimulaContextValue {
   hasNoFill: (slot: string, position: number) => boolean;
   /** Mark a slot/position as having no fill */
   markNoFill: (slot: string, position: number) => void;
+
+  /*  Aditude Config */
+  aditudeReady: boolean;
+  aditudeConfig: any; // TODO: type
 }
 
 export interface BotDetectionResult {
