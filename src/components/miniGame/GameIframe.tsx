@@ -402,7 +402,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             position: 'absolute',
             top: isBottomSheet ? '44px' : 'max(16px, env(safe-area-inset-top, 16px))',
             right: 'max(16px, env(safe-area-inset-right, 16px))',
-            zIndex: 10000,
+            zIndex: 10002,
             pointerEvents: 'auto',
           }}
         />
