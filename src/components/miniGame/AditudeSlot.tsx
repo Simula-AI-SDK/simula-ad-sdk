@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSimula } from '../../SimulaProvider';
+import { AditudePlaceholder } from '../aditude/AditudePlaceholder';
 
 // TODO: move to types.ts
 export interface AditudeSlotProps {
@@ -8,7 +9,7 @@ export interface AditudeSlotProps {
     height: number
     label: string
     targeting?: Record<string, any>
-    style?: Record<string, any>
+    style?: React.CSSProperties
 }
 
 const refreshAdSlot = (
@@ -32,7 +33,7 @@ export const AditudeSlot: React.FC<AditudeSlotProps> = ({
     targeting = {},
     style
 }) => {
-    const { aditudeReady, aditudeConfig } = useSimula();
+    const { devMode, aditudeReady, aditudeConfig } = useSimula();
 
     const divId = baseDivId === '.htlad-anchor' ? 'anchor'
         : baseDivId === '.htlad-medrec' ? 'medrec'
@@ -41,14 +42,18 @@ export const AditudeSlot: React.FC<AditudeSlotProps> = ({
 
     // when aditude becomes ready, call refreshAdSlot
     useEffect(() => {
-        if (aditudeReady) {
+        if (aditudeReady && !devMode) {
             refreshAdSlot(divId, baseDivId, targeting);
         }
     }, [aditudeReady])
 
-    if (aditudeReady) {
-        return <div id={divId}/>
-    } else {
-        return <div></div>
+    if (devMode) {
+        return <AditudePlaceholder width={width} height={height} label={label} style={style} />;
     }
+
+    if (!aditudeConfig || !aditudeReady) {
+        return null;
+    }
+
+    return <div id={divId} style={style} />;
 }

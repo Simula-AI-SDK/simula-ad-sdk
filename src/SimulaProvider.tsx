@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { SimulaProviderProps, SimulaContextValue, AdData } from './types';
-import { createSession, updateSessionPpid } from './utils/api';
+import { createSession, updateSessionPpid, fetchAditudeConfig } from './utils/api';
 import { validateSimulaProviderProps } from './utils/validation';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
@@ -71,10 +71,20 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     });
   }, [primaryUserID, hasPrivacyConsent, sessionId]);
 
-  // Effect 3: Load Aditude config
+  // Effect 3: Load Aditude config from API
   useEffect(() => {
-    const aditudeExists = document.querySelector("link[href='https://www.googletagservices.com/tag/js/gpt.js']")
-    if (aditudeExists == null) {
+    let cancelled = false;
+
+    async function loadAditudeConfig() {
+      const domain = window.location.hostname;
+      const config = await fetchAditudeConfig(domain);
+
+      if (cancelled || !config || !config.enabled) return;
+
+      setAditudeConfig(config);
+
+      // Inject scripts if not already present
+      if (!document.querySelector("link[href='https://www.googletagservices.com/tag/js/gpt.js']")) {
         const preload = document.createElement('link');
         preload.rel = 'preload';
         preload.as = 'script';
@@ -87,14 +97,17 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
 
         const htlbidScript = document.createElement('script');
         htlbidScript.async = true;
-        htlbidScript.src = 'https://htlbid.com/v3/wsup.ai/htlbid.js';
+        htlbidScript.src = config.script_url;
         document.head.prepend(htlbidScript);
+      }
+
+      setAditudeReady(true);
+      console.log("Aditude configured for domain:", domain);
     }
-    setAditudeReady(true);
-    // setAditudeConfig()
-    // { "domain": "wsup.ai", "enabled": true }
-    console.log("Aditude configured!")
-  })
+
+    loadAditudeConfig();
+    return () => { cancelled = true; };
+  }, [])
 
   // Cache management functions
   const getCachedAd = useCallback((slot: string, position: number): AdData | null => {

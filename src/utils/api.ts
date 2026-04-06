@@ -406,6 +406,65 @@ export const fetchAdForMinigame = async (aid: string): Promise<string | null> =>
     }
 };
 
+// Aditude API
+export interface AditudeSlotMapping {
+  div_id: string;
+  devices: string[];
+  ad_unit_path: string;
+  sizes: Record<string, number[][]>;
+}
+
+export interface AditudeConfig {
+  domain: string;
+  enabled: boolean;
+  script_url: string;
+  mappings: AditudeSlotMapping[];
+}
+
+export const fetchAditudeConfig = async (domain: string): Promise<AditudeConfig | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/aditude/config?domain=${encodeURIComponent(domain)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: AditudeConfig = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch Aditude config:', error);
+    return null;
+  }
+};
+
+export const fetchAllAditudeConfigs = async (): Promise<AditudeConfig[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/aditude/config/all`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: AditudeConfig[] = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch all Aditude configs:', error);
+    return [];
+  }
+};
+
 // NativeBanner API
 export interface FetchNativeBannerRequest {
   sessionId: string;
