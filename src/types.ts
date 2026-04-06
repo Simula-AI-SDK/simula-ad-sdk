@@ -181,6 +181,8 @@ export interface MiniGameMenuProps {
   onGameOpen?: (gameName: string, gameDescription: string) => void;
   /** Called when the game closes (game iframe closed, and ad iframe closed if applicable). Receives the game name. */
   onGameClose?: (gameName: string) => void;
+  /** Whether to show a banner ad at the top of the minigame iframe. Default: true */
+  showBanner?: boolean;
 }
 
 export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';

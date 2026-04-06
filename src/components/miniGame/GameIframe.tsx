@@ -3,6 +3,7 @@ import { getMinigame } from '../../utils/api';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
+import { AditudeSlot } from './AditudeSlot';
 
 const MIN_PLAYABLE_HEIGHT = 500;
 
@@ -23,6 +24,8 @@ interface GameIframeProps {
   playableHeight?: number | string;
   /** Background color for the bottom sheet border area */
   playableBorderColor?: string;
+  /** Whether to show a banner ad at the top of the game. Default: true */
+  showBanner?: boolean;
 }
 
 export const GameIframe: React.FC<GameIframeProps> = ({
@@ -40,9 +43,11 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   menuId,
   playableHeight,
   playableBorderColor = '#262626',
+  showBanner = true,
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const { sessionId } = useSimula();
+  const { sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
+  const bannerEnabled = showBanner && (devMode || (aditudeReady && aditudeConfig?.enabled));
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +252,13 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   }, [playableHeight]);
 
   // Effective height: user-resized overrides calculated
-  const effectiveHeight = resizedHeight ?? containerHeight;
+  // If banner is enabled and game is not fullscreen, add 50px for the banner
+  const bannerHeight = 50;
+  const baseHeight = resizedHeight ?? containerHeight;
+  const isFullscreen = baseHeight === null || baseHeight >= window.innerHeight - bannerHeight;
+  const effectiveHeight = (bannerEnabled && baseHeight !== null && !isFullscreen)
+    ? Math.min(baseHeight + bannerHeight, window.innerHeight)
+    : baseHeight;
 
   // Re-clamp resizedHeight on window resize
   useEffect(() => {
@@ -423,6 +434,29 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             justifyContent: 'center',
           }}>
             {error}
+          </div>
+        )}
+
+        {/* Banner ad */}
+        {bannerEnabled && !loading && !error && iframeUrl && (
+          <div
+            style={{
+              width: '100%',
+              height: `${bannerHeight}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              pointerEvents: 'auto',
+              ...(isFullscreen ? {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: 10001,
+              } : {}),
+            }}
+          >
+            <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
           </div>
         )}
 
