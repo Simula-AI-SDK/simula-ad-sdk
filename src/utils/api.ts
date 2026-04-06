@@ -65,6 +65,25 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
   }
 }
 
+// Update the primaryUserID (PPID) on an existing session
+export async function updateSessionPpid(sessionId: string, ppid: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/session/${sessionId}/ppid/${ppid}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to update session PPID: HTTP ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Failed to update session PPID:', error);
+  }
+}
+
 export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse> => {
   try {
     const conversationHistory = request.messages;

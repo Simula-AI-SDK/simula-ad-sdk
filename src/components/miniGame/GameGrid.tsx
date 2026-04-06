@@ -13,7 +13,7 @@ interface GameGridProps {
   maxGamesToShow?: 3 | 6 | 9;
   charID: string;
   theme: MiniGameTheme;
-  onGameSelect: (gameId: string, gameName: string) => void;
+  onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
   menuId?: string | null;
   navigationType?: 'dot' | 'arrow' | 'pagination';
 }
@@ -64,7 +64,7 @@ const getDotOpacity = (pageIndex: number, currentPage: number): number => {
 
 interface MobileCarouselProps {
   games: GameData[];
-  onGameSelect: (gameId: string, gameName: string) => void;
+  onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
   accentColor: string;
 }
 
@@ -297,7 +297,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
                 >
                   <CoverCard
                     game={game}
-                    onGameSelect={(id) => onGameSelect(id, game.name)}
+                    onGameSelect={(id) => onGameSelect(id, game.name, game.description)}
                     style={{
                       width: `${cardWidth}px`,
                       maxWidth: `${cardWidth}px`,
@@ -321,7 +321,7 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
 interface DesktopGridProps {
   games: GameData[];
   theme: MiniGameTheme;
-  onGameSelect: (gameId: string, gameName: string) => void;
+  onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
   navigationType: 'dot' | 'arrow' | 'pagination';
 }
 
@@ -499,7 +499,7 @@ const DesktopGrid: React.FC<DesktopGridProps> = ({ games, theme, onGameSelect, n
           <CoverCard
             key={game.id}
             game={game}
-            onGameSelect={(id) => onGameSelect(id, game.name)}
+            onGameSelect={(id) => onGameSelect(id, game.name, game.description)}
             style={{
               width: cardWidth ? `${cardWidth}px` : undefined,
               maxWidth: cardWidth ? `${cardWidth}px` : undefined,

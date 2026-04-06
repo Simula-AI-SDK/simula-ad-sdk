@@ -231,7 +231,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
   };
 
-  const handleGameSelect = (gameId: string, gameName: string) => {
+  const handleGameSelect = (gameId: string, gameName: string, gameDescription: string) => {
     // Track menu game click if menuId is available
     if (menuId && gameName) {
       trackMenuGameClick(menuId, gameName, apiKey).catch(() => {
@@ -246,7 +246,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     setAdFetched(false);
     setCurrentAdId(null);
     adFetchingRef.current = false;
-    onGameOpen?.(gameName);
+    onGameOpen?.(gameName, gameDescription);
   };
 
   const handleAdIdReceived = (adId: string) => {
