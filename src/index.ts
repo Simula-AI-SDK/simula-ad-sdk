@@ -64,4 +64,6 @@ export type {
   MiniGameInterstitialProps,
   NativeContext,
   NativeBannerProps,
+  AditudeConfig,
+  AditudeSlotProps,
 } from './types';

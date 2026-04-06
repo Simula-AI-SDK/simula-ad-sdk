@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { SimulaProviderProps, SimulaContextValue, AdData } from './types';
 import { createSession, updateSessionPpid, fetchAditudeConfig } from './utils/api';
+import { injectAditudeScript } from './utils/aditude';
 import { validateSimulaProviderProps } from './utils/validation';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
@@ -31,7 +32,7 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
 
   // aditude
   const [aditudeReady, setAditudeReady] = useState<boolean>(false);
-  const [aditudeConfig, setAditudeConfig] = useState<any | undefined>(undefined);
+  const [aditudeConfig, setAditudeConfig] = useState<import('./types').AditudeConfig | undefined>(undefined);
 
   // Ad caching infrastructure (matching Flutter SDK)
   const adCacheRef = useRef<Map<string, AdData>>(new Map());
@@ -86,25 +87,8 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
 
         setAditudeConfig(config);
 
-        // Inject scripts if not already present (idempotent — safe with React strict mode)
-        if (!document.querySelector('script[data-simula-aditude]')) {
-          const preload = document.createElement('link');
-          preload.rel = 'preload';
-          preload.as = 'script';
-          preload.href = 'https://www.googletagservices.com/tag/js/gpt.js';
-          document.head.prepend(preload);
-
-          const tudeScript = document.createElement('script');
-          tudeScript.textContent = 'window.tude = window.tude || { cmd: [] };';
-          tudeScript.setAttribute('data-simula-aditude', 'tude');
-          document.head.prepend(tudeScript);
-
-          const htlbidScript = document.createElement('script');
-          htlbidScript.async = true;
-          htlbidScript.src = config.script_url;
-          htlbidScript.setAttribute('data-simula-aditude', 'htlbid');
-          document.head.prepend(htlbidScript);
-        }
+        // Inject scripts (idempotent — safe with React strict mode)
+        injectAditudeScript(config.script_url);
 
         setAditudeReady(true);
       } catch {

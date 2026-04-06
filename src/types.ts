@@ -89,7 +89,88 @@ export interface SimulaContextValue {
 
   /*  Aditude Config */
   aditudeReady: boolean;
-  aditudeConfig: any; // TODO: type
+  aditudeConfig: AditudeConfig | undefined;
+}
+
+export interface FetchAdRequest {
+  messages: Message[];
+  apiKey: string;
+  slotId?: string;
+  theme?: InChatTheme;
+  sessionId?: string;
+  charDesc?: string;
+}
+
+export interface FetchAdResponse {
+  ad?: AdData;
+  error?: string;
+}
+
+export interface CatalogResponse {
+  menuId: string;
+  games: GameData[];
+}
+
+export interface InitMinigameRequest {
+  gameType: string;
+  sessionId: string;
+  convId?: string | null;
+  entryPoint?: string;
+  currencyMode?: boolean;
+  w: number;
+  h: number;
+  char_id?: string;
+  char_name?: string;
+  char_image?: string;
+  char_desc?: string;
+  messages?: Message[];
+  delegate_char?: boolean;
+  menuId?: string;
+}
+
+export interface MinigameResponse {
+  adType: 'minigame';
+  adInserted: boolean;
+  adResponse: {
+    ad_id: string;
+    iframe_url: string;
+  };
+}
+
+export interface AditudeSlotMapping {
+  div_id: string;
+  devices: string[];
+  ad_unit_path: string;
+  sizes: Record<string, number[][]>;
+}
+
+export interface AditudeConfig {
+  domain: string;
+  enabled: boolean;
+  script_url: string;
+  mappings: AditudeSlotMapping[];
+}
+
+export interface FetchNativeBannerRequest {
+  sessionId: string;
+  slot: string;
+  position: number;
+  context: NativeContext;
+  width?: number;
+}
+
+export interface FetchNativeAdResponse {
+  ad?: AdData;
+  error?: string;
+}
+
+export interface AditudeSlotProps {
+  baseDivId: string;
+  width: number;
+  height: number;
+  label: string;
+  targeting?: Record<string, any>;
+  style?: React.CSSProperties;
 }
 
 export interface BotDetectionResult {
