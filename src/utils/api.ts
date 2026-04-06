@@ -336,9 +336,9 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
     }
 }
 
-export const fetchAdForMinigame = async (aid: string): Promise<string | null> => {
+export const fetchAdForMinigame = async (aid: string, sessionId: string): Promise<string | null> => {
     try {
-        const response: Response = await fetch(`${API_BASE_URL}/minigames/fallback_ad/${aid}`, {
+        const response: Response = await fetch(`${API_BASE_URL}/minigames/fallback_ad/${aid}?session_id=${encodeURIComponent(sessionId)}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
