@@ -36,6 +36,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   navigationType = 'dot',
   onGameOpen,
   onGameClose,
+  showBanner = true,
 }) => {
   const { apiKey, devMode, aditudeReady, aditudeConfig } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -373,6 +374,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             menuId={menuId}
             playableHeight={appliedTheme.playableHeight}
             playableBorderColor={appliedTheme.playableBorderColor}
+            showBanner={showBanner}
         />
       )}
 
