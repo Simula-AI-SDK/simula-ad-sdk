@@ -71,43 +71,50 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     });
   }, [primaryUserID, hasPrivacyConsent, sessionId]);
 
-  // Effect 3: Load Aditude config from API
+  // Effect 3: Load Aditude config from API (skip in devMode)
   useEffect(() => {
+    if (devMode) return;
+
     let cancelled = false;
 
     async function loadAditudeConfig() {
-      const domain = window.location.hostname;
-      const config = await fetchAditudeConfig(domain);
+      try {
+        const domain = window.location.hostname;
+        const config = await fetchAditudeConfig(domain);
 
-      if (cancelled || !config || !config.enabled) return;
+        if (cancelled || !config || !config.enabled) return;
 
-      setAditudeConfig(config);
+        setAditudeConfig(config);
 
-      // Inject scripts if not already present
-      if (!document.querySelector("link[href='https://www.googletagservices.com/tag/js/gpt.js']")) {
-        const preload = document.createElement('link');
-        preload.rel = 'preload';
-        preload.as = 'script';
-        preload.href = 'https://www.googletagservices.com/tag/js/gpt.js';
-        document.head.prepend(preload);
+        // Inject scripts if not already present (idempotent — safe with React strict mode)
+        if (!document.querySelector('script[data-simula-aditude]')) {
+          const preload = document.createElement('link');
+          preload.rel = 'preload';
+          preload.as = 'script';
+          preload.href = 'https://www.googletagservices.com/tag/js/gpt.js';
+          document.head.prepend(preload);
 
-        const tudeScript = document.createElement('script');
-        tudeScript.textContent = 'window.tude = window.tude || { cmd: [] };';
-        document.head.prepend(tudeScript);
+          const tudeScript = document.createElement('script');
+          tudeScript.textContent = 'window.tude = window.tude || { cmd: [] };';
+          tudeScript.setAttribute('data-simula-aditude', 'tude');
+          document.head.prepend(tudeScript);
 
-        const htlbidScript = document.createElement('script');
-        htlbidScript.async = true;
-        htlbidScript.src = config.script_url;
-        document.head.prepend(htlbidScript);
+          const htlbidScript = document.createElement('script');
+          htlbidScript.async = true;
+          htlbidScript.src = config.script_url;
+          htlbidScript.setAttribute('data-simula-aditude', 'htlbid');
+          document.head.prepend(htlbidScript);
+        }
+
+        setAditudeReady(true);
+      } catch {
+        // Silently disable Aditude — existing SDK behavior unchanged
       }
-
-      setAditudeReady(true);
-      console.log("Aditude configured for domain:", domain);
     }
 
     loadAditudeConfig();
     return () => { cancelled = true; };
-  }, [])
+  }, [devMode])
 
   // Cache management functions
   const getCachedAd = useCallback((slot: string, position: number): AdData | null => {
