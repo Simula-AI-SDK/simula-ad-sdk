@@ -37,7 +37,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   onGameOpen,
   onGameClose,
 }) => {
-  const { apiKey, aditudeReady } = useSimula();
+  const { apiKey, devMode, aditudeReady, aditudeConfig } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedGameName, setSelectedGameName] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -315,7 +315,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         adFetchingRef.current = false;
       }
       // If ad fetch fails or no ad ID, try aditude as fallback
-      if (aditudeReady) {
+      if (aditudeReady && aditudeConfig?.enabled) {
         setShouldFetchAditude(true);
         setAdFetched(true);
         return;
