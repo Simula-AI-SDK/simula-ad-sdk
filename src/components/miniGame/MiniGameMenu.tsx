@@ -315,8 +315,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         }
         adFetchingRef.current = false;
       }
-      // If ad fetch fails or no ad ID, try aditude as fallback
-      if (aditudeReady && aditudeConfig?.enabled) {
+      // If ad fetch fails or no ad ID, try aditude as fallback (never in devMode)
+      if (!devMode && aditudeReady && aditudeConfig?.enabled) {
         setShouldFetchAditude(true);
         setAdFetched(true);
         return;
