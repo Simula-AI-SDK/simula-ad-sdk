@@ -91,8 +91,9 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
         document.head.prepend(htlbidScript);
     }
     setAditudeReady(true);
+    // setAditudeConfig()
+    // { "domain": "wsup.ai", "enabled": true }
     console.log("Aditude configured!")
-    // setAditudeConfig();
   })
 
   // Cache management functions
