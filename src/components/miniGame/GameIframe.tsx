@@ -394,8 +394,8 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         </div>
       )}
 
-      {/* Banner ad */}
-      {bannerEnabled && !loading && !error && iframeUrl && (
+      {/* Banner ad (mobile only — desktop renders it outside the phone case) */}
+      {!isDesktop && bannerEnabled && !loading && !error && iframeUrl && (
         <div
           style={{
             width: '100%',
@@ -487,26 +487,45 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             </div>
           )}
 
-          {/* Phone case */}
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: '430px',
-              minWidth: '430px',
-              height: 'min(932px, 90vh)',
-              minHeight: 'min(932px, 90vh)',
-              display: 'flex',
-              flexDirection: 'column',
-              borderRadius: '40px',
-              border: '2px solid rgba(255, 255, 255, 0.15)',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-              overflow: 'hidden',
-              pointerEvents: 'none',
-              backgroundColor: '#000',
-            }}
-          >
-            {gameContent}
+          {/* Phone case + banner above */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {/* Banner ad above the phone */}
+            {bannerEnabled && (
+              <div
+                style={{
+                  width: '320px',
+                  height: `${bannerHeight}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                  pointerEvents: 'auto',
+                  marginBottom: '4px',
+                }}
+              >
+                <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
+              </div>
+            )}
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: '430px',
+                minWidth: '430px',
+                height: bannerEnabled ? 'min(882px, calc(90vh - 54px))' : 'min(932px, 90vh)',
+                minHeight: bannerEnabled ? 'min(882px, calc(90vh - 54px))' : 'min(932px, 90vh)',
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: '40px',
+                border: '2px solid rgba(255, 255, 255, 0.15)',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                backgroundColor: '#000',
+              }}
+            >
+              {gameContent}
+            </div>
           </div>
 
           {/* Right rail */}
