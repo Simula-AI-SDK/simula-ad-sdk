@@ -461,3 +461,96 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
     };
   }
 };
+
+// ---------------------------------------------------------------------------
+// RewardMiniGame APIs
+// ---------------------------------------------------------------------------
+
+export interface InitRewardedGameParams {
+  sessionId: string;
+  charID: string;
+  charName?: string;
+  charImage?: string;
+  charDesc?: string;
+  messages?: Message[];
+  minPlayThreshold: number;
+  w: number;
+  h: number;
+}
+
+export interface InitRewardedGameResponse {
+  id: string;
+  name: string;
+  description: string;
+  iconUrl: string;
+  iconFallback: string | null;
+  gifCover: string | null;
+  serve_id: string;
+  iframe_url: string;
+  duration_seconds: number;
+}
+
+export const initRewardedGame = async (params: InitRewardedGameParams): Promise<InitRewardedGameResponse> => {
+  const response = await fetch(`${API_BASE_URL}/minigames/init/rewarded`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': '1',
+    },
+    body: JSON.stringify({
+      session_id: params.sessionId,
+      w: params.w,
+      h: params.h,
+      char_id: params.charID,
+      char_name: params.charName ?? null,
+      char_image: params.charImage ?? null,
+      char_desc: params.charDesc ?? null,
+      messages: params.messages ?? null,
+      min_play_threshold: params.minPlayThreshold,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+};
+
+export interface VerifyRewardParams {
+  serve_id: string;
+  session_id: string;
+  elapsed_play_time: number;
+}
+
+export interface VerifyRewardResponse {
+  verified: boolean;
+  token: string;
+}
+
+export const verifyReward = async (params: VerifyRewardParams): Promise<VerifyRewardResponse> => {
+  const attempt = async (): Promise<VerifyRewardResponse> => {
+    const response = await fetch(`${API_BASE_URL}/minigames/verify-reward`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  };
+
+  try {
+    return await attempt();
+  } catch (error) {
+    // One automatic retry on network failure
+    console.warn('verifyReward first attempt failed, retrying:', error);
+    return await attempt();
+  }
+};

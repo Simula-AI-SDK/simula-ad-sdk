@@ -37,6 +37,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   onGameOpen,
   onGameClose,
   showBanner = true,
+  title,
 }) => {
   const { apiKey, sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -878,8 +879,14 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                     lineHeight: '1.2',
                   }}
                 >
-                  <div>Play a Game with</div>
-                  <div style={{ color: appliedTheme.titleFontColor, opacity: 0.78, fontWeight: 800 }}>{charName}</div>
+                  {title ? (
+                    <div>{title}</div>
+                  ) : (
+                    <>
+                      <div>Play a Game with</div>
+                      <div style={{ color: appliedTheme.titleFontColor, opacity: 0.78, fontWeight: 800 }}>{charName}</div>
+                    </>
+                  )}
                 </h2>
               </div>
             </div>

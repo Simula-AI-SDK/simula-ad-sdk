@@ -264,9 +264,39 @@ export interface MiniGameMenuProps {
   onGameClose?: (gameName: string) => void;
   /** Whether to show a banner ad at the top of the minigame iframe. Default: true */
   showBanner?: boolean;
+  /** Optional custom title for the menu header. Overrides the default "Play a Game with {charName}" text. */
+  title?: string;
 }
 
 export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';
+
+// RewardMiniGame types
+
+export interface RewardMiniGameTheme {
+  overlayBackgroundColor?: string;
+  claimButtonColor?: string;
+  claimButtonTextColor?: string;
+  claimButtonCornerRadius?: number;
+  claimButtonText?: string;
+  claimButtonPosition?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  fontFamily?: string;
+}
+
+export interface RewardMiniGameProps {
+  isOpen: boolean;
+  charName: string;
+  charID: string;
+  charImage: string;
+  minPlayThreshold: number;
+  onRewardCompleted: (token: string) => void;
+  onRewardAbandoned: () => void;
+  onRewardVerificationFailed?: () => void;
+  onGameOpen?: (gameName: string, gameDescription: string) => void;
+  onGameClose?: (gameName: string) => void;
+  theme?: RewardMiniGameTheme;
+  messages?: Message[];
+  charDesc?: string;
+}
 
 // MiniGameInvitation types
 export type MiniGameInvitationAnimation = 'auto' | 'slideDown' | 'fadeIn' | 'slideUp' | 'none';

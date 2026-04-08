@@ -1,6 +1,7 @@
 export { SimulaProvider, useSimula } from './SimulaProvider';
 export { InChatAdSlot } from './components/inChatAd/InChatAdSlot';
 export { MiniGameMenu } from './components/miniGame/MiniGameMenu';
+export { RewardMiniGame } from './components/miniGame/RewardMiniGame';
 export { MiniGameInvitation } from './components/miniGame/MiniGameInvitation';
 export { MiniGameButton } from './components/miniGame/MiniGameButton';
 export { MiniGameInterstitial } from './components/miniGame/MiniGameInterstitial';
@@ -66,4 +67,6 @@ export type {
   NativeBannerProps,
   AditudeConfig,
   AditudeSlotProps,
+  RewardMiniGameProps,
+  RewardMiniGameTheme,
 } from './types';
