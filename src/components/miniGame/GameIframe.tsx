@@ -394,7 +394,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         </div>
       )}
 
-      {/* Banner ad (mobile only — desktop renders it outside the phone case) */}
+      {/* Banner ad (mobile only) */}
       {!isDesktop && bannerEnabled && !loading && !error && iframeUrl && (
         <div
           style={{
@@ -489,31 +489,14 @@ export const GameIframe: React.FC<GameIframeProps> = ({
 
           {/* Phone case + banner above */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {/* Banner ad above the phone */}
-            {bannerEnabled && (
-              <div
-                style={{
-                  width: '320px',
-                  height: `${bannerHeight}px`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                  pointerEvents: 'auto',
-                  marginBottom: '4px',
-                }}
-              >
-                <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
-              </div>
-            )}
             <div
               style={{
                 position: 'relative',
                 width: '100%',
                 maxWidth: '430px',
                 minWidth: '430px',
-                height: bannerEnabled ? 'min(882px, calc(90vh - 54px))' : 'min(932px, 90vh)',
-                minHeight: bannerEnabled ? 'min(882px, calc(90vh - 54px))' : 'min(932px, 90vh)',
+                height: 'min(932px, 90vh)',
+                minHeight: 'min(932px, 90vh)',
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: '40px',
