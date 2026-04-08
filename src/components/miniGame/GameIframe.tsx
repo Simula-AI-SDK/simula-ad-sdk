@@ -432,6 +432,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
         />
       )}
+
     </>
   );
 
