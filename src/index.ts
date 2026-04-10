@@ -4,16 +4,21 @@ export { MiniGameMenu } from './components/miniGame/MiniGameMenu';
 export { MiniGameInvitation } from './components/miniGame/MiniGameInvitation';
 export { MiniGameButton } from './components/miniGame/MiniGameButton';
 export { MiniGameInterstitial } from './components/miniGame/MiniGameInterstitial';
+export { RewardedMiniGame } from './components/miniGame/RewardedMiniGame';
 
 // MiniGameInviteKit — grouped access to mini game invite components
 import { MiniGameInvitation as _Invitation } from './components/miniGame/MiniGameInvitation';
 import { MiniGameButton as _Button } from './components/miniGame/MiniGameButton';
 import { MiniGameInterstitial as _Interstitial } from './components/miniGame/MiniGameInterstitial';
+import { RewardInvitation as _RewardInvitation } from './components/miniGame/RewardInvitation';
+
+export { RewardInvitation } from './components/miniGame/RewardInvitation';
 
 export const MiniGameInviteKit = {
   Invitation: _Invitation,
   Button: _Button,
   Interstitial: _Interstitial,
+  RewardInvitation: _RewardInvitation,
 } as const;
 export { NativeBanner } from './components/nativeBanner/NativeBanner';
 export { RadialLinesSpinner } from './components/nativeBanner/RadialLinesSpinner';
@@ -66,4 +71,7 @@ export type {
   NativeBannerProps,
   AditudeConfig,
   AditudeSlotProps,
+  RewardedMiniGameProps,
+  InitRewardedResponse,
+  VerifyRewardResponse,
 } from './types';
