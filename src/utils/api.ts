@@ -440,6 +440,31 @@ export const verifyReward = async (params: {
   }
 };
 
+export const reportAdInterstitial = async (params: {
+  serveId: string;
+  sessionId: string;
+  adSource: 'simula' | 'aditude' | 'none';
+  renderedFormat?: string;
+}): Promise<void> => {
+  try {
+    await fetch(`${API_BASE_URL}/minigames/play/${encodeURIComponent(params.serveId)}/ad-interstitial`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify({
+        session_id: params.sessionId,
+        ad_source: params.adSource,
+        rendered_format: params.renderedFormat ?? null,
+      }),
+    });
+  } catch (error) {
+    // Best-effort tracking — don't block the ad flow
+    console.error('Failed to report ad interstitial:', error);
+  }
+};
+
 // Aditude API
 export const fetchAditudeConfig = async (domain: string): Promise<AditudeConfig | null> => {
   try {

@@ -133,6 +133,7 @@ export interface MinigameResponse {
   adInserted: boolean;
   adResponse: {
     ad_id: string;
+    serve_id?: string;
     iframe_url: string;
   };
 }

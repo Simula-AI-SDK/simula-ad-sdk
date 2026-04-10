@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RewardedMiniGameProps } from '../../types';
-import { initRewardedGame, fetchAdForMinigame, verifyReward } from '../../utils/api';
+import { initRewardedGame, fetchAdForMinigame, verifyReward, reportAdInterstitial } from '../../utils/api';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
 import { MiniGameMenu } from './MiniGameMenu';
@@ -169,6 +169,18 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
 
     let cancelled = false;
 
+    // Fire-and-forget interstitial report
+    const reportAd = (adSource: 'simula' | 'aditude' | 'none', renderedFormat?: string) => {
+      if (serveId && sessionIdRef.current) {
+        reportAdInterstitial({
+          serveId,
+          sessionId: sessionIdRef.current,
+          adSource,
+          renderedFormat,
+        });
+      }
+    };
+
     const loadAd = async () => {
       if (adFetchingRef.current) return;
       adFetchingRef.current = true;
@@ -178,6 +190,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
         if (!cancelled) {
           setShowAditude(true);
           startAdCountdown();
+          reportAd('aditude', 'medrec');
         }
         adFetchingRef.current = false;
         return;
@@ -190,6 +203,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
           if (!cancelled && url) {
             setAdIframeUrl(url);
             startAdCountdown();
+            reportAd('simula');
             adFetchingRef.current = false;
             return;
           }
@@ -199,9 +213,10 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
       }
 
       // Fallback: aditude if available
-      if (!cancelled && (devMode || (aditudeReady && aditudeConfig?.enabled))) {
+      if (!cancelled && (aditudeReady && aditudeConfig?.enabled)) {
         setShowAditude(true);
         startAdCountdown();
+        reportAd('aditude', 'medrec');
         adFetchingRef.current = false;
         return;
       }
@@ -209,6 +224,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
       // PRD: If ads.html fails to load → 5s grace period then Claim Reward
       if (!cancelled) {
         startAdCountdown();
+        reportAd('none');
       }
       adFetchingRef.current = false;
     };
