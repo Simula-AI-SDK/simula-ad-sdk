@@ -1,4 +1,4 @@
-import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse } from '../types';
+import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
 
 // const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
@@ -360,6 +360,84 @@ export const fetchAdForMinigame = async (aid: string, sessionId: string): Promis
         console.error('Failed to fetch ad for minigame:', error);
         return null;
     }
+};
+
+// Rewarded MiniGame API
+export const initRewardedGame = async (params: {
+  sessionId: string;
+  w: number;
+  h: number;
+  charId?: string;
+  charName?: string;
+  charImage?: string;
+  charDesc?: string;
+  messages?: Message[];
+  minPlayThreshold?: number;
+}): Promise<InitRewardedResponse> => {
+  try {
+    const requestBody: Record<string, any> = {
+      session_id: params.sessionId,
+      w: params.w,
+      h: params.h,
+      char_id: params.charId,
+      char_name: params.charName,
+      char_image: params.charImage,
+      char_desc: params.charDesc,
+      messages: params.messages,
+    };
+
+    if (params.minPlayThreshold !== undefined) {
+      requestBody.min_play_threshold = params.minPlayThreshold;
+    }
+
+    const response: Response = await fetch(`${API_BASE_URL}/minigames/init/rewarded`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to initialize rewarded game:', error);
+    throw error;
+  }
+};
+
+export const verifyReward = async (params: {
+  serveId: string;
+  sessionId: string;
+  elapsedPlayTime: number;
+}): Promise<VerifyRewardResponse> => {
+  try {
+    const response: Response = await fetch(`${API_BASE_URL}/minigames/verify-reward`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify({
+        serve_id: params.serveId,
+        session_id: params.sessionId,
+        elapsed_play_time: params.elapsedPlayTime,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to verify reward:', error);
+    throw error;
+  }
 };
 
 // Aditude API

@@ -388,6 +388,40 @@ export interface MiniGameInterstitialProps {
   onClose?: () => void;
 }
 
+// RewardedMiniGame types
+export interface InitRewardedResponse {
+  id: string;
+  name: string;
+  iconUrl: string;
+  description: string;
+  gifCover?: string;
+  serve_id: string;
+  iframe_url: string;
+  duration_seconds: number;
+  ad_id: string | null;
+}
+
+export interface VerifyRewardResponse {
+  verified: boolean;
+  token: string;
+}
+
+export interface RewardedMiniGameProps {
+  isOpen: boolean;
+  charName: string;
+  charID: string;
+  charImage: string;
+  charDesc?: string;
+  /** Minimum play seconds required before close button appears. Clamped to [10, 30]. Default: 15 */
+  minPlayThreshold?: number;
+  /** Called when SSV verification succeeds. Grant reward here. */
+  onRewardVerified: () => void;
+  /** Called when SSV verification fails after retry. */
+  onRewardVerificationFailed?: () => void;
+  /** Conversation history passed through to post-game MiniGameMenu. */
+  messages?: Message[];
+}
+
 // NativeBanner types
 export interface NativeContext {
   searchTerm?: string;
