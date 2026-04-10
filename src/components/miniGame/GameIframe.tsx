@@ -16,6 +16,7 @@ interface GameIframeProps {
   delegateChar?: boolean;
   onClose: () => void;
   onAdIdReceived?: (adId: string) => void;
+  onServeIdReceived?: (serveId: string) => void;
   charDesc?: string;
   convId?: string;
   entryPoint?: string;
@@ -37,6 +38,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   delegateChar = true,
   onClose,
   onAdIdReceived,
+  onServeIdReceived,
   charDesc,
   convId,
   entryPoint,
@@ -151,6 +153,9 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         // Callback with the ad_id for tracking
         if (onAdIdReceived && response.adResponse.ad_id) {
           onAdIdReceived(response.adResponse.ad_id);
+        }
+        if (onServeIdReceived && response.adResponse.serve_id) {
+          onServeIdReceived(response.adResponse.serve_id);
         }
       } catch (err) {
         // Only set error if this is still the current request

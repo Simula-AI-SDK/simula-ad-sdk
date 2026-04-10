@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
-import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick } from '../../utils/api';
+import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick, reportAdInterstitial } from '../../utils/api';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
@@ -49,6 +49,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const [adFetched, setAdFetched] = useState(false);
   const [adIframeUrl, setAdIframeUrl] = useState<string | null>(null);
   const [currentAdId, setCurrentAdId] = useState<string | null>(null);
+  const [currentServeId, setCurrentServeId] = useState<string | null>(null);
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
   const adCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adFetchingRef = useRef(false);
@@ -285,6 +286,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     // Reset ad tracking when a new game is selected
     setAdFetched(false);
     setCurrentAdId(null);
+    setCurrentServeId(null);
     adFetchingRef.current = false;
     onGameOpen?.(gameName, gameDescription);
   };
@@ -293,18 +295,35 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     setCurrentAdId(adId);
   };
 
+  const handleServeIdReceived = (serveId: string) => {
+    setCurrentServeId(serveId);
+  };
+
+  // Fire-and-forget ad interstitial report
+  const reportAd = useCallback((adSource: 'simula' | 'aditude' | 'none', renderedFormat?: string) => {
+    if (currentServeId && sessionIdRef.current) {
+      reportAdInterstitial({
+        serveId: currentServeId,
+        sessionId: sessionIdRef.current,
+        adSource,
+        renderedFormat,
+      });
+    }
+  }, [currentServeId]);
+
   const handleIframeClose = async () => {
     // Prevent multiple simultaneous ad fetches (e.g., from spam clicking close)
     if (adFetchingRef.current) {
       return;
     }
-    
+
     if (!adFetched) {
       // In devMode, skip real ad fetch and go straight to aditude placeholder
       if (devMode) {
         setShouldFetchAditude(true);
         setAdFetched(true);
         setSelectedGameId(null);
+        reportAd('aditude', 'medrec');
         return;
       }
       // Make API request and fetch / display ad.html here
@@ -317,6 +336,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             setAdFetched(true);
             setSelectedGameId(null);
             adFetchingRef.current = false;
+            reportAd('simula');
             return; // Ad will be shown, onGameClose will be called when ad closes
           }
         } catch (error) {
@@ -326,12 +346,14 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       }
       // If ad fetch fails or no ad ID, try aditude as fallback
       // In devMode, show placeholder; in prod, show real ad
-      if (devMode || (aditudeReady && aditudeConfig?.enabled)) {
+      if (aditudeReady && aditudeConfig?.enabled) {
         setShouldFetchAditude(true);
         setAdFetched(true);
+        reportAd('aditude', 'medrec');
         return;
       }
       // No ad available at all — close without showing ad
+      reportAd('none');
       setSelectedGameId(null);
       onGameClose?.(selectedGameName ?? '');
     } else {
@@ -375,6 +397,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             charName={charName}
             charImage={charImage}
             charDesc={charDesc}
+            onServeIdReceived={handleServeIdReceived}
             convId={convId}
             entryPoint={entryPoint}
             messages={messages}
