@@ -503,8 +503,8 @@ export const GameIframe: React.FC<GameIframeProps> = ({
               style={{
                 position: 'relative',
                 width: '100%',
-                maxWidth: '430px',
-                minWidth: '430px',
+                maxWidth: '380px',
+                minWidth: '380px',
                 height: 'min(932px, 90vh)',
                 minHeight: 'min(932px, 90vh)',
                 display: 'flex',
