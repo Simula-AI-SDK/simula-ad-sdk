@@ -431,6 +431,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             border: 'none',
             display: 'block',
             pointerEvents: 'auto',
+            ...(!isDesktop && bannerEnabled && isFullscreen ? {
+              marginTop: `${bannerHeight}px`,
+              height: `calc(100% - ${bannerHeight}px)`,
+            } : {}),
           }}
           title={`Game: ${gameId}`}
           allow="fullscreen"
