@@ -296,18 +296,28 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   };
 
   const handleServeIdReceived = (serveId: string) => {
+    console.log('[MiniGameMenu] handleServeIdReceived:', serveId);
     setCurrentServeId(serveId);
   };
 
   // Fire-and-forget ad interstitial report
   const reportAd = useCallback((adSource: 'simula' | 'aditude' | 'none', renderedFormat?: string) => {
+    console.log('[MiniGameMenu] reportAd called', {
+      adSource,
+      renderedFormat,
+      currentServeId,
+      sessionId: sessionIdRef.current,
+    });
     if (currentServeId && sessionIdRef.current) {
+      console.log('[MiniGameMenu] reportAd firing HTTP call');
       reportAdInterstitial({
         serveId: currentServeId,
         sessionId: sessionIdRef.current,
         adSource,
         renderedFormat,
       });
+    } else {
+      console.warn('[MiniGameMenu] reportAd SKIPPED — missing serveId or sessionId');
     }
   }, [currentServeId]);
 
