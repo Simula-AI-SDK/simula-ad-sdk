@@ -149,13 +149,20 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           return;
         }
 
+        console.log('[GameIframe] init response adResponse:', response.adResponse);
         setIframeUrl(response.adResponse.iframe_url);
         // Callback with the ad_id for tracking
         if (onAdIdReceived && response.adResponse.ad_id) {
           onAdIdReceived(response.adResponse.ad_id);
         }
         if (onServeIdReceived && response.adResponse.serve_id) {
+          console.log('[GameIframe] firing onServeIdReceived with:', response.adResponse.serve_id);
           onServeIdReceived(response.adResponse.serve_id);
+        } else {
+          console.warn('[GameIframe] serve_id missing from response or callback not provided', {
+            hasCallback: !!onServeIdReceived,
+            serve_id: response.adResponse.serve_id,
+          });
         }
       } catch (err) {
         // Only set error if this is still the current request

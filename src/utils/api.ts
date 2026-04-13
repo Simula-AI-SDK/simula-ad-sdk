@@ -447,7 +447,8 @@ export const reportAdInterstitial = async (params: {
   renderedFormat?: string;
 }): Promise<void> => {
   try {
-    await fetch(`${API_BASE_URL}/minigames/play/${encodeURIComponent(params.serveId)}/ad-interstitial`, {
+    console.log('[reportAdInterstitial] fetching', params);
+    const response = await fetch(`${API_BASE_URL}/minigames/play/${encodeURIComponent(params.serveId)}/ad-interstitial`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -459,9 +460,10 @@ export const reportAdInterstitial = async (params: {
         rendered_format: params.renderedFormat ?? null,
       }),
     });
+    console.log('[reportAdInterstitial] response status:', response.status);
   } catch (error) {
     // Best-effort tracking — don't block the ad flow
-    console.error('Failed to report ad interstitial:', error);
+    console.error('[reportAdInterstitial] Failed:', error);
   }
 };
 
