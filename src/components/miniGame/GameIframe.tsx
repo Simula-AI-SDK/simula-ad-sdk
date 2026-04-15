@@ -415,25 +415,6 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         </div>
       )}
 
-      {/* Banner ad (mobile only) — participates in flex layout so iframe is pushed below */}
-      {!isDesktop && bannerEnabled && !loading && !error && iframeUrl && (
-        <div
-          style={{
-            width: '100%',
-            height: `${bannerHeight}px`,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            pointerEvents: 'auto',
-            zIndex: 10001,
-          }}
-        >
-          <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
-        </div>
-      )}
-
       {!loading && !error && iframeUrl && (
         <iframe
           src={iframeUrl}
@@ -555,6 +536,23 @@ export const GameIframe: React.FC<GameIframeProps> = ({
             } : {}),
           }}
         >
+          {bannerEnabled && (
+            <div
+              style={{
+                width: '100%',
+                height: `${bannerHeight}px`,
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                pointerEvents: 'auto',
+                zIndex: 10001,
+              }}
+            >
+              <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
+            </div>
+          )}
           {gameContent}
         </div>
       )}
