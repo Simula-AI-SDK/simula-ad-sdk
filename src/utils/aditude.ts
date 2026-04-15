@@ -53,17 +53,3 @@ export const refreshAdSlot = (
     document.body.append(script);
   }
 };
-
-/** Remove an injected Aditude slot and its refresh script so stale mobile banners do not linger. */
-export const cleanupAdSlot = (divId: string): void => {
-  const slotScript = document.querySelector(`script[data-aditude-slot="${divId}"]`);
-  if (slotScript) {
-    slotScript.remove();
-  }
-
-  const slotDiv = document.getElementById(divId);
-  if (slotDiv) {
-    slotDiv.innerHTML = '';
-    slotDiv.remove();
-  }
-};
