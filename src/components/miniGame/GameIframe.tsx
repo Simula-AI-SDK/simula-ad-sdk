@@ -5,7 +5,9 @@ import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
 import { AditudeSlot } from '../aditude/AditudeSlot';
 
-const MIN_PLAYABLE_HEIGHT = 500;
+const MIN_GAME_HEIGHT = 500;
+const HANDLE_HEIGHT = 28; // 12px padding top + 4px bar + 12px padding bottom
+const BANNER_HEIGHT = 50;
 
 interface GameIframeProps {
   gameId: string;
@@ -66,6 +68,9 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   }, []);
   const isDesktop = viewportWidth >= 768;
   const showBothRails = viewportWidth >= 1100;
+
+  // 500px minimum for the game iframe itself, plus handle height on mobile
+  const MIN_PLAYABLE_HEIGHT = MIN_GAME_HEIGHT + (!isDesktop ? HANDLE_HEIGHT : 0);
 
   // Drag-to-resize state
   const [resizedHeight, setResizedHeight] = useState<number | null>(null);
@@ -220,6 +225,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   };
 
   // Calculate container height based on playableHeight prop (matches RN SDK logic)
+  // On mobile bottom sheets the drag handle lives inside the container, so we add
+  // HANDLE_HEIGHT so the specified playableHeight maps to actual game (iframe) size.
+  const handleOffset = !isDesktop ? HANDLE_HEIGHT : 0;
+
   const { containerHeight, isBottomSheet } = useMemo(() => {
     if (playableHeight === undefined || playableHeight === null) {
       return { containerHeight: null, isBottomSheet: false };
@@ -233,10 +242,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         if (playableHeight >= 0.95) {
           return { containerHeight: null, isBottomSheet: false };
         }
-        const computed = Math.max(Math.min(screenHeight * playableHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
+        const computed = Math.max(Math.min(screenHeight * playableHeight + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
         return { containerHeight: computed, isBottomSheet: true };
       }
-      const clamped = Math.max(Math.min(playableHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
+      const clamped = Math.max(Math.min(playableHeight + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
       if (clamped >= screenHeight * 0.95) {
         return { containerHeight: null, isBottomSheet: false };
       }
@@ -254,7 +263,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           if (pct >= 0.95) {
             return { containerHeight: null, isBottomSheet: false };
           }
-          const computed = Math.max(Math.min(screenHeight * pct, screenHeight), MIN_PLAYABLE_HEIGHT);
+          const computed = Math.max(Math.min(screenHeight * pct + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
           return { containerHeight: computed, isBottomSheet: true };
         }
       }
@@ -262,7 +271,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       // Numeric string without % (e.g., "600")
       const parsed = parseFloat(playableHeight);
       if (!isNaN(parsed)) {
-        const clamped = Math.max(Math.min(parsed, screenHeight), MIN_PLAYABLE_HEIGHT);
+        const clamped = Math.max(Math.min(parsed + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
         if (clamped >= screenHeight * 0.95) {
           return { containerHeight: null, isBottomSheet: false };
         }
@@ -271,11 +280,11 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     }
 
     return { containerHeight: null, isBottomSheet: false };
-  }, [playableHeight]);
+  }, [playableHeight, MIN_PLAYABLE_HEIGHT, handleOffset]);
 
   // Effective height: user-resized overrides calculated
   // If banner is enabled and game is not fullscreen, add 50px for the banner
-  const bannerHeight = 50;
+  const bannerHeight = BANNER_HEIGHT;
   const baseHeight = resizedHeight ?? containerHeight;
   const isFullscreen = baseHeight === null || baseHeight >= window.innerHeight - bannerHeight;
   const effectiveHeight = (bannerEnabled && baseHeight !== null && !isFullscreen)

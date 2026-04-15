@@ -223,7 +223,7 @@ export interface MiniGameTheme {
    * - number: pixel value (e.g., 500 = 500px)
    * - string with %: percentage of screen height (e.g., "80%")
    * - undefined/null: full screen (default behavior)
-   * Minimum height is 500px.
+   * Minimum game content height is 500px (handle and banner are added on top).
    */
   playableHeight?: number | string;
   /** 
