@@ -500,7 +500,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           }}
         >
           {/* Left rail — only at wide viewports */}
-          {showBothRails && (
+          {bannerEnabled && showBothRails && (
             <div style={{ pointerEvents: 'auto', flexShrink: 0 }}>
               <AditudeSlot baseDivId=".htlad-rightrail" width={300} height={600} label="Right Rail Ad" />
             </div>
@@ -531,9 +531,11 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           </div>
 
           {/* Right rail */}
-          <div style={{ pointerEvents: 'auto', flexShrink: 0 }}>
-            <AditudeSlot baseDivId=".htlad-rightrail" width={300} height={600} label="Right Rail Ad" />
-          </div>
+          {bannerEnabled && (
+            <div style={{ pointerEvents: 'auto', flexShrink: 0 }}>
+              <AditudeSlot baseDivId=".htlad-rightrail" width={300} height={600} label="Right Rail Ad" />
+            </div>
+          )}
         </div>
       ) : (
         /* Mobile: existing behavior */
