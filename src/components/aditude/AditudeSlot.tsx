@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { AditudeSlotProps } from '../../types';
 import { useSimula } from '../../SimulaProvider';
-import { generateSlotId, getSlotPrefix, refreshAdSlot } from '../../utils/aditude';
+import { cleanupAdSlot, generateSlotId, getSlotPrefix, refreshAdSlot } from '../../utils/aditude';
 import { AditudePlaceholder } from './AditudePlaceholder';
 
 export const AditudeSlot: React.FC<AditudeSlotProps> = ({
@@ -23,7 +23,10 @@ export const AditudeSlot: React.FC<AditudeSlotProps> = ({
         if (aditudeReady && !devMode) {
             refreshAdSlot(divId, baseDivId, targeting);
         }
-    }, [aditudeReady])
+        return () => {
+            cleanupAdSlot(divId);
+        };
+    }, [aditudeReady, baseDivId, devMode, divId, targeting])
 
     if (devMode) {
         return <AditudePlaceholder width={width} height={height} label={label} style={style} />;

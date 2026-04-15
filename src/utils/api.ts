@@ -1,8 +1,8 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
 
-const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
-// const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
+const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
 
 // Create a server session and return its id
