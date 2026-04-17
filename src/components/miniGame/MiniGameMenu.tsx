@@ -7,7 +7,7 @@ import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
-import { AditudeSlot } from '../aditude/AditudeSlot';
+import { WidgetShell } from '../WidgetShell';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -638,7 +638,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
           >
             Ad
           </span>
-          <AditudeSlot baseDivId=".htlad-medrec" width={300} height={250} label="medrec" />
+          <WidgetShell variant="medrec" />
         </div>
       )}
 

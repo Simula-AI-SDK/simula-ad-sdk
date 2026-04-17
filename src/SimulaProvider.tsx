@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { SimulaProviderProps, SimulaContextValue, AdData } from './types';
 import { createSession, updateSessionPpid, fetchAditudeConfig } from './utils/api';
-import { injectAditudeScript } from './utils/aditude';
 import { validateSimulaProviderProps } from './utils/validation';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
@@ -72,7 +71,14 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     });
   }, [primaryUserID, hasPrivacyConsent, sessionId]);
 
-  // Effect 3: Load Aditude config from API (skip in devMode)
+  // Effect 3: Fetch Aditude config from API (skip in devMode).
+  //
+  // We no longer inject Aditude scripts into the publisher's page — the
+  // WidgetShell iframe owns the Aditude Cloud Wrapper inside its own
+  // document, which is what the shell route serves. The publisher's
+  // window.tude is never touched. All we need on the SDK side is the
+  // "is this domain Aditude-enabled?" gate for deciding whether to render
+  // WidgetShell medrecs at all.
   useEffect(() => {
     if (devMode) return;
 
@@ -86,10 +92,6 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
         if (cancelled || !config || !config.enabled) return;
 
         setAditudeConfig(config);
-
-        // Inject scripts (idempotent — safe with React strict mode)
-        injectAditudeScript(config.script_url);
-
         setAditudeReady(true);
       } catch {
         // Silently disable Aditude — existing SDK behavior unchanged
