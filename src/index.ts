@@ -70,7 +70,6 @@ export type {
   NativeContext,
   NativeBannerProps,
   AditudeConfig,
-  AditudeSlotProps,
   RewardedMiniGameProps,
   InitRewardedResponse,
   VerifyRewardResponse,
