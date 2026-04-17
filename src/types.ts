@@ -165,15 +165,6 @@ export interface FetchNativeAdResponse {
   error?: string;
 }
 
-export interface AditudeSlotProps {
-  baseDivId: string;
-  width: number;
-  height: number;
-  label: string;
-  targeting?: Record<string, any>;
-  style?: React.CSSProperties;
-}
-
 export interface BotDetectionResult {
   isBot: boolean;
   reasons: string[];

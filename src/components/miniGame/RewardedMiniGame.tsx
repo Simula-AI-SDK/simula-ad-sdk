@@ -4,7 +4,7 @@ import { initRewardedGame, fetchAdForMinigame, verifyReward, reportAdInterstitia
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
 import { MiniGameMenu } from './MiniGameMenu';
-import { AditudeSlot } from '../aditude/AditudeSlot';
+import { WidgetShell } from '../WidgetShell';
 
 type Phase = 'idle' | 'loading' | 'playing' | 'ad' | 'claim' | 'verifying' | 'done';
 
@@ -592,7 +592,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
               >
                 Ad
               </span>
-              <AditudeSlot baseDivId=".htlad-medrec_rewarded" width={300} height={250} label="medrec" />
+              <WidgetShell variant="rewarded_medrec" />
             </div>
           )}
 
