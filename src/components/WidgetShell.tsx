@@ -1,9 +1,6 @@
 import React from 'react';
 import { useSimula } from '../SimulaProvider';
-
-// Mirror the API_BASE_URL from utils/api.ts. The widget shell route is part
-// of the same backend so it uses the same base.
-const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+import { API_BASE_URL } from '../utils/api';
 
 export type WidgetShellVariant = 'game' | 'medrec' | 'rewarded_medrec';
 
