@@ -3,11 +3,10 @@ import { getMinigame } from '../../utils/api';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
-import { AditudeSlot } from '../aditude/AditudeSlot';
+import { WidgetShell } from '../WidgetShell';
 
 const MIN_GAME_HEIGHT = 500;
 const HANDLE_HEIGHT = 28; // 12px padding top + 4px bar + 12px padding bottom
-const BANNER_HEIGHT = 50;
 
 interface GameIframeProps {
   gameId: string;
@@ -50,16 +49,16 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   showBanner = true,
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const { sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
-  const bannerEnabled = showBanner && (devMode || (aditudeReady && aditudeConfig?.enabled));
+  const { sessionId } = useSimula();
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [serveId, setServeId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const currentRequestRef = useRef<Promise<void> | null>(null);
   const initKeyRef = useRef<string | null>(null);
 
-  // Desktop detection for phone-case layout
+  // Desktop detection for bottom-sheet vs. centered layout.
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   useEffect(() => {
     const handleResize = () => setViewportWidth(window.innerWidth);
@@ -67,12 +66,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const isDesktop = viewportWidth >= 768;
-  const showBothRails = viewportWidth >= 1100;
 
-  // 500px minimum for the game iframe itself, plus handle height on mobile
   const MIN_PLAYABLE_HEIGHT = MIN_GAME_HEIGHT + (!isDesktop ? HANDLE_HEIGHT : 0);
 
-  // Drag-to-resize state
+  // Drag-to-resize state (mobile bottom sheet only)
   const [resizedHeight, setResizedHeight] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef<number>(0);
@@ -83,42 +80,25 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  // Fetch the minigame iframe URL
+  // Fetch the minigame iframe URL (passed into WidgetShell as gameUrl)
   useEffect(() => {
-    // Block if sessionId is missing or invalid
     if (!sessionId) {
       setError('Session invalid, cannot initialize minigame');
       setLoading(false);
       return;
     }
 
-    // Create a unique key for this initialization based on the actual parameters
     const initKey = `${gameId}-${charID}-${sessionId}`;
 
-    // Prevent multiple initializations with the same key
     if (currentRequestRef.current && initKeyRef.current === initKey) {
-      console.log('[GameIframe] Initialization already in progress for key:', initKey);
       return;
     }
 
-    // If there's a different request in progress, we'll let it complete but won't process its result
-    // (the new request will override)
-    if (currentRequestRef.current && initKeyRef.current !== initKey) {
-      console.log('[GameIframe] New parameters detected, will override previous request. Old key:', initKeyRef.current, 'New key:', initKey);
-    }
-
-    // Set the key immediately
     initKeyRef.current = initKey;
 
-    console.log('[GameIframe] Initializing minigame with sessionId:', sessionId);
-    console.log('[GameIframe] sessionId from context:', sessionId);
-    console.log('[GameIframe] sessionIdRef.current:', sessionIdRef.current);
-
     const initMinigame = async () => {
-      // Use the latest sessionId from ref to avoid stale closures
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) {
-        console.error('[GameIframe] Session ID became undefined during initialization');
         setError('Session invalid, cannot initialize minigame');
         setLoading(false);
         if (initKeyRef.current === initKey) {
@@ -130,7 +110,6 @@ export const GameIframe: React.FC<GameIframeProps> = ({
 
       try {
         setLoading(true);
-        console.log('[GameIframe] Calling getMinigame with sessionId:', currentSessionId);
         const response = await getMinigame({
           gameType: gameId,
           sessionId: currentSessionId,
@@ -148,85 +127,57 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           menuId: menuId ?? undefined,
         });
 
-        // Only process response if this is still the current request
-        if (initKeyRef.current !== initKey) {
-          console.log('[GameIframe] Response received but parameters changed, ignoring');
-          return;
-        }
+        if (initKeyRef.current !== initKey) return;
 
-        console.log('[GameIframe] init response adResponse:', response.adResponse);
         setIframeUrl(response.adResponse.iframe_url);
-        // Callback with the ad_id for tracking
+        if (response.adResponse.serve_id) {
+          setServeId(response.adResponse.serve_id);
+        }
         if (onAdIdReceived && response.adResponse.ad_id) {
           onAdIdReceived(response.adResponse.ad_id);
         }
         if (onServeIdReceived && response.adResponse.serve_id) {
-          console.log('[GameIframe] firing onServeIdReceived with:', response.adResponse.serve_id);
           onServeIdReceived(response.adResponse.serve_id);
-        } else {
-          console.warn('[GameIframe] serve_id missing from response or callback not provided', {
-            hasCallback: !!onServeIdReceived,
-            serve_id: response.adResponse.serve_id,
-          });
         }
       } catch (err) {
-        // Only set error if this is still the current request
-        if (initKeyRef.current !== initKey) {
-          console.log('[GameIframe] Error occurred but parameters changed, ignoring');
-          return;
-        }
+        if (initKeyRef.current !== initKey) return;
         console.error('Error initializing minigame:', err);
         setError('Failed to load game. Please try again.');
       } finally {
-        // Only update loading state if this is still the current request
         if (initKeyRef.current === initKey) {
           setLoading(false);
           currentRequestRef.current = null;
-          // Don't clear initKeyRef here - let the next effect run decide
         }
       }
     };
 
-    // Store the promise and execute
     const requestPromise = initMinigame();
     currentRequestRef.current = requestPromise;
 
-    // Cleanup function
     return () => {
-      // If parameters changed, the new effect will handle it
-      // We don't need to abort here since we check initKeyRef in the async function
-      console.log('[GameIframe] Cleanup for key:', initKey);
+      // Parameter-change detection handled via initKeyRef inside the async
+      // function — no abort needed here.
     };
   }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId, menuId]);
 
-  // Handle ESC key to close
+  // ESC to close + lock body scroll while open
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
-
     document.addEventListener('keydown', handleEscape);
-    // Prevent body scroll when iframe is open
     document.body.style.overflow = 'hidden';
-
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
     };
   }, [onClose]);
 
-  // Handle click outside (on overlay) to close
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === overlayRef.current) {
-      onClose();
-    }
+    if (e.target === overlayRef.current) onClose();
   };
 
-  // Calculate container height based on playableHeight prop (matches RN SDK logic)
-  // On mobile bottom sheets the drag handle lives inside the container, so we add
-  // HANDLE_HEIGHT so the specified playableHeight maps to actual game (iframe) size.
+  // Calculate container height based on playableHeight prop (bottom sheet mode).
   const handleOffset = !isDesktop ? HANDLE_HEIGHT : 0;
 
   const { containerHeight, isBottomSheet } = useMemo(() => {
@@ -237,7 +188,6 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     const screenHeight = window.innerHeight;
 
     if (typeof playableHeight === 'number') {
-      // Treat values between 0 and 1 (exclusive) as percentages (e.g., 0.8 = 80%)
       if (playableHeight > 0 && playableHeight < 1) {
         if (playableHeight >= 0.95) {
           return { containerHeight: null, isBottomSheet: false };
@@ -256,7 +206,6 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       if (playableHeight.toLowerCase() === 'auto') {
         return { containerHeight: null, isBottomSheet: false };
       }
-
       if (playableHeight.includes('%')) {
         const pct = parseFloat(playableHeight) / 100;
         if (!isNaN(pct)) {
@@ -267,8 +216,6 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           return { containerHeight: computed, isBottomSheet: true };
         }
       }
-
-      // Numeric string without % (e.g., "600")
       const parsed = parseFloat(playableHeight);
       if (!isNaN(parsed)) {
         const clamped = Math.max(Math.min(parsed + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
@@ -282,19 +229,12 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     return { containerHeight: null, isBottomSheet: false };
   }, [playableHeight, MIN_PLAYABLE_HEIGHT, handleOffset]);
 
-  // Effective height: user-resized overrides calculated
-  // If banner is enabled and game is not fullscreen, add 50px for the banner
-  const bannerHeight = BANNER_HEIGHT;
   const baseHeight = resizedHeight ?? containerHeight;
-  const isFullscreen = baseHeight === null || baseHeight >= window.innerHeight - bannerHeight;
-  const effectiveHeight = (bannerEnabled && baseHeight !== null && !isFullscreen)
-    ? Math.min(baseHeight + bannerHeight, window.innerHeight)
-    : baseHeight;
+  const effectiveHeight = baseHeight;
 
   // Re-clamp resizedHeight on window resize
   useEffect(() => {
     if (resizedHeight === null) return;
-
     const handleResize = () => {
       const screenHeight = window.innerHeight;
       const clamped = Math.max(Math.min(resizedHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
@@ -304,12 +244,11 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         setResizedHeight(clamped);
       }
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [resizedHeight]);
 
-  // Drag-to-resize handlers (Pointer Events for unified mouse+touch)
+  // Drag-to-resize handlers (mobile bottom sheet)
   const handleDragStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -321,119 +260,22 @@ export const GameIframe: React.FC<GameIframeProps> = ({
 
   const handleDragMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
-    const deltaY = dragStartY.current - e.clientY; // up = positive = taller
+    const deltaY = dragStartY.current - e.clientY;
     const screenHeight = window.innerHeight;
     const newHeight = Math.max(Math.min(dragStartHeight.current + deltaY, screenHeight), MIN_PLAYABLE_HEIGHT);
     setResizedHeight(newHeight);
-  }, [isDragging]);
+  }, [isDragging, MIN_PLAYABLE_HEIGHT]);
 
   const handleDragEnd = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     setIsDragging(false);
-
-    // Snap to fullscreen if >= 95% of screen height
     if (resizedHeight !== null && resizedHeight >= window.innerHeight * 0.95) {
       setResizedHeight(window.innerHeight);
     }
   }, [isDragging, resizedHeight]);
 
-  const gameContent = (
-    <>
-      {/* Bottom sheet header with draggable handle */}
-      {isBottomSheet && !isDesktop && (
-        <div
-          onPointerDown={handleDragStart}
-          onPointerMove={handleDragMove}
-          onPointerUp={handleDragEnd}
-          onPointerCancel={handleDragEnd}
-          style={{
-            width: '100%',
-            backgroundColor: playableBorderColor,
-            borderTopLeftRadius: '16px',
-            borderTopRightRadius: '16px',
-            padding: '12px 0',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            pointerEvents: 'auto',
-            cursor: isDragging ? 'grabbing' : 'grab',
-            touchAction: 'none',
-            userSelect: 'none',
-          }}
-        >
-          <div
-            style={{
-              width: '36px',
-              height: '4px',
-              backgroundColor: 'rgba(0, 0, 0, 0.2)',
-              borderRadius: '2px',
-            }}
-          />
-        </div>
-      )}
-
-      <CloseButton
-        onClick={onClose}
-        ariaLabel="Close game"
-        style={{
-          position: 'absolute',
-          top: '50px',
-          right: '16px',
-          zIndex: 10002,
-          pointerEvents: 'auto',
-        }}
-      />
-
-      {loading && (
-        <div style={{
-          color: '#FFFFFF',
-          fontSize: '18px',
-          fontWeight: '500',
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          Loading game...
-        </div>
-      )}
-
-      {error && (
-        <div style={{
-          color: '#FFFFFF',
-          fontSize: '18px',
-          fontWeight: '500',
-          textAlign: 'center',
-          padding: '20px',
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && iframeUrl && (
-        <iframe
-          src={iframeUrl}
-          style={{
-            width: '100%',
-            flex: 1,
-            minHeight: 0,
-            border: 'none',
-            display: 'block',
-            pointerEvents: 'auto',
-          }}
-          title={`Game: ${gameId}`}
-          allow="fullscreen"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
-        />
-      )}
-
-    </>
-  );
+  const shellReady = !loading && !error && iframeUrl;
 
   return (
     <div
@@ -457,105 +299,119 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       aria-label="Game iframe"
     >
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
 
-      {isDesktop ? (
-        /* Desktop: flex row with optional left rail, phone case, right rail */
-        <div
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: !isDesktop && effectiveHeight !== null ? `${effectiveHeight}px` : '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: !isDesktop && isBottomSheet ? 'flex-end' : 'center',
+          pointerEvents: 'none',
+          transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          ...(!isDesktop && isBottomSheet ? { animation: 'slideUp 0.3s ease-out' } : {}),
+        }}
+      >
+        {/* Bottom-sheet drag handle (mobile only, when playableHeight is set) */}
+        {isBottomSheet && !isDesktop && (
+          <div
+            onPointerDown={handleDragStart}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+            onPointerCancel={handleDragEnd}
+            style={{
+              width: '100%',
+              backgroundColor: playableBorderColor,
+              borderTopLeftRadius: '16px',
+              borderTopRightRadius: '16px',
+              padding: '12px 0',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              pointerEvents: 'auto',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
+            }}
+          >
+            <div
+              style={{
+                width: '36px',
+                height: '4px',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: '2px',
+              }}
+            />
+          </div>
+        )}
+
+        <CloseButton
+          onClick={onClose}
+          ariaLabel="Close game"
           style={{
+            position: 'absolute',
+            top: '50px',
+            right: '16px',
+            zIndex: 10002,
+            pointerEvents: 'auto',
+          }}
+        />
+
+        {loading && (
+          <div style={{
+            color: '#FFFFFF',
+            fontSize: '18px',
+            fontWeight: '500',
+            flex: 1,
             display: 'flex',
-            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '24px',
-            height: '100%',
-            pointerEvents: 'none',
-          }}
-        >
-          {/* Left rail — only at wide viewports */}
-          {bannerEnabled && showBothRails && (
-            <div style={{ pointerEvents: 'auto', flexShrink: 0 }}>
-              <AditudeSlot baseDivId=".htlad-rightrail" width={300} height={600} label="Right Rail Ad" />
-            </div>
-          )}
-
-          {/* Phone case + banner above */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                maxWidth: '380px',
-                minWidth: '380px',
-                height: 'min(932px, 90vh)',
-                minHeight: 'min(932px, 90vh)',
-                display: 'flex',
-                flexDirection: 'column',
-                borderRadius: '40px',
-                border: '2px solid rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-                overflow: 'hidden',
-                pointerEvents: 'none',
-                backgroundColor: '#000',
-              }}
-            >
-              {gameContent}
-            </div>
+          }}>
+            Loading game...
           </div>
+        )}
 
-          {/* Right rail */}
-          {bannerEnabled && (
-            <div style={{ pointerEvents: 'auto', flexShrink: 0 }}>
-              <AditudeSlot baseDivId=".htlad-rightrail" width={300} height={600} label="Right Rail Ad" />
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Mobile: existing behavior */
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            height: effectiveHeight !== null ? `${effectiveHeight}px` : '100%',
+        {error && (
+          <div style={{
+            color: '#FFFFFF',
+            fontSize: '18px',
+            fontWeight: '500',
+            textAlign: 'center',
+            padding: '20px',
+            flex: 1,
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: isBottomSheet ? 'flex-end' : 'center',
-            pointerEvents: 'none',
-            transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-            ...(isBottomSheet ? {
-              animation: 'slideUp 0.3s ease-out',
-            } : {}),
-          }}
-        >
-          {bannerEnabled && (
-            <div
-              style={{
-                width: '100%',
-                height: `${bannerHeight}px`,
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                pointerEvents: 'auto',
-                zIndex: 10001,
-              }}
-            >
-              <AditudeSlot baseDivId=".htlad-anchor" width={320} height={50} label="Banner Ad" />
-            </div>
-          )}
-          {gameContent}
-        </div>
-      )}
+            justifyContent: 'center',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {shellReady && (
+          <div
+            style={{
+              width: '100%',
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              pointerEvents: 'auto',
+            }}
+          >
+            <WidgetShell
+              variant="game"
+              gameUrl={iframeUrl!}
+              showBanner={showBanner}
+              serveId={serveId}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

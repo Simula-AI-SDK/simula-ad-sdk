@@ -7,7 +7,7 @@ import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
-import { AditudeSlot } from '../aditude/AditudeSlot';
+import { WidgetShell } from '../WidgetShell';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -328,7 +328,10 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
 
     if (!adFetched) {
-      // In devMode, skip real ad fetch and go straight to aditude placeholder
+      // In devMode, skip real ad fetch and go straight to aditude placeholder.
+      // Fire the close-flow medrec report immediately (race-resistant against
+      // tab-close navigation). The WidgetShell bridge skips medrec divIds to
+      // avoid double-counting, so banner/rails are reported separately.
       if (devMode) {
         setShouldFetchAditude(true);
         setAdFetched(true);
@@ -354,8 +357,10 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         }
         adFetchingRef.current = false;
       }
-      // If ad fetch fails or no ad ID, try aditude as fallback
-      // In devMode, show placeholder; in prod, show real ad
+      // If ad fetch fails or no ad ID, try aditude as fallback.
+      // Fire close-flow medrec report immediately (race-resistant against
+      // tab-close). WidgetShell's bridge skips medrec divIds to avoid
+      // double-counting, and reports banner/rails separately.
       if (aditudeReady && aditudeConfig?.enabled) {
         setShouldFetchAditude(true);
         setAdFetched(true);
@@ -638,7 +643,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
           >
             Ad
           </span>
-          <AditudeSlot baseDivId=".htlad-medrec" width={300} height={250} label="medrec" />
+          <WidgetShell variant="medrec" serveId={currentServeId} />
         </div>
       )}
 

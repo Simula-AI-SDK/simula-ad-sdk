@@ -1,8 +1,8 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
 
-const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-// const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
-// const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
+export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
+// export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
 
 // Create a server session and return its id
@@ -448,6 +448,11 @@ export const reportAdInterstitial = async (params: {
 }): Promise<void> => {
   try {
     console.log('[reportAdInterstitial] fetching', params);
+    // keepalive: true — the close-flow variant of this call fires
+    // immediately before the user navigates away. Without keepalive the
+    // browser aborts the beacon on tab close / navigation, losing the
+    // impression. Worker:4 verified this race against dev.3.0 on
+    // coolaigames.com and recommended the flag.
     const response = await fetch(`${API_BASE_URL}/minigames/play/${encodeURIComponent(params.serveId)}/ad-interstitial`, {
       method: 'POST',
       headers: {
@@ -459,6 +464,7 @@ export const reportAdInterstitial = async (params: {
         ad_source: params.adSource,
         rendered_format: params.renderedFormat ?? null,
       }),
+      keepalive: true,
     });
     console.log('[reportAdInterstitial] response status:', response.status);
   } catch (error) {
