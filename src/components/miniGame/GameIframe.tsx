@@ -51,6 +51,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   const overlayRef = useRef<HTMLDivElement>(null);
   const { sessionId } = useSimula();
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [serveId, setServeId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const sessionIdRef = useRef<string | undefined>(sessionId);
@@ -129,6 +130,9 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         if (initKeyRef.current !== initKey) return;
 
         setIframeUrl(response.adResponse.iframe_url);
+        if (response.adResponse.serve_id) {
+          setServeId(response.adResponse.serve_id);
+        }
         if (onAdIdReceived && response.adResponse.ad_id) {
           onAdIdReceived(response.adResponse.ad_id);
         }
@@ -402,6 +406,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
               variant="game"
               gameUrl={iframeUrl!}
               showBanner={showBanner}
+              serveId={serveId}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
