@@ -185,7 +185,10 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
       if (adFetchingRef.current) return;
       adFetchingRef.current = true;
 
-      // In devMode, skip real ad and use aditude placeholder
+      // In devMode, skip real ad and use aditude placeholder.
+      // Fire the close-flow medrec report immediately (race-resistant against
+      // tab-close navigation). WidgetShell's bridge skips medrec divIds to
+      // avoid double-counting; banner/rails are reported separately by it.
       if (devMode) {
         if (!cancelled) {
           setShowAditude(true);
@@ -212,7 +215,9 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
         }
       }
 
-      // Fallback: aditude if available
+      // Fallback: aditude if available.
+      // Close-flow reportAd fires immediately to beat any tab-close race;
+      // WidgetShell's bridge handles banner/rails (if any) and skips medrec.
       if (!cancelled && (aditudeReady && aditudeConfig?.enabled)) {
         setShowAditude(true);
         startAdCountdown();
@@ -592,7 +597,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
               >
                 Ad
               </span>
-              <WidgetShell variant="rewarded_medrec" />
+              <WidgetShell variant="rewarded_medrec" serveId={serveId} />
             </div>
           )}
 

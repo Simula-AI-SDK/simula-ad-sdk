@@ -448,6 +448,11 @@ export const reportAdInterstitial = async (params: {
 }): Promise<void> => {
   try {
     console.log('[reportAdInterstitial] fetching', params);
+    // keepalive: true — the close-flow variant of this call fires
+    // immediately before the user navigates away. Without keepalive the
+    // browser aborts the beacon on tab close / navigation, losing the
+    // impression. Worker:4 verified this race against dev.3.0 on
+    // coolaigames.com and recommended the flag.
     const response = await fetch(`${API_BASE_URL}/minigames/play/${encodeURIComponent(params.serveId)}/ad-interstitial`, {
       method: 'POST',
       headers: {
@@ -459,6 +464,7 @@ export const reportAdInterstitial = async (params: {
         ad_source: params.adSource,
         rendered_format: params.renderedFormat ?? null,
       }),
+      keepalive: true,
     });
     console.log('[reportAdInterstitial] response status:', response.status);
   } catch (error) {
