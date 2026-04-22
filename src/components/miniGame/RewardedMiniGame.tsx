@@ -611,7 +611,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
                 top: '8px',
                 right: '8px',
                 zIndex: 10001,
-                padding: '3px',
+                padding: '3px 6px',
                 fontSize: '10px',
                 fontWeight: '700',
                 color: '#000000',
