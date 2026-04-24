@@ -14,6 +14,14 @@ export interface SimulaImperativeContextValue {
   onEvent: (type: SimulaEventType, payload: unknown) => void;
   /** Request the imperative owner to tear down the visible child tree. */
   onImperativeClose: () => void;
+  /**
+   * Advance the imperative manager's internal phase machine. Today only
+   * SimulaMiniGameInterstitial consumes this — `'interstitial:cta'`
+   * transitions interstitial → fullInvitation, and
+   * `'fullInvitation:accept'` transitions fullInvitation → game. Unknown
+   * tokens are ignored by managers that don't recognize them.
+   */
+  onImperativeAdvance?: (token: string) => void;
 }
 
 export const SimulaImperativeContext = createContext<SimulaImperativeContextValue | null>(null);

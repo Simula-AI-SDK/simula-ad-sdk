@@ -63,11 +63,20 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
   }, [onClose, imperativeCtx]);
 
   const handleCtaClick = useCallback(() => {
-    // Imperative owner fires CLICKED + CLOSED + tears down before the
-    // declarative path runs. Declarative behavior unchanged when ctx is null.
-    imperativeCtx?.onEvent('CLICKED', null);
-    imperativeCtx?.onEvent('CLOSED', null);
-    imperativeCtx?.onImperativeClose();
+    if (imperativeCtx) {
+      // Imperative flow: CTA emits CLICKED and hands off to the manager's
+      // phase machine (interstitial → fullInvitation → game). The manager
+      // unmounts this component by moving the tree forward; we intentionally
+      // do NOT emit CLOSED and do NOT call onImperativeClose here. Keeping
+      // `closedInternally` unset lets the manager decide when the
+      // declarative tree comes down.
+      imperativeCtx.onEvent('CLICKED', null);
+      imperativeCtx.onImperativeAdvance?.('interstitial:cta');
+      onClick();
+      return;
+    }
+    // Declarative flow unchanged: fire CTA callback and let the parent
+    // close via `isOpen=false`.
     setClosedInternally(true);
     onClick();
   }, [onClick, imperativeCtx]);

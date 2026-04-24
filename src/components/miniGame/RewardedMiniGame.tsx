@@ -21,6 +21,8 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
   onRewardVerified,
   onRewardVerificationFailed,
   messages = [],
+  _preloadedRewarded,
+  _preloadedFallbackAdUrl,
 }) => {
   const { sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
   const imperativeCtx = useContext(SimulaImperativeContext);
@@ -94,11 +96,36 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
     }
   }, [isOpen, phase, resetState]);
 
-  // Phase: loading — init the rewarded game
+  // Phase: loading — init the rewarded game.
+  // Imperative preload short-circuit: when `_preloadedRewarded` is provided
+  // by SimulaRewardedMiniGame.load(), hydrate from it and skip the network
+  // call. The preload path already emitted LOADED, so user-visible loading
+  // should be near-zero here.
   useEffect(() => {
     if (phase !== 'loading') return;
     if (!sessionIdRef.current) {
       setError('Session invalid');
+      return;
+    }
+
+    if (_preloadedRewarded) {
+      try {
+        const response = _preloadedRewarded;
+        if (!response.iframe_url || !response.serve_id) {
+          throw new Error('Preloaded rewarded payload missing iframe_url / serve_id');
+        }
+        setIframeUrl(response.iframe_url);
+        setServeId(response.serve_id);
+        setAdId(response.ad_id);
+        setDurationSeconds(response.duration_seconds);
+        setPlayCountdown(response.duration_seconds);
+        setPhase('playing');
+        playStartRef.current = Date.now();
+      } catch (err) {
+        console.error('[RewardedMiniGame] Failed to hydrate preloaded rewarded payload:', err);
+        setError('Failed to load game.');
+        imperativeCtx?.onEvent('DISPLAY_FAILED', { error: err });
+      }
       return;
     }
 
@@ -138,7 +165,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
 
     init();
     return () => { cancelled = true; };
-  }, [phase, charID, charName, charImage, charDesc, clampedThreshold, imperativeCtx]);
+  }, [phase, charID, charName, charImage, charDesc, clampedThreshold, imperativeCtx, _preloadedRewarded]);
 
   // Imperative-only: emit DISPLAYED once when the rewarded game iframe
   // actually becomes visible to the user (phase playing + iframeUrl loaded).
@@ -212,6 +239,19 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
         return;
       }
 
+      // Imperative preload short-circuit: use the prefetched fallback ad
+      // URL when the manager provided one. Preserves declarative behavior
+      // for all other callers.
+      if (_preloadedFallbackAdUrl) {
+        if (!cancelled) {
+          setAdIframeUrl(_preloadedFallbackAdUrl);
+          startAdCountdown();
+          reportAd('simula');
+        }
+        adFetchingRef.current = false;
+        return;
+      }
+
       // Try to fetch the real ad
       if (adId) {
         try {
@@ -249,7 +289,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
 
     loadAd();
     return () => { cancelled = true; };
-  }, [phase, adId, devMode, aditudeReady, aditudeConfig]);
+  }, [phase, adId, devMode, aditudeReady, aditudeConfig, _preloadedFallbackAdUrl]);
 
   // Start the 5-second ad countdown
   const startAdCountdown = useCallback(() => {

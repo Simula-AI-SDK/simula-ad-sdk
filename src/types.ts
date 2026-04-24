@@ -233,6 +233,40 @@ export interface GameData {
   gifCover?: string; // GIF cover image URL for card display
 }
 
+/**
+ * Internal-only preloaded entry hook used by the imperative interstitial path
+ * to open MiniGameMenu directly into a preselected sponsored game without
+ * mounting the grid UI or firing a menu-click beacon.
+ *
+ * NOT part of the public declarative API — treat this as an internal contract
+ * between `SimulaMiniGameInterstitial` and `MiniGameMenu`.
+ *
+ * @internal
+ */
+export interface MiniGameMenuPreloadedEntry {
+  /** Sponsored game id to open immediately. */
+  gameId: string;
+  /** Sponsored game name (used for onGameOpen / onGameClose callbacks). */
+  gameName: string;
+  /** Sponsored game description (used for onGameOpen callback). */
+  gameDescription: string;
+  /** Pre-fetched catalog so the menu can skip its own fetchCatalog. Optional. */
+  games?: GameData[];
+  /** Pre-fetched menu id (if any). Optional. */
+  menuId?: string | null;
+  /**
+   * Pre-fetched minigame bootstrap. When present, the underlying GameIframe
+   * skips its own getMinigame() call and renders from this payload directly.
+   */
+  preloadedMinigame?: MinigameResponse;
+  /**
+   * Pre-fetched fallback-ad iframe URL for the post-game ad slot. `null` /
+   * `undefined` means nothing prefetched; the component will fall back to
+   * its existing network behavior.
+   */
+  preloadedFallbackAdUrl?: string | null;
+}
+
 export interface MiniGameMenuProps {
   isOpen: boolean;
   onClose: () => void;
@@ -256,6 +290,16 @@ export interface MiniGameMenuProps {
   onGameClose?: (gameName: string) => void;
   /** Whether to show a banner ad at the top of the minigame iframe. Default: true */
   showBanner?: boolean;
+  /**
+   * Internal-only. When provided, MiniGameMenu opens directly into the given
+   * sponsored game without rendering the selection grid, does NOT fire
+   * `trackMenuGameClick`, and forwards the preloaded minigame bootstrap /
+   * fallback-ad URL to the child components. Set by the imperative
+   * interstitial manager; public declarative callers should leave it
+   * undefined.
+   * @internal
+   */
+  _preloadedEntry?: MiniGameMenuPreloadedEntry;
 }
 
 export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';
@@ -412,6 +456,20 @@ export interface RewardedMiniGameProps {
   onRewardVerificationFailed?: () => void;
   /** Conversation history passed through to post-game MiniGameMenu. */
   messages?: Message[];
+  /**
+   * Internal-only. Pre-fetched rewarded bootstrap. When present, the
+   * component skips its own initRewardedGame() call and enters the 'playing'
+   * phase directly from this payload. Set by SimulaRewardedMiniGame after
+   * `.load()` preload settles.
+   * @internal
+   */
+  _preloadedRewarded?: InitRewardedResponse;
+  /**
+   * Internal-only. Pre-fetched fallback-ad iframe URL for the post-game ad
+   * slot. Skips the fetchAdForMinigame() call during the 'ad' phase when set.
+   * @internal
+   */
+  _preloadedFallbackAdUrl?: string | null;
 }
 
 // NativeBanner types

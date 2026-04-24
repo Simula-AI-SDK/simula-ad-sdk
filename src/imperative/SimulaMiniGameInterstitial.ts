@@ -2,10 +2,22 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { SimulaProvider } from '../SimulaProvider';
 import { MiniGameInterstitial } from '../components/miniGame/MiniGameInterstitial';
+import { InterstitialFullGameInvitation } from '../components/miniGame/InterstitialFullGameInvitation';
+import { MiniGameMenu } from '../components/miniGame/MiniGameMenu';
 import { SimulaImperativeContext } from './SimulaImperativeContext';
 import { ReadinessProbe } from './ReadinessProbe';
 import { EventRegistry } from './events';
-import { clampMinPlayThreshold } from './utils';
+import {
+  clampMinPlayThreshold,
+  selectSponsoredGame,
+  normalizeFallbackAd,
+  type InterstitialPreloadCache,
+} from './utils';
+import {
+  fetchCatalog,
+  getMinigame,
+  fetchAdForMinigame,
+} from '../utils/api';
 import type {
   InterstitialInitConfig,
   ImperativeShowParams,
@@ -16,22 +28,31 @@ import type {
 
 const LOAD_TIMEOUT_MS = 15000;
 
+type Phase = 'interstitial' | 'fullInvitation' | 'game';
+
 /**
- * Imperative wrapper over the declarative `MiniGameInterstitial`.
+ * Imperative wrapper over the declarative interstitial + full-game flow.
  *
  * Lifecycle:
  *  - `.init(config)` constructs the manager (static factory).
  *  - `.load()` creates a hidden DOM host, mounts a private SimulaProvider
- *    tree via legacy `ReactDOM.render`, and resolves when the ReadinessProbe
- *    sees a truthy `sessionId`. Idempotent.
- *  - `.show(params)` flips the host visible and mounts a fresh
- *    `<MiniGameInterstitial key={showNonce} isOpen=true />` child. If called
- *    before `.load()` completes, queues the payload and consumes it on ready.
- *  - The declarative component calls back through `SimulaImperativeContext`
- *    on CTA / close, which in turn invokes `onImperativeClose()` and
- *    re-renders the tree with the visible child nulled out so the component
- *    unmounts cleanly.
- *  - `.dispose()` unmounts + removes the host and short-circuits late state.
+ *    tree via legacy `ReactDOM.render`, waits for both ReadinessProbe
+ *    (session-ready) AND a content preload stage (catalog → sponsored-game
+ *    selection → getMinigame bootstrap → fallback-ad prefetch) to settle
+ *    before emitting `LOADED`. Idempotent.
+ *  - `.show(params)` flips the host visible and transitions through the
+ *    three phases: `interstitial` (fullscreen CTA card) →
+ *    `fullInvitation` (internal-only invite) → `game` (MiniGameMenu
+ *    preloaded directly into the sponsored game, never shows the grid).
+ *  - CTA on the fullscreen interstitial emits `CLICKED` and advances to
+ *    `fullInvitation`. It does NOT emit `CLOSED` and does NOT teardown.
+ *  - Explicit dismiss paths (X, ESC, fullInvitation "Not Now") emit
+ *    `CLOSED` and tear down the visible tree.
+ *  - Terminal close from the game/ad flow tears down without firing a
+ *    redundant `CLOSED` from the imperative side (the declarative
+ *    components already emit it through the context).
+ *  - `.dispose()` unmounts + removes the host, clears timers + promise
+ *    refs + cached preload payload so a later `.load()` starts clean.
  */
 export class SimulaMiniGameInterstitial {
   private readonly config: InterstitialInitConfig;
@@ -47,9 +68,22 @@ export class SimulaMiniGameInterstitial {
   private _loadReject: ((err: Error) => void) | null = null;
   private _loadTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Session-ready + content-ready latches. LOADED fires only after BOTH
+  // settle; either failing clears both and fires LOAD_FAILED.
+  private _sessionReady: boolean = false;
+  private _contentReady: boolean = false;
+  private _preload: InterstitialPreloadCache | null = null;
+  // Tracks whether an in-flight content preload has been started so a
+  // duplicate ReadinessProbe fire (unlikely, but defensive) doesn't kick
+  // off a second pipeline.
+  private _preloadStarted: boolean = false;
+
   private _pendingShowParams: ImperativeShowParams | null = null;
   private _currentShowParams: ImperativeShowParams | null = null;
   private _showNonce: number = 0;
+  private _phase: Phase = 'interstitial';
+  // DISPLAY_FAILED fires at most once per show cycle.
+  private _displayFailedFired: boolean = false;
 
   private constructor(config: InterstitialInitConfig) {
     this.config = {
@@ -94,6 +128,11 @@ export class SimulaMiniGameInterstitial {
       if (this._ready || this.disposed) return;
       this._emitLoadFailed(new Error('Load timeout'));
     }, LOAD_TIMEOUT_MS);
+
+    this._sessionReady = false;
+    this._contentReady = false;
+    this._preloadStarted = false;
+    this._preload = null;
 
     this._renderTree();
   }
@@ -151,6 +190,11 @@ export class SimulaMiniGameInterstitial {
     this._loadInFlight = null;
     this._pendingShowParams = null;
     this._currentShowParams = null;
+    this._sessionReady = false;
+    this._contentReady = false;
+    this._preload = null;
+    this._preloadStarted = false;
+    this._displayFailedFired = false;
 
     if (this.host) {
       try { ReactDOM.unmountComponentAtNode(this.host); } catch { /* ignore */ }
@@ -161,6 +205,7 @@ export class SimulaMiniGameInterstitial {
     }
     this._ready = false;
     this._visible = false;
+    this._phase = 'interstitial';
   }
 
   // ---------- internals ----------
@@ -177,8 +222,79 @@ export class SimulaMiniGameInterstitial {
     this.host = host;
   }
 
-  private _onReady = (_sessionId: string): void => {
+  private _onReady = (sessionId: string): void => {
     if (this.disposed || this._ready) return;
+    this._sessionReady = true;
+    this._maybeStartContentPreload(sessionId);
+    this._maybeEmitLoaded();
+  };
+
+  private _maybeStartContentPreload(sessionId: string): void {
+    if (this.disposed || this._preloadStarted) return;
+    this._preloadStarted = true;
+
+    // Capture the load in-flight promise identity; if a dispose or
+    // LOAD_FAILED nulls `_loadInFlight` or rotates it, we must NOT commit
+    // stale preload payloads onto the instance.
+    const loadToken = this._loadInFlight;
+
+    (async () => {
+      try {
+        const catalog = await fetchCatalog();
+        if (this.disposed || this._loadInFlight !== loadToken) return;
+
+        const selectedGame = selectSponsoredGame(catalog.games);
+        if (!selectedGame) {
+          throw new Error('No sponsored game available in catalog');
+        }
+
+        const minigame = await getMinigame({
+          gameType: selectedGame.id,
+          sessionId,
+          currencyMode: false,
+          w: typeof window !== 'undefined' ? window.innerWidth : 0,
+          h: typeof window !== 'undefined' ? window.innerHeight : 0,
+          delegate_char: this.config.delegateChar ?? true,
+          menuId: catalog.menuId || undefined,
+        });
+        if (this.disposed || this._loadInFlight !== loadToken) return;
+        if (!minigame || !minigame.adResponse || !minigame.adResponse.iframe_url) {
+          throw new Error('getMinigame returned no iframe_url');
+        }
+
+        // Fallback-ad prefetch — best-effort. `null` is an acceptable
+        // "no ad available" settlement; we represent it as `{ kind: 'none' }`
+        // rather than failing the preload.
+        const adId = minigame.adResponse.ad_id;
+        let fallbackUrl: string | null = null;
+        if (adId) {
+          try {
+            fallbackUrl = await fetchAdForMinigame(adId, sessionId);
+          } catch {
+            fallbackUrl = null;
+          }
+        }
+        if (this.disposed || this._loadInFlight !== loadToken) return;
+
+        this._preload = {
+          catalog: catalog.games,
+          menuId: catalog.menuId || null,
+          selectedGame,
+          minigame,
+          fallbackAd: normalizeFallbackAd(fallbackUrl),
+        };
+        this._contentReady = true;
+        this._maybeEmitLoaded();
+      } catch (err) {
+        if (this.disposed || this._loadInFlight !== loadToken) return;
+        this._emitLoadFailed(err);
+      }
+    })();
+  }
+
+  private _maybeEmitLoaded(): void {
+    if (this.disposed || this._ready) return;
+    if (!this._sessionReady || !this._contentReady) return;
     this._ready = true;
     if (this._loadTimeout) {
       clearTimeout(this._loadTimeout);
@@ -190,7 +306,7 @@ export class SimulaMiniGameInterstitial {
     this._loadInFlight = null;
     this.events.emit('LOADED', null);
     if (resolve) resolve();
-  };
+  }
 
   private _emitLoadFailed(err: unknown): void {
     if (this._loadTimeout) {
@@ -202,6 +318,10 @@ export class SimulaMiniGameInterstitial {
     this._loadReject = null;
     this._loadInFlight = null;
     this._pendingShowParams = null;
+    this._sessionReady = false;
+    this._contentReady = false;
+    this._preload = null;
+    this._preloadStarted = false;
 
     // Tear down hidden host so a subsequent .load() can start clean.
     if (this.host) {
@@ -220,18 +340,63 @@ export class SimulaMiniGameInterstitial {
   }
 
   private _onImperativeClose = (): void => {
-    // Declarative component requested teardown (CTA / X / ESC).
+    // Declarative component requested teardown (X / ESC / fullInvitation
+    // dismiss / terminal game+ad close / DISPLAY_FAILED).
     if (this.disposed) return;
     this._visible = false;
     this._currentShowParams = null;
     this._pendingShowParams = null;
+    this._phase = 'interstitial';
+    this._displayFailedFired = false;
+    // Preload is single-use: a fresh LOADED cycle must start clean.
+    // Clear `_ready` + preload caches so the next `.show()` requires a
+    // fresh `.load()` — matches plan §Testing ACs.
+    this._ready = false;
+    this._sessionReady = false;
+    this._contentReady = false;
+    this._preload = null;
+    this._preloadStarted = false;
+
     if (this.host) {
-      this.host.style.display = 'none';
+      try { ReactDOM.unmountComponentAtNode(this.host); } catch { /* ignore */ }
+      try {
+        if (this.host.parentNode) this.host.parentNode.removeChild(this.host);
+      } catch { /* ignore */ }
+      this.host = null;
     }
-    this._renderTree();
+  };
+
+  private _onImperativeAdvance = (token: string): void => {
+    if (this.disposed) return;
+    if (!this._visible) return;
+    if (token === 'interstitial:cta' && this._phase === 'interstitial') {
+      this._phase = 'fullInvitation';
+      this._showNonce += 1;
+      this._renderTree();
+      return;
+    }
+    if (token === 'fullInvitation:accept' && this._phase === 'fullInvitation') {
+      this._phase = 'game';
+      this._showNonce += 1;
+      this._renderTree();
+      return;
+    }
+    // Unknown token or unexpected phase — ignore.
   };
 
   private _onEvent = (type: SimulaEventType, payload: unknown): void => {
+    // GameIframe forwards DISPLAY_FAILED via the imperative context on mount
+    // failure. Dedupe + auto-teardown here so callers only ever see ONE
+    // DISPLAY_FAILED per show, and so CLOSED is NOT also emitted for the
+    // same failure per plan §Edge cases.
+    if (type === 'DISPLAY_FAILED') {
+      if (this._displayFailedFired) return;
+      this._displayFailedFired = true;
+      this.events.emit('DISPLAY_FAILED', payload);
+      // Tear down the visible tree; do NOT emit CLOSED.
+      this._onImperativeClose();
+      return;
+    }
     this.events.emit(type, payload);
   };
 
@@ -242,6 +407,8 @@ export class SimulaMiniGameInterstitial {
     this._pendingShowParams = null;
     this._currentShowParams = params;
     this._visible = true;
+    this._phase = 'interstitial';
+    this._displayFailedFired = false;
     this._showNonce += 1;
     this.host.style.display = 'block';
     this._renderTree();
@@ -252,6 +419,7 @@ export class SimulaMiniGameInterstitial {
     const ctxValue = {
       onEvent: this._onEvent,
       onImperativeClose: this._onImperativeClose,
+      onImperativeAdvance: this._onImperativeAdvance,
     };
 
     const children: React.ReactNode[] = [
@@ -259,17 +427,67 @@ export class SimulaMiniGameInterstitial {
     ];
 
     if (this._visible && this._currentShowParams) {
-      children.push(
-        React.createElement(MiniGameInterstitial, {
-          key: `show-${this._showNonce}`,
-          isOpen: true,
-          charImage: this._currentShowParams.charImage,
-          // CTA click is wired through the imperative context; provide a
-          // no-op prop so TypeScript's required `onClick` is satisfied.
-          onClick: () => { /* handled via SimulaImperativeContext */ },
-          onClose: () => { /* handled via SimulaImperativeContext */ },
-        }),
-      );
+      const params = this._currentShowParams;
+      if (this._phase === 'interstitial') {
+        children.push(
+          React.createElement(MiniGameInterstitial, {
+            key: `interstitial-${this._showNonce}`,
+            isOpen: true,
+            charImage: params.charImage,
+            // CTA / close / ESC route through SimulaImperativeContext; the
+            // required declarative callbacks are satisfied with no-ops so
+            // TypeScript stays happy.
+            onClick: () => { /* handled via SimulaImperativeContext */ },
+            onClose: () => { /* handled via SimulaImperativeContext */ },
+          }),
+        );
+      } else if (this._phase === 'fullInvitation') {
+        children.push(
+          React.createElement(InterstitialFullGameInvitation, {
+            key: `fullinvite-${this._showNonce}`,
+            isOpen: true,
+            charImage: params.charImage,
+            charName: params.charName,
+          }),
+        );
+      } else if (this._phase === 'game' && this._preload) {
+        const preload = this._preload;
+        children.push(
+          React.createElement(MiniGameMenu, {
+            key: `game-${this._showNonce}`,
+            isOpen: true,
+            onClose: () => {
+              // Terminal close from the game/ad flow. The declarative
+              // ad-close handlers already fired onGameClose; this routes
+              // the manager into teardown. CLOSED is NOT emitted here —
+              // the user dismissing after playing the game is not the
+              // same as dismissing the interstitial.
+              this._onImperativeClose();
+            },
+            charName: params.charName,
+            charID: params.charID,
+            charImage: params.charImage,
+            charDesc: params.charDesc,
+            messages: params.messages,
+            delegateChar: this.config.delegateChar ?? true,
+            _preloadedEntry: {
+              gameId: preload.selectedGame.id,
+              gameName: preload.selectedGame.name,
+              gameDescription: preload.selectedGame.description,
+              games: preload.catalog,
+              menuId: preload.menuId,
+              preloadedMinigame: preload.minigame,
+              preloadedFallbackAdUrl:
+                preload.fallbackAd.kind === 'iframe'
+                  ? preload.fallbackAd.iframeUrl
+                  : null,
+            },
+          }),
+        );
+        // DISPLAY_FAILED: GameIframe emits via SimulaImperativeContext on
+        // mount failure; this manager's `_onEvent` dedupes + auto-tears
+        // down. See plan §Edge cases.
+      }
     }
 
     const innerTree = React.createElement(

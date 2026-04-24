@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback, useContext } from 'react';
 import { getMinigame } from '../../utils/api';
-import { Message } from '../../types';
+import { Message, MinigameResponse } from '../../types';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
 import { WidgetShell } from '../WidgetShell';
+import { SimulaImperativeContext } from '../../imperative/SimulaImperativeContext';
 
 const MIN_GAME_HEIGHT = 500;
 const HANDLE_HEIGHT = 28; // 12px padding top + 4px bar + 12px padding bottom
@@ -28,6 +29,12 @@ interface GameIframeProps {
   playableBorderColor?: string;
   /** Whether to show a banner ad at the top of the game. Default: true */
   showBanner?: boolean;
+  /**
+   * Internal-only. Pre-fetched minigame bootstrap. When present, the iframe
+   * skips its own getMinigame() call and renders from this payload directly.
+   * @internal
+   */
+  _preloadedMinigame?: MinigameResponse;
 }
 
 export const GameIframe: React.FC<GameIframeProps> = ({
@@ -47,7 +54,9 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   playableHeight,
   playableBorderColor = '#262626',
   showBanner = true,
+  _preloadedMinigame,
 }) => {
+  const imperativeCtx = useContext(SimulaImperativeContext);
   const overlayRef = useRef<HTMLDivElement>(null);
   const { sessionId } = useSimula();
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
@@ -80,11 +89,54 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  // Fetch the minigame iframe URL (passed into WidgetShell as gameUrl)
+  // Track whether mount-failure has already been surfaced so _onMountFailed
+  // can only fire once per lifecycle. Matches the DISPLAY_FAILED-once
+  // contract in SimulaMiniGameInterstitial.
+  const mountFailedFiredRef = useRef(false);
+
+  // Fetch the minigame iframe URL (passed into WidgetShell as gameUrl).
+  // When `_preloadedMinigame` is provided by the imperative manager, skip
+  // the network call entirely and hydrate from the preload payload.
   useEffect(() => {
     if (!sessionId) {
-      setError('Session invalid, cannot initialize minigame');
+      const sessionErr = new Error('Session invalid, cannot initialize minigame');
+      setError(sessionErr.message);
       setLoading(false);
+      if (!mountFailedFiredRef.current) {
+        mountFailedFiredRef.current = true;
+        imperativeCtx?.onEvent('DISPLAY_FAILED', { error: sessionErr });
+      }
+      return;
+    }
+
+    // Imperative preload short-circuit: hydrate synchronously.
+    if (_preloadedMinigame) {
+      try {
+        const response = _preloadedMinigame;
+        if (!response.adResponse || !response.adResponse.iframe_url) {
+          throw new Error('Preloaded minigame payload missing iframe_url');
+        }
+        setIframeUrl(response.adResponse.iframe_url);
+        if (response.adResponse.serve_id) {
+          setServeId(response.adResponse.serve_id);
+        }
+        if (onAdIdReceived && response.adResponse.ad_id) {
+          onAdIdReceived(response.adResponse.ad_id);
+        }
+        if (onServeIdReceived && response.adResponse.serve_id) {
+          onServeIdReceived(response.adResponse.serve_id);
+        }
+        setError(null);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error hydrating preloaded minigame:', err);
+        setError('Failed to load game. Please try again.');
+        setLoading(false);
+        if (!mountFailedFiredRef.current) {
+          mountFailedFiredRef.current = true;
+          imperativeCtx?.onEvent('DISPLAY_FAILED', { error: err });
+        }
+      }
       return;
     }
 
@@ -99,11 +151,16 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     const initMinigame = async () => {
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) {
-        setError('Session invalid, cannot initialize minigame');
+        const sessionErr = new Error('Session invalid, cannot initialize minigame');
+        setError(sessionErr.message);
         setLoading(false);
         if (initKeyRef.current === initKey) {
           currentRequestRef.current = null;
           initKeyRef.current = null;
+        }
+        if (!mountFailedFiredRef.current) {
+          mountFailedFiredRef.current = true;
+          imperativeCtx?.onEvent('DISPLAY_FAILED', { error: sessionErr });
         }
         return;
       }
@@ -143,6 +200,10 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         if (initKeyRef.current !== initKey) return;
         console.error('Error initializing minigame:', err);
         setError('Failed to load game. Please try again.');
+        if (!mountFailedFiredRef.current) {
+          mountFailedFiredRef.current = true;
+          imperativeCtx?.onEvent('DISPLAY_FAILED', { error: err });
+        }
       } finally {
         if (initKeyRef.current === initKey) {
           setLoading(false);
@@ -158,7 +219,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       // Parameter-change detection handled via initKeyRef inside the async
       // function — no abort needed here.
     };
-  }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId, menuId]);
+  }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId, menuId, _preloadedMinigame, imperativeCtx]);
 
   // ESC to close + lock body scroll while open
   useEffect(() => {

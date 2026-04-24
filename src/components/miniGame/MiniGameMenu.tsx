@@ -37,14 +37,33 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   onGameOpen,
   onGameClose,
   showBanner = true,
+  _preloadedEntry,
 }) => {
   const { apiKey, sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
-  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
-  const [selectedGameName, setSelectedGameName] = useState<string | null>(null);
+  // Imperative direct-open mode: `_preloadedEntry` is set at mount time by
+  // SimulaMiniGameInterstitial. We skip the catalog + grid UI entirely, open
+  // straight into the preselected sponsored game, do NOT fire the menu-click
+  // beacon (no user tap happened), and forward the preloaded payloads to the
+  // child GameIframe. On terminal close (game + ad dismissed) we call
+  // `onClose()` once so the imperative manager can tear down.
+  const preloadedEntryRef = useRef(_preloadedEntry ?? null);
+  const directOpenMode = preloadedEntryRef.current !== null;
+  const onGameOpenFiredRef = useRef(false);
+
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(
+    preloadedEntryRef.current ? preloadedEntryRef.current.gameId : null,
+  );
+  const [selectedGameName, setSelectedGameName] = useState<string | null>(
+    preloadedEntryRef.current ? preloadedEntryRef.current.gameName : null,
+  );
   const [imageError, setImageError] = useState(false);
-  const [games, setGames] = useState<GameData[]>([]);
-  const [menuId, setMenuId] = useState<string | null>(null);
-  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [games, setGames] = useState<GameData[]>(
+    preloadedEntryRef.current?.games ?? [],
+  );
+  const [menuId, setMenuId] = useState<string | null>(
+    preloadedEntryRef.current?.menuId ?? null,
+  );
+  const [catalogLoading, setCatalogLoading] = useState(!directOpenMode);
   const [catalogError, setCatalogError] = useState(false);
   const [adFetched, setAdFetched] = useState(false);
   const [adIframeUrl, setAdIframeUrl] = useState<string | null>(null);
@@ -143,9 +162,23 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   };
 
 
-  // Fetch catalog when menu opens
+  // Imperative direct-open: fire onGameOpen once (mirrors what
+  // handleGameSelect would have done for a real menu tap).
+  useEffect(() => {
+    if (!directOpenMode) return;
+    if (onGameOpenFiredRef.current) return;
+    const entry = preloadedEntryRef.current;
+    if (!entry) return;
+    onGameOpenFiredRef.current = true;
+    onGameOpen?.(entry.gameName, entry.gameDescription);
+  }, [directOpenMode, onGameOpen]);
+
+  // Fetch catalog when menu opens.
+  // Skipped entirely in imperative direct-open mode — the grid is never
+  // rendered and the preloaded entry carries everything needed.
   useEffect(() => {
     if (!isOpen) return;
+    if (directOpenMode) return;
 
     const loadCatalog = async () => {
       setCatalogLoading(true);
@@ -181,7 +214,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     };
 
     loadCatalog();
-  }, [isOpen]);
+  }, [isOpen, directOpenMode]);
 
   // Handle ESC key
   useEffect(() => {
@@ -273,13 +306,15 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   };
 
   const handleGameSelect = (gameId: string, gameName: string, gameDescription: string) => {
-    // Track menu game click if menuId is available
-    if (menuId && gameName) {
+    // Track menu game click if menuId is available.
+    // Imperative direct-open never reaches here (selection is preloaded), but
+    // guard directOpenMode explicitly for future-proofing.
+    if (!directOpenMode && menuId && gameName) {
       trackMenuGameClick(menuId, gameName, apiKey).catch(() => {
         // Silently fail - tracking is best effort
       });
     }
-    
+
     handleClose();
     setSelectedGameId(gameId);
     setSelectedGameName(gameName);
@@ -339,6 +374,16 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         reportAd('aditude', 'medrec');
         return;
       }
+      // Imperative preload short-circuit: if the manager prefetched a
+      // fallback ad, skip the network call and render it directly.
+      const preloadedAdUrl = preloadedEntryRef.current?.preloadedFallbackAdUrl;
+      if (preloadedAdUrl) {
+        setAdIframeUrl(preloadedAdUrl);
+        setAdFetched(true);
+        setSelectedGameId(null);
+        reportAd('simula');
+        return;
+      }
       // Make API request and fetch / display ad.html here
       if (currentAdId) {
         adFetchingRef.current = true;
@@ -371,10 +416,18 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       reportAd('none');
       setSelectedGameId(null);
       onGameClose?.(selectedGameName ?? '');
+      if (directOpenMode) {
+        // Imperative direct-open mode: no menu behind the iframe to return
+        // to; terminal close routes to the manager for teardown.
+        onClose();
+      }
     } else {
       // If ad has already been already fetched, just close so we don't double count impressions
       setSelectedGameId(null);
       onGameClose?.(selectedGameName ?? '');
+      if (directOpenMode) {
+        onClose();
+      }
     }
   };
 
@@ -383,6 +436,9 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     // Keep adFetched as true so we don't show another ad
     onGameClose?.(selectedGameName ?? '');
     setSelectedGameName(null);
+    if (directOpenMode) {
+      onClose();
+    }
   };
 
   const handleAditudeClose = () => {
@@ -390,6 +446,9 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     onGameClose?.(selectedGameName ?? '');
     setSelectedGameName(null);
     setSelectedGameId(null);
+    if (directOpenMode) {
+      onClose();
+    }
   };
 
   const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -423,6 +482,11 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             playableHeight={appliedTheme.playableHeight}
             playableBorderColor={appliedTheme.playableBorderColor}
             showBanner={showBanner}
+            _preloadedMinigame={
+              directOpenMode && preloadedEntryRef.current?.gameId === selectedGameId
+                ? preloadedEntryRef.current?.preloadedMinigame
+                : undefined
+            }
         />
       )}
 
@@ -647,8 +711,10 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         </div>
       )}
 
-      {/* Modal */}
-      {isOpen && (
+      {/* Modal — suppressed entirely in imperative direct-open mode; the
+          manager pins `isOpen=true` only to keep the tree alive through the
+          game/ad flow, not to show the selection grid. */}
+      {isOpen && !directOpenMode && (
         <div
           onClick={handleBackdropClick}
           style={{
