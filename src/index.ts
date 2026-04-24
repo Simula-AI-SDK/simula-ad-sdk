@@ -6,6 +6,19 @@ export { MiniGameButton } from './components/miniGame/MiniGameButton';
 export { MiniGameInterstitial } from './components/miniGame/MiniGameInterstitial';
 export { RewardedMiniGame } from './components/miniGame/RewardedMiniGame';
 
+// Imperative API (additive; declarative exports above remain unchanged).
+export { SimulaMiniGameInterstitial } from './imperative/SimulaMiniGameInterstitial';
+export { SimulaRewardedMiniGame } from './imperative/SimulaRewardedMiniGame';
+export type {
+  ImperativeInitConfigBase,
+  InterstitialInitConfig,
+  RewardedInitConfig,
+  ImperativeShowParams,
+  SimulaEventType,
+  SimulaEventHandler,
+  SimulaAdEventSubscription,
+} from './imperative/types';
+
 // MiniGameInviteKit — grouped access to mini game invite components
 import { MiniGameInvitation as _Invitation } from './components/miniGame/MiniGameInvitation';
 import { MiniGameButton as _Button } from './components/miniGame/MiniGameButton';
