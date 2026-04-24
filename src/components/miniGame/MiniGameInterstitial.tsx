@@ -65,11 +65,13 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
   const handleCtaClick = useCallback(() => {
     if (imperativeCtx) {
       // Imperative flow: CTA emits CLICKED and hands off to the manager's
-      // phase machine (interstitial → fullInvitation → game). The manager
-      // unmounts this component by moving the tree forward; we intentionally
-      // do NOT emit CLOSED and do NOT call onImperativeClose here. Keeping
-      // `closedInternally` unset lets the manager decide when the
-      // declarative tree comes down.
+      // phase machine. Per proposal #19 the manager now advances the
+      // `interstitial:cta` token directly from `interstitial` → `game`
+      // (the legacy `fullInvitation` modal is no longer in the imperative
+      // happy path). The manager unmounts this component by moving the
+      // tree forward; we intentionally do NOT emit CLOSED and do NOT call
+      // onImperativeClose here. Keeping `closedInternally` unset lets the
+      // manager decide when the declarative tree comes down.
       imperativeCtx.onEvent('CLICKED', null);
       imperativeCtx.onImperativeAdvance?.('interstitial:cta');
       onClick();

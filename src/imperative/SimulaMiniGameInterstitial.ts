@@ -2,7 +2,6 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { SimulaProvider } from '../SimulaProvider';
 import { MiniGameInterstitial } from '../components/miniGame/MiniGameInterstitial';
-import { InterstitialFullGameInvitation } from '../components/miniGame/InterstitialFullGameInvitation';
 import { MiniGameMenu } from '../components/miniGame/MiniGameMenu';
 import { SimulaImperativeContext } from './SimulaImperativeContext';
 import { ReadinessProbe } from './ReadinessProbe';
@@ -28,7 +27,7 @@ import type {
 
 const LOAD_TIMEOUT_MS = 15000;
 
-type Phase = 'interstitial' | 'fullInvitation' | 'game';
+type Phase = 'interstitial' | 'game';
 
 /**
  * Imperative wrapper over the declarative interstitial + full-game flow.
@@ -40,17 +39,20 @@ type Phase = 'interstitial' | 'fullInvitation' | 'game';
  *    (session-ready) AND a content preload stage (catalog → sponsored-game
  *    selection → getMinigame bootstrap → fallback-ad prefetch) to settle
  *    before emitting `LOADED`. Idempotent.
- *  - `.show(params)` flips the host visible and transitions through the
- *    three phases: `interstitial` (fullscreen CTA card) →
- *    `fullInvitation` (internal-only invite) → `game` (MiniGameMenu
+ *  - `.show(params)` flips the host visible and transitions through two
+ *    phases: `interstitial` (fullscreen CTA card) → `game` (MiniGameMenu
  *    preloaded directly into the sponsored game, never shows the grid).
- *  - CTA on the fullscreen interstitial emits `CLICKED` and advances to
- *    `fullInvitation`. It does NOT emit `CLOSED` and does NOT teardown.
- *  - Explicit dismiss paths (X, ESC, fullInvitation "Not Now") emit
- *    `CLOSED` and tear down the visible tree.
- *  - Terminal close from the game/ad flow tears down without firing a
- *    redundant `CLOSED` from the imperative side (the declarative
- *    components already emit it through the context).
+ *    The legacy `fullInvitation` interstitial-modal phase has been
+ *    collapsed out of the imperative happy path per proposal #19.
+ *  - CTA on the fullscreen interstitial emits `CLICKED` and advances
+ *    directly to `game`. It does NOT emit `CLOSED` and does NOT teardown.
+ *  - Explicit dismiss paths (X, ESC) emit `CLOSED` (from the declarative
+ *    component) and tear down the visible tree.
+ *  - Terminal close from the game/ad flow emits `CLOSED` exactly once
+ *    BEFORE teardown so consumers can leave their local `showing` state
+ *    and relaunch.
+ *  - `DISPLAY_FAILED` path emits `DISPLAY_FAILED` once and tears down
+ *    WITHOUT a second `CLOSED`.
  *  - `.dispose()` unmounts + removes the host, clears timers + promise
  *    refs + cached preload payload so a later `.load()` starts clean.
  */
@@ -339,9 +341,33 @@ export class SimulaMiniGameInterstitial {
     }
   }
 
+  /**
+   * Normal terminal close from the playable game/ad flow. Emits SDK
+   * `CLOSED` exactly once BEFORE running the standard teardown so that
+   * consumers (e.g. `dippy-ai-mock/src/pages/CharacterPage.tsx`) can
+   * leave their local `showing` state and relaunch via the trigger.
+   *
+   * `DISPLAY_FAILED` does NOT route through here — see `_onEvent`,
+   * which emits `DISPLAY_FAILED` once and then calls the bare
+   * `_onImperativeClose` teardown without a second `CLOSED`.
+   */
+  private _closeFromTerminalGame = (): void => {
+    if (this.disposed) return;
+    if (!this._visible) return;
+    // Emit CLOSED first, while internal state still reflects the
+    // visible-game session — teardown clears `_visible` / `_ready` /
+    // `_preload` / phase / host / show params right after.
+    this.events.emit('CLOSED', null);
+    this._onImperativeClose();
+  };
+
   private _onImperativeClose = (): void => {
-    // Declarative component requested teardown (X / ESC / fullInvitation
-    // dismiss / terminal game+ad close / DISPLAY_FAILED).
+    // Declarative component requested teardown (X / ESC /
+    // terminal game+ad close / DISPLAY_FAILED). This method is the
+    // bare teardown — it does NOT emit any SDK event itself. Callers
+    // that need to emit `CLOSED` (the X/ESC path inside
+    // MiniGameInterstitial.tsx, and `_closeFromTerminalGame` above)
+    // are responsible for emitting BEFORE invoking this teardown.
     if (this.disposed) return;
     this._visible = false;
     this._currentShowParams = null;
@@ -370,18 +396,17 @@ export class SimulaMiniGameInterstitial {
     if (this.disposed) return;
     if (!this._visible) return;
     if (token === 'interstitial:cta' && this._phase === 'interstitial') {
-      this._phase = 'fullInvitation';
-      this._showNonce += 1;
-      this._renderTree();
-      return;
-    }
-    if (token === 'fullInvitation:accept' && this._phase === 'fullInvitation') {
+      // Per proposal #19: collapse the interstitial:cta CTA path so it
+      // goes directly from `interstitial` to `game`, skipping the
+      // legacy `fullInvitation` modal.
       this._phase = 'game';
       this._showNonce += 1;
       this._renderTree();
       return;
     }
-    // Unknown token or unexpected phase — ignore.
+    // Unknown token or unexpected phase — ignore. The legacy
+    // `fullInvitation:accept` token is no longer reachable in the
+    // imperative happy path.
   };
 
   private _onEvent = (type: SimulaEventType, payload: unknown): void => {
@@ -441,15 +466,6 @@ export class SimulaMiniGameInterstitial {
             onClose: () => { /* handled via SimulaImperativeContext */ },
           }),
         );
-      } else if (this._phase === 'fullInvitation') {
-        children.push(
-          React.createElement(InterstitialFullGameInvitation, {
-            key: `fullinvite-${this._showNonce}`,
-            isOpen: true,
-            charImage: params.charImage,
-            charName: params.charName,
-          }),
-        );
       } else if (this._phase === 'game' && this._preload) {
         const preload = this._preload;
         children.push(
@@ -457,12 +473,14 @@ export class SimulaMiniGameInterstitial {
             key: `game-${this._showNonce}`,
             isOpen: true,
             onClose: () => {
-              // Terminal close from the game/ad flow. The declarative
-              // ad-close handlers already fired onGameClose; this routes
-              // the manager into teardown. CLOSED is NOT emitted here —
-              // the user dismissing after playing the game is not the
-              // same as dismissing the interstitial.
-              this._onImperativeClose();
+              // Terminal close from the game/ad flow. Per proposal #19,
+              // emit SDK `CLOSED` exactly once BEFORE clearing visible /
+              // ready / preload / phase / host / show params (i.e.,
+              // before teardown) so consumers like CharacterPage can
+              // leave their local `showing` state and relaunch from the
+              // trigger. `DISPLAY_FAILED` has its own path in `_onEvent`
+              // that tears down WITHOUT emitting `CLOSED`.
+              this._closeFromTerminalGame();
             },
             charName: params.charName,
             charID: params.charID,
