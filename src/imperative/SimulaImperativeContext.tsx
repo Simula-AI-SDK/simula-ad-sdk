@@ -17,9 +17,8 @@ export interface SimulaImperativeContextValue {
   /**
    * Advance the imperative manager's internal phase machine. Today only
    * SimulaMiniGameInterstitial consumes this — `'interstitial:cta'`
-   * transitions interstitial → fullInvitation, and
-   * `'fullInvitation:accept'` transitions fullInvitation → game. Unknown
-   * tokens are ignored by managers that don't recognize them.
+   * transitions interstitial → game. Unknown tokens are ignored by
+   * managers that don't recognize them.
    */
   onImperativeAdvance?: (token: string) => void;
 }
