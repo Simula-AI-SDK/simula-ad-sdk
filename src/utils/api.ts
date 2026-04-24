@@ -440,6 +440,36 @@ export const verifyReward = async (params: {
   }
 };
 
+/**
+ * Best-effort claim-initiation trace. Fires when the user taps "Claim Reward"
+ * on the rewarded flow, BEFORE the verify-reward call. Tracing-only,
+ * unauthenticated, keepalive so it survives tab-close races. Never blocks
+ * the UI; logs errors only.
+ */
+export async function reportClaimInitiated(params: {
+  serveId: string;
+  sessionId: string;
+  ts: number;
+}): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/minigames/claim-initiated`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify({
+        serve_id: params.serveId,
+        session_id: params.sessionId,
+        ts: params.ts,
+      }),
+      keepalive: true,
+    });
+  } catch (error) {
+    console.error('[reportClaimInitiated] Failed:', error);
+  }
+}
+
 export const reportAdInterstitial = async (params: {
   serveId: string;
   sessionId: string;

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { RewardedMiniGameProps } from '../../types';
-import { initRewardedGame, fetchAdForMinigame, verifyReward, reportAdInterstitial } from '../../utils/api';
+import { initRewardedGame, fetchAdForMinigame, verifyReward, reportAdInterstitial, reportClaimInitiated } from '../../utils/api';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
 import { MiniGameMenu } from './MiniGameMenu';
 import { WidgetShell } from '../WidgetShell';
+import { SimulaImperativeContext } from '../../imperative/SimulaImperativeContext';
 
 type Phase = 'idle' | 'loading' | 'playing' | 'ad' | 'claim' | 'verifying' | 'done';
 
@@ -22,6 +23,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
   messages = [],
 }) => {
   const { sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
+  const imperativeCtx = useContext(SimulaImperativeContext);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -130,12 +132,23 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
         console.error('[RewardedMiniGame] Failed to initialize:', err);
         setError('Failed to load game.');
         // PRD: game iframe fails to load → no session created; close button never appears
+        imperativeCtx?.onEvent('DISPLAY_FAILED', { error: err });
       }
     };
 
     init();
     return () => { cancelled = true; };
-  }, [phase, charID, charName, charImage, charDesc, clampedThreshold]);
+  }, [phase, charID, charName, charImage, charDesc, clampedThreshold, imperativeCtx]);
+
+  // Imperative-only: emit DISPLAYED once when the rewarded game iframe
+  // actually becomes visible to the user (phase playing + iframeUrl loaded).
+  const rewardedDisplayedOnceRef = useRef(false);
+  useEffect(() => {
+    if (phase === 'playing' && iframeUrl && !rewardedDisplayedOnceRef.current) {
+      rewardedDisplayedOnceRef.current = true;
+      imperativeCtx?.onEvent('DISPLAYED', { serveId });
+    }
+  }, [phase, iframeUrl, serveId, imperativeCtx]);
 
   // Phase: playing — countdown timer
   useEffect(() => {
@@ -272,6 +285,18 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
   const handleClaimReward = useCallback(async () => {
     if (verifyingRef.current) return;
     verifyingRef.current = true;
+
+    // Best-effort claim-initiated trace + imperative CLICKED event.
+    // Fire AFTER the verifyingRef guard so duplicate taps don't double-report.
+    if (serveId && sessionIdRef.current) {
+      reportClaimInitiated({
+        serveId,
+        sessionId: sessionIdRef.current,
+        ts: Date.now(),
+      });
+    }
+    imperativeCtx?.onEvent('CLICKED', { serveId });
+
     setPhase('verifying');
 
     const elapsedPlayTime = (Date.now() - playStartRef.current) / 1000;
@@ -312,9 +337,13 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
 
   // Handle menu close (post-reward)
   const handleMenuClose = useCallback(() => {
+    // Imperative owner fires CLOSED + tears down before the declarative
+    // reset. Declarative behavior unchanged when ctx is null.
+    imperativeCtx?.onEvent('CLOSED', null);
+    imperativeCtx?.onImperativeClose();
     setShowMenu(false);
     resetState();
-  }, [resetState]);
+  }, [resetState, imperativeCtx]);
 
   // Prevent body scroll
   useEffect(() => {

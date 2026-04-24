@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { MiniGameInterstitialProps, MiniGameInterstitialTheme } from '../../types';
 import defaultBackgroundImage from '../../assets/minigame_interstitial_background.png';
+import { SimulaImperativeContext } from '../../imperative/SimulaImperativeContext';
 
 
 const defaultTheme: Required<MiniGameInterstitialTheme> = {
@@ -24,11 +25,21 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
   onClick,
   onClose,
 }) => {
+  const imperativeCtx = useContext(SimulaImperativeContext);
   const [imageError, setImageError] = useState(false);
   const [closedInternally, setClosedInternally] = useState(false);
   const appliedTheme = { ...defaultTheme, ...theme };
 
   const isVisible = isOpen && !closedInternally;
+
+  // Imperative-only: emit DISPLAYED exactly once on the first visible transition.
+  const displayedOnceRef = useRef(false);
+  useEffect(() => {
+    if (isVisible && !displayedOnceRef.current) {
+      displayedOnceRef.current = true;
+      imperativeCtx?.onEvent('DISPLAYED', null);
+    }
+  }, [isVisible, imperativeCtx]);
 
   // Reset internal close state when parent re-opens
   useEffect(() => {
@@ -44,14 +55,22 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
   }, [charImage]);
 
   const handleClose = useCallback(() => {
+    // Imperative owner fires CLOSED + tears down before the declarative path runs.
+    imperativeCtx?.onEvent('CLOSED', null);
+    imperativeCtx?.onImperativeClose();
     setClosedInternally(true);
     onClose?.();
-  }, [onClose]);
+  }, [onClose, imperativeCtx]);
 
   const handleCtaClick = useCallback(() => {
+    // Imperative owner fires CLICKED + CLOSED + tears down before the
+    // declarative path runs. Declarative behavior unchanged when ctx is null.
+    imperativeCtx?.onEvent('CLICKED', null);
+    imperativeCtx?.onEvent('CLOSED', null);
+    imperativeCtx?.onImperativeClose();
     setClosedInternally(true);
     onClick();
-  }, [onClick]);
+  }, [onClick, imperativeCtx]);
 
   // Prevent body scroll when visible
   useEffect(() => {
