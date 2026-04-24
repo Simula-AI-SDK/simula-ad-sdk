@@ -5,6 +5,7 @@ import { RewardedMiniGame } from '../components/miniGame/RewardedMiniGame';
 import { SimulaImperativeContext } from './SimulaImperativeContext';
 import { ReadinessProbe } from './ReadinessProbe';
 import { EventRegistry } from './events';
+import { clampMinPlayThreshold } from './utils';
 import type {
   RewardedInitConfig,
   ImperativeShowParams,
@@ -13,17 +14,7 @@ import type {
   SimulaEventType,
 } from './types';
 
-const DEFAULT_MIN_PLAY_THRESHOLD = 15;
-const MIN_PLAY_THRESHOLD_LOWER = 10;
-const MIN_PLAY_THRESHOLD_UPPER = 30;
 const LOAD_TIMEOUT_MS = 15000;
-
-function clampMinPlayThreshold(value: number | undefined): number {
-  const raw = typeof value === 'number' && !Number.isNaN(value)
-    ? value
-    : DEFAULT_MIN_PLAY_THRESHOLD;
-  return Math.max(MIN_PLAY_THRESHOLD_LOWER, Math.min(MIN_PLAY_THRESHOLD_UPPER, Math.round(raw)));
-}
 
 /**
  * Imperative wrapper over the declarative `RewardedMiniGame`.
@@ -182,6 +173,7 @@ export class SimulaRewardedMiniGame {
     const resolve = this._loadResolve;
     this._loadResolve = null;
     this._loadReject = null;
+    this._loadInFlight = null;
     this.events.emit('LOADED', null);
     if (resolve) resolve();
   };
