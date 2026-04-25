@@ -203,7 +203,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
 
         {/* CTA button */}
         <button
-          onClick={handleCtaClick}
+          onClick={(e) => { e.stopPropagation(); handleCtaClick(); }}
           style={{
             backgroundColor: appliedTheme.ctaColor,
             color: appliedTheme.ctaTextColor,
