@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
-import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick } from '../../utils/api';
+import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick, reportAdInterstitial } from '../../utils/api';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
+import { WidgetShell } from '../WidgetShell';
 
 const defaultTheme: Omit<Required<MiniGameTheme>, 'backgroundColor' | 'headerColor' | 'borderColor' | 'playableHeight' | 'playableBorderColor'> & { backgroundColor?: string; headerColor?: string; borderColor?: string; playableHeight?: number | string; playableBorderColor?: string } = {
   titleFont: 'Inter, system-ui, sans-serif',
@@ -35,24 +36,83 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   navigationType = 'dot',
   onGameOpen,
   onGameClose,
+  showBanner = true,
+  _preloadedEntry,
 }) => {
-  const { apiKey } = useSimula();
-  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
-  const [selectedGameName, setSelectedGameName] = useState<string | null>(null);
+  const { apiKey, sessionId, devMode, aditudeReady, aditudeConfig } = useSimula();
+  // Imperative direct-open mode: `_preloadedEntry` is set at mount time by
+  // SimulaMiniGameInterstitial. We skip the catalog + grid UI entirely, open
+  // straight into the preselected sponsored game, do NOT fire the menu-click
+  // beacon (no user tap happened), and forward the preloaded payloads to the
+  // child GameIframe. On terminal close (game + ad dismissed) we call
+  // `onClose()` once so the imperative manager can tear down.
+  const preloadedEntryRef = useRef(_preloadedEntry ?? null);
+  const directOpenMode = preloadedEntryRef.current !== null;
+  const onGameOpenFiredRef = useRef(false);
+
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(
+    preloadedEntryRef.current ? preloadedEntryRef.current.gameId : null,
+  );
+  const [selectedGameName, setSelectedGameName] = useState<string | null>(
+    preloadedEntryRef.current ? preloadedEntryRef.current.gameName : null,
+  );
   const [imageError, setImageError] = useState(false);
-  const [games, setGames] = useState<GameData[]>([]);
-  const [menuId, setMenuId] = useState<string | null>(null);
-  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [games, setGames] = useState<GameData[]>(
+    preloadedEntryRef.current?.games ?? [],
+  );
+  const [menuId, setMenuId] = useState<string | null>(
+    preloadedEntryRef.current?.menuId ?? null,
+  );
+  const [catalogLoading, setCatalogLoading] = useState(!directOpenMode);
   const [catalogError, setCatalogError] = useState(false);
   const [adFetched, setAdFetched] = useState(false);
   const [adIframeUrl, setAdIframeUrl] = useState<string | null>(null);
   const [currentAdId, setCurrentAdId] = useState<string | null>(null);
+  const [currentServeId, setCurrentServeId] = useState<string | null>(null);
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
   const adCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adFetchingRef = useRef(false);
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const modalRef = useRef<HTMLDivElement>(null);
   const adOverlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  // aditude
+  const [shouldFetchAditude, setShouldFetchAditude] = useState<boolean>(false);
+  const [aditudeCountdown, setAditudeCountdown] = useState<number | null>(null);
+  const aditudeCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Aditude countdown timer
+  useEffect(() => {
+    if (shouldFetchAditude) {
+      setAditudeCountdown(5);
+      aditudeCountdownRef.current = setInterval(() => {
+        setAditudeCountdown((prev) => {
+          if (prev !== null && prev <= 1) {
+            if (aditudeCountdownRef.current) {
+              clearInterval(aditudeCountdownRef.current);
+              aditudeCountdownRef.current = null;
+            }
+            return 0;
+          }
+          return prev !== null ? prev - 1 : null;
+        });
+      }, 1000);
+    } else {
+      setAditudeCountdown(null);
+      if (aditudeCountdownRef.current) {
+        clearInterval(aditudeCountdownRef.current);
+        aditudeCountdownRef.current = null;
+      }
+    }
+    return () => {
+      if (aditudeCountdownRef.current) {
+        clearInterval(aditudeCountdownRef.current);
+        aditudeCountdownRef.current = null;
+      }
+    };
+  }, [shouldFetchAditude]);
 
   // Ad countdown timer
   useEffect(() => {
@@ -102,9 +162,23 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   };
 
 
-  // Fetch catalog when menu opens
+  // Imperative direct-open: fire onGameOpen once (mirrors what
+  // handleGameSelect would have done for a real menu tap).
+  useEffect(() => {
+    if (!directOpenMode) return;
+    if (onGameOpenFiredRef.current) return;
+    const entry = preloadedEntryRef.current;
+    if (!entry) return;
+    onGameOpenFiredRef.current = true;
+    onGameOpen?.(entry.gameName, entry.gameDescription);
+  }, [directOpenMode, onGameOpen]);
+
+  // Fetch catalog when menu opens.
+  // Skipped entirely in imperative direct-open mode — the grid is never
+  // rendered and the preloaded entry carries everything needed.
   useEffect(() => {
     if (!isOpen) return;
+    if (directOpenMode) return;
 
     const loadCatalog = async () => {
       setCatalogLoading(true);
@@ -140,7 +214,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     };
 
     loadCatalog();
-  }, [isOpen]);
+  }, [isOpen, directOpenMode]);
 
   // Handle ESC key
   useEffect(() => {
@@ -231,60 +305,129 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
   };
 
-  const handleGameSelect = (gameId: string, gameName: string) => {
-    // Track menu game click if menuId is available
-    if (menuId && gameName) {
+  const handleGameSelect = (gameId: string, gameName: string, gameDescription: string) => {
+    // Track menu game click if menuId is available.
+    // Imperative direct-open never reaches here (selection is preloaded), but
+    // guard directOpenMode explicitly for future-proofing.
+    if (!directOpenMode && menuId && gameName) {
       trackMenuGameClick(menuId, gameName, apiKey).catch(() => {
         // Silently fail - tracking is best effort
       });
     }
-    
+
     handleClose();
     setSelectedGameId(gameId);
     setSelectedGameName(gameName);
     // Reset ad tracking when a new game is selected
     setAdFetched(false);
     setCurrentAdId(null);
+    setCurrentServeId(null);
     adFetchingRef.current = false;
-    onGameOpen?.(gameName);
+    onGameOpen?.(gameName, gameDescription);
   };
 
   const handleAdIdReceived = (adId: string) => {
     setCurrentAdId(adId);
   };
 
+  const handleServeIdReceived = (serveId: string) => {
+    console.log('[MiniGameMenu] handleServeIdReceived:', serveId);
+    setCurrentServeId(serveId);
+  };
+
+  // Fire-and-forget ad interstitial report
+  const reportAd = useCallback((adSource: 'simula' | 'aditude' | 'none', renderedFormat?: string) => {
+    console.log('[MiniGameMenu] reportAd called', {
+      adSource,
+      renderedFormat,
+      currentServeId,
+      sessionId: sessionIdRef.current,
+    });
+    if (currentServeId && sessionIdRef.current) {
+      console.log('[MiniGameMenu] reportAd firing HTTP call');
+      reportAdInterstitial({
+        serveId: currentServeId,
+        sessionId: sessionIdRef.current,
+        adSource,
+        renderedFormat,
+      });
+    } else {
+      console.warn('[MiniGameMenu] reportAd SKIPPED — missing serveId or sessionId');
+    }
+  }, [currentServeId]);
+
   const handleIframeClose = async () => {
     // Prevent multiple simultaneous ad fetches (e.g., from spam clicking close)
     if (adFetchingRef.current) {
       return;
     }
-    
+
     if (!adFetched) {
+      // In devMode, skip real ad fetch and go straight to aditude placeholder.
+      // Fire the close-flow medrec report immediately (race-resistant against
+      // tab-close navigation). The WidgetShell bridge skips medrec divIds to
+      // avoid double-counting, so banner/rails are reported separately.
+      if (devMode) {
+        setShouldFetchAditude(true);
+        setAdFetched(true);
+        setSelectedGameId(null);
+        reportAd('aditude', 'medrec');
+        return;
+      }
+      // Imperative preload short-circuit: if the manager prefetched a
+      // fallback ad, skip the network call and render it directly.
+      const preloadedAdUrl = preloadedEntryRef.current?.preloadedFallbackAdUrl;
+      if (preloadedAdUrl) {
+        setAdIframeUrl(preloadedAdUrl);
+        setAdFetched(true);
+        setSelectedGameId(null);
+        reportAd('simula');
+        return;
+      }
       // Make API request and fetch / display ad.html here
       if (currentAdId) {
         adFetchingRef.current = true;
         try {
-          const iframeUrl = await fetchAdForMinigame(currentAdId);
+          const iframeUrl = await fetchAdForMinigame(currentAdId, sessionIdRef.current!);
           if (iframeUrl) {
             setAdIframeUrl(iframeUrl);
             setAdFetched(true);
             setSelectedGameId(null);
             adFetchingRef.current = false;
+            reportAd('simula');
             return; // Ad will be shown, onGameClose will be called when ad closes
           }
         } catch (error) {
           console.error('Error fetching ad:', error);
-          // If ad fetch fails, just close without showing ad
         }
         adFetchingRef.current = false;
       }
-      // No ad to show - game closes here
+      // If ad fetch fails or no ad ID, try aditude as fallback.
+      // Fire close-flow medrec report immediately (race-resistant against
+      // tab-close). WidgetShell's bridge skips medrec divIds to avoid
+      // double-counting, and reports banner/rails separately.
+      if (aditudeReady && aditudeConfig?.enabled) {
+        setShouldFetchAditude(true);
+        setAdFetched(true);
+        reportAd('aditude', 'medrec');
+        return;
+      }
+      // No ad available at all — close without showing ad
+      reportAd('none');
       setSelectedGameId(null);
       onGameClose?.(selectedGameName ?? '');
+      if (directOpenMode) {
+        // Imperative direct-open mode: no menu behind the iframe to return
+        // to; terminal close routes to the manager for teardown.
+        onClose();
+      }
     } else {
       // If ad has already been already fetched, just close so we don't double count impressions
       setSelectedGameId(null);
       onGameClose?.(selectedGameName ?? '');
+      if (directOpenMode) {
+        onClose();
+      }
     }
   };
 
@@ -293,6 +436,19 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     // Keep adFetched as true so we don't show another ad
     onGameClose?.(selectedGameName ?? '');
     setSelectedGameName(null);
+    if (directOpenMode) {
+      onClose();
+    }
+  };
+
+  const handleAditudeClose = () => {
+    setShouldFetchAditude(false);
+    onGameClose?.(selectedGameName ?? '');
+    setSelectedGameName(null);
+    setSelectedGameId(null);
+    if (directOpenMode) {
+      onClose();
+    }
   };
 
   const handleAdOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -301,7 +457,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
   };
 
-  if (!isOpen && !selectedGameId && !adIframeUrl) {
+  if (!isOpen && !selectedGameId && !adIframeUrl && !shouldFetchAditude) {
     return null;
   }
 
@@ -315,6 +471,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             charName={charName}
             charImage={charImage}
             charDesc={charDesc}
+            onServeIdReceived={handleServeIdReceived}
             convId={convId}
             entryPoint={entryPoint}
             messages={messages}
@@ -324,6 +481,12 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             menuId={menuId}
             playableHeight={appliedTheme.playableHeight}
             playableBorderColor={appliedTheme.playableBorderColor}
+            showBanner={showBanner}
+            _preloadedMinigame={
+              directOpenMode && preloadedEntryRef.current?.gameId === selectedGameId
+                ? preloadedEntryRef.current?.preloadedMinigame
+                : undefined
+            }
         />
       )}
 
@@ -448,8 +611,110 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         </div>
       )}
 
-      {/* Modal */}
-      {isOpen && (
+      {/* Aditude Interstitial */}
+      {shouldFetchAditude && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Advertisement"
+        >
+          {aditudeCountdown !== null && aditudeCountdown > 0 ? (
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                width: '32px',
+                height: '32px',
+                minWidth: '32px',
+                minHeight: '32px',
+                zIndex: 10000,
+              }}
+              aria-label={`Ad closes in ${aditudeCountdown} seconds`}
+            >
+              <style>{`
+                @keyframes simula-aditude-countdown-ring {
+                  from { stroke-dashoffset: 0; }
+                  to { stroke-dashoffset: 81.68; }
+                }
+              `}</style>
+              <svg
+                viewBox="0 0 32 32"
+                width="32"
+                height="32"
+                style={{ transform: 'rotate(90deg) scaleX(-1)' }}
+              >
+                <circle cx="16" cy="16" r="13" fill="rgba(0, 0, 0, 0.4)" stroke="none" />
+                <circle
+                  cx="16"
+                  cy="16"
+                  r="13"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="3"
+                  strokeDasharray="81.68"
+                  strokeDashoffset="0"
+                  strokeLinecap="round"
+                  style={{ animation: 'simula-aditude-countdown-ring 5s linear forwards' }}
+                />
+              </svg>
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  color: '#ffffff',
+                  fontWeight: '600',
+                }}
+              >
+                {aditudeCountdown}
+              </span>
+            </div>
+          ) : (
+            <CloseButton
+              onClick={handleAditudeClose}
+              ariaLabel="Close ad"
+              style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10000 }}
+            />
+          )}
+          <span
+            style={{
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: '11px',
+              letterSpacing: '0.5px',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+            }}
+          >
+            Ad
+          </span>
+          <WidgetShell variant="medrec" serveId={currentServeId} />
+        </div>
+      )}
+
+      {/* Modal — suppressed entirely in imperative direct-open mode; the
+          manager pins `isOpen=true` only to keep the tree alive through the
+          game/ad flow, not to show the selection grid. */}
+      {isOpen && !directOpenMode && (
         <div
           onClick={handleBackdropClick}
           style={{

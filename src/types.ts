@@ -86,6 +86,83 @@ export interface SimulaContextValue {
   hasNoFill: (slot: string, position: number) => boolean;
   /** Mark a slot/position as having no fill */
   markNoFill: (slot: string, position: number) => void;
+
+  /*  Aditude Config */
+  aditudeReady: boolean;
+  aditudeConfig: AditudeConfig | undefined;
+}
+
+export interface FetchAdRequest {
+  messages: Message[];
+  apiKey: string;
+  slotId?: string;
+  theme?: InChatTheme;
+  sessionId?: string;
+  charDesc?: string;
+}
+
+export interface FetchAdResponse {
+  ad?: AdData;
+  error?: string;
+}
+
+export interface CatalogResponse {
+  menuId: string;
+  games: GameData[];
+}
+
+export interface InitMinigameRequest {
+  gameType: string;
+  sessionId: string;
+  convId?: string | null;
+  entryPoint?: string;
+  currencyMode?: boolean;
+  w: number;
+  h: number;
+  char_id?: string;
+  char_name?: string;
+  char_image?: string;
+  char_desc?: string;
+  messages?: Message[];
+  delegate_char?: boolean;
+  menuId?: string;
+}
+
+export interface MinigameResponse {
+  adType: 'minigame';
+  adInserted: boolean;
+  adResponse: {
+    ad_id: string;
+    serve_id?: string;
+    iframe_url: string;
+  };
+}
+
+export interface AditudeSlotMapping {
+  div_id: string;
+  devices: string[];
+  ad_unit_path: string;
+  sizes: Record<string, number[][]>;
+}
+
+export interface AditudeConfig {
+  domain: string;
+  enabled: boolean;
+  script_url: string;
+  mappings: AditudeSlotMapping[];
+}
+
+export interface FetchNativeBannerRequest {
+  sessionId: string;
+  slot: string;
+  position: number;
+  context: NativeContext;
+  width?: number;
+}
+
+export interface FetchNativeAdResponse {
+  ad?: AdData;
+  error?: string;
 }
 
 export interface BotDetectionResult {
@@ -137,7 +214,7 @@ export interface MiniGameTheme {
    * - number: pixel value (e.g., 500 = 500px)
    * - string with %: percentage of screen height (e.g., "80%")
    * - undefined/null: full screen (default behavior)
-   * Minimum height is 500px.
+   * Minimum game content height is 500px (handle and banner are added on top).
    */
   playableHeight?: number | string;
   /** 
@@ -154,6 +231,40 @@ export interface GameData {
   description: string;
   iconFallback?: string; // Optional fallback emoji (defaults to 🎮)
   gifCover?: string; // GIF cover image URL for card display
+}
+
+/**
+ * Internal-only preloaded entry hook used by the imperative interstitial path
+ * to open MiniGameMenu directly into a preselected sponsored game without
+ * mounting the grid UI or firing a menu-click beacon.
+ *
+ * NOT part of the public declarative API — treat this as an internal contract
+ * between `SimulaMiniGameInterstitial` and `MiniGameMenu`.
+ *
+ * @internal
+ */
+export interface MiniGameMenuPreloadedEntry {
+  /** Sponsored game id to open immediately. */
+  gameId: string;
+  /** Sponsored game name (used for onGameOpen / onGameClose callbacks). */
+  gameName: string;
+  /** Sponsored game description (used for onGameOpen callback). */
+  gameDescription: string;
+  /** Pre-fetched catalog so the menu can skip its own fetchCatalog. Optional. */
+  games?: GameData[];
+  /** Pre-fetched menu id (if any). Optional. */
+  menuId?: string | null;
+  /**
+   * Pre-fetched minigame bootstrap. When present, the underlying GameIframe
+   * skips its own getMinigame() call and renders from this payload directly.
+   */
+  preloadedMinigame?: MinigameResponse;
+  /**
+   * Pre-fetched fallback-ad iframe URL for the post-game ad slot. `null` /
+   * `undefined` means nothing prefetched; the component will fall back to
+   * its existing network behavior.
+   */
+  preloadedFallbackAdUrl?: string | null;
 }
 
 export interface MiniGameMenuProps {
@@ -173,10 +284,22 @@ export interface MiniGameMenuProps {
   delegateChar?: boolean; // Whether Simula should display the AI character within the iframe (default: true)
   /** Navigation style for the game grid. Default: 'dot'. */
   navigationType?: MiniGameNavigationType;
-  /** Called when a game is opened (user selects a game from the menu). Receives the game name. */
-  onGameOpen?: (gameName: string) => void;
+  /** Called when a game is opened (user selects a game from the menu). Receives the game name and description. */
+  onGameOpen?: (gameName: string, gameDescription: string) => void;
   /** Called when the game closes (game iframe closed, and ad iframe closed if applicable). Receives the game name. */
   onGameClose?: (gameName: string) => void;
+  /** Whether to show a banner ad at the top of the minigame iframe. Default: true */
+  showBanner?: boolean;
+  /**
+   * Internal-only. When provided, MiniGameMenu opens directly into the given
+   * sponsored game without rendering the selection grid, does NOT fire
+   * `trackMenuGameClick`, and forwards the preloaded minigame bootstrap /
+   * fallback-ad URL to the child components. Set by the imperative
+   * interstitial manager; public declarative callers should leave it
+   * undefined.
+   * @internal
+   */
+  _preloadedEntry?: MiniGameMenuPreloadedEntry;
 }
 
 export type MiniGameNavigationType = 'dot' | 'arrow' | 'pagination';
@@ -299,6 +422,54 @@ export interface MiniGameInterstitialProps {
   onClick: () => void;
   /** Optional callback when the interstitial is dismissed (close button or ESC). Not called on CTA/backdrop click — use onClick for that. */
   onClose?: () => void;
+}
+
+// RewardedMiniGame types
+export interface InitRewardedResponse {
+  id: string;
+  name: string;
+  iconUrl: string;
+  description: string;
+  gifCover?: string;
+  serve_id: string;
+  iframe_url: string;
+  duration_seconds: number;
+  ad_id: string | null;
+}
+
+export interface VerifyRewardResponse {
+  verified: boolean;
+  token: string;
+}
+
+export interface RewardedMiniGameProps {
+  isOpen: boolean;
+  charName: string;
+  charID: string;
+  charImage: string;
+  charDesc?: string;
+  /** Minimum play seconds required before close button appears. Clamped to [10, 30]. Default: 15 */
+  minPlayThreshold?: number;
+  /** Called when SSV verification succeeds. Grant reward here. */
+  onRewardVerified: () => void;
+  /** Called when SSV verification fails after retry. */
+  onRewardVerificationFailed?: () => void;
+  /** Conversation history passed through to post-game MiniGameMenu. */
+  messages?: Message[];
+  /**
+   * Internal-only. Pre-fetched rewarded bootstrap. When present, the
+   * component skips its own initRewardedGame() call and enters the 'playing'
+   * phase directly from this payload. Set by SimulaRewardedMiniGame after
+   * `.load()` preload settles.
+   * @internal
+   */
+  _preloadedRewarded?: InitRewardedResponse;
+  /**
+   * Internal-only. Pre-fetched fallback-ad iframe URL for the post-game ad
+   * slot. Skips the fetchAdForMinigame() call during the 'ad' phase when set.
+   * @internal
+   */
+  _preloadedFallbackAdUrl?: string | null;
 }
 
 // NativeBanner types

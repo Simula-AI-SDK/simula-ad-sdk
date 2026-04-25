@@ -1,10 +1,13 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback, useContext } from 'react';
 import { getMinigame } from '../../utils/api';
-import { Message } from '../../types';
+import { Message, MinigameResponse } from '../../types';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
+import { WidgetShell } from '../WidgetShell';
+import { SimulaImperativeContext } from '../../imperative/SimulaImperativeContext';
 
-const MIN_PLAYABLE_HEIGHT = 500;
+const MIN_GAME_HEIGHT = 500;
+const HANDLE_HEIGHT = 28; // 12px padding top + 4px bar + 12px padding bottom
 
 interface GameIframeProps {
   gameId: string;
@@ -15,6 +18,7 @@ interface GameIframeProps {
   delegateChar?: boolean;
   onClose: () => void;
   onAdIdReceived?: (adId: string) => void;
+  onServeIdReceived?: (serveId: string) => void;
   charDesc?: string;
   convId?: string;
   entryPoint?: string;
@@ -23,6 +27,14 @@ interface GameIframeProps {
   playableHeight?: number | string;
   /** Background color for the bottom sheet border area */
   playableBorderColor?: string;
+  /** Whether to show a banner ad at the top of the game. Default: true */
+  showBanner?: boolean;
+  /**
+   * Internal-only. Pre-fetched minigame bootstrap. When present, the iframe
+   * skips its own getMinigame() call and renders from this payload directly.
+   * @internal
+   */
+  _preloadedMinigame?: MinigameResponse;
 }
 
 export const GameIframe: React.FC<GameIframeProps> = ({
@@ -34,23 +46,39 @@ export const GameIframe: React.FC<GameIframeProps> = ({
   delegateChar = true,
   onClose,
   onAdIdReceived,
+  onServeIdReceived,
   charDesc,
   convId,
   entryPoint,
   menuId,
   playableHeight,
   playableBorderColor = '#262626',
+  showBanner = true,
+  _preloadedMinigame,
 }) => {
+  const imperativeCtx = useContext(SimulaImperativeContext);
   const overlayRef = useRef<HTMLDivElement>(null);
   const { sessionId } = useSimula();
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [serveId, setServeId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const currentRequestRef = useRef<Promise<void> | null>(null);
   const initKeyRef = useRef<string | null>(null);
 
-  // Drag-to-resize state
+  // Desktop detection for bottom-sheet vs. centered layout.
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isDesktop = viewportWidth >= 768;
+
+  const MIN_PLAYABLE_HEIGHT = MIN_GAME_HEIGHT + (!isDesktop ? HANDLE_HEIGHT : 0);
+
+  // Drag-to-resize state (mobile bottom sheet only)
   const [resizedHeight, setResizedHeight] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef<number>(0);
@@ -61,54 +89,84 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  // Fetch the minigame iframe URL
+  // Track whether mount-failure has already been surfaced so _onMountFailed
+  // can only fire once per lifecycle. Matches the DISPLAY_FAILED-once
+  // contract in SimulaMiniGameInterstitial.
+  const mountFailedFiredRef = useRef(false);
+
+  // Fetch the minigame iframe URL (passed into WidgetShell as gameUrl).
+  // When `_preloadedMinigame` is provided by the imperative manager, skip
+  // the network call entirely and hydrate from the preload payload.
   useEffect(() => {
-    // Block if sessionId is missing or invalid
     if (!sessionId) {
-      setError('Session invalid, cannot initialize minigame');
+      const sessionErr = new Error('Session invalid, cannot initialize minigame');
+      setError(sessionErr.message);
       setLoading(false);
+      if (!mountFailedFiredRef.current) {
+        mountFailedFiredRef.current = true;
+        imperativeCtx?.onEvent('DISPLAY_FAILED', { error: sessionErr });
+      }
       return;
     }
 
-    // Create a unique key for this initialization based on the actual parameters
+    // Imperative preload short-circuit: hydrate synchronously.
+    if (_preloadedMinigame) {
+      try {
+        const response = _preloadedMinigame;
+        if (!response.adResponse || !response.adResponse.iframe_url) {
+          throw new Error('Preloaded minigame payload missing iframe_url');
+        }
+        setIframeUrl(response.adResponse.iframe_url);
+        if (response.adResponse.serve_id) {
+          setServeId(response.adResponse.serve_id);
+        }
+        if (onAdIdReceived && response.adResponse.ad_id) {
+          onAdIdReceived(response.adResponse.ad_id);
+        }
+        if (onServeIdReceived && response.adResponse.serve_id) {
+          onServeIdReceived(response.adResponse.serve_id);
+        }
+        setError(null);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error hydrating preloaded minigame:', err);
+        setError('Failed to load game. Please try again.');
+        setLoading(false);
+        if (!mountFailedFiredRef.current) {
+          mountFailedFiredRef.current = true;
+          imperativeCtx?.onEvent('DISPLAY_FAILED', { error: err });
+        }
+      }
+      return;
+    }
+
     const initKey = `${gameId}-${charID}-${sessionId}`;
 
-    // Prevent multiple initializations with the same key
     if (currentRequestRef.current && initKeyRef.current === initKey) {
-      console.log('[GameIframe] Initialization already in progress for key:', initKey);
       return;
     }
 
-    // If there's a different request in progress, we'll let it complete but won't process its result
-    // (the new request will override)
-    if (currentRequestRef.current && initKeyRef.current !== initKey) {
-      console.log('[GameIframe] New parameters detected, will override previous request. Old key:', initKeyRef.current, 'New key:', initKey);
-    }
-
-    // Set the key immediately
     initKeyRef.current = initKey;
 
-    console.log('[GameIframe] Initializing minigame with sessionId:', sessionId);
-    console.log('[GameIframe] sessionId from context:', sessionId);
-    console.log('[GameIframe] sessionIdRef.current:', sessionIdRef.current);
-
     const initMinigame = async () => {
-      // Use the latest sessionId from ref to avoid stale closures
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) {
-        console.error('[GameIframe] Session ID became undefined during initialization');
-        setError('Session invalid, cannot initialize minigame');
+        const sessionErr = new Error('Session invalid, cannot initialize minigame');
+        setError(sessionErr.message);
         setLoading(false);
         if (initKeyRef.current === initKey) {
           currentRequestRef.current = null;
           initKeyRef.current = null;
+        }
+        if (!mountFailedFiredRef.current) {
+          mountFailedFiredRef.current = true;
+          imperativeCtx?.onEvent('DISPLAY_FAILED', { error: sessionErr });
         }
         return;
       }
 
       try {
         setLoading(true);
-        console.log('[GameIframe] Calling getMinigame with sessionId:', currentSessionId);
         const response = await getMinigame({
           gameType: gameId,
           sessionId: currentSessionId,
@@ -126,73 +184,63 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           menuId: menuId ?? undefined,
         });
 
-        // Only process response if this is still the current request
-        if (initKeyRef.current !== initKey) {
-          console.log('[GameIframe] Response received but parameters changed, ignoring');
-          return;
-        }
+        if (initKeyRef.current !== initKey) return;
 
         setIframeUrl(response.adResponse.iframe_url);
-        // Callback with the ad_id for tracking
+        if (response.adResponse.serve_id) {
+          setServeId(response.adResponse.serve_id);
+        }
         if (onAdIdReceived && response.adResponse.ad_id) {
           onAdIdReceived(response.adResponse.ad_id);
         }
-      } catch (err) {
-        // Only set error if this is still the current request
-        if (initKeyRef.current !== initKey) {
-          console.log('[GameIframe] Error occurred but parameters changed, ignoring');
-          return;
+        if (onServeIdReceived && response.adResponse.serve_id) {
+          onServeIdReceived(response.adResponse.serve_id);
         }
+      } catch (err) {
+        if (initKeyRef.current !== initKey) return;
         console.error('Error initializing minigame:', err);
         setError('Failed to load game. Please try again.');
+        if (!mountFailedFiredRef.current) {
+          mountFailedFiredRef.current = true;
+          imperativeCtx?.onEvent('DISPLAY_FAILED', { error: err });
+        }
       } finally {
-        // Only update loading state if this is still the current request
         if (initKeyRef.current === initKey) {
           setLoading(false);
           currentRequestRef.current = null;
-          // Don't clear initKeyRef here - let the next effect run decide
         }
       }
     };
 
-    // Store the promise and execute
     const requestPromise = initMinigame();
     currentRequestRef.current = requestPromise;
 
-    // Cleanup function
     return () => {
-      // If parameters changed, the new effect will handle it
-      // We don't need to abort here since we check initKeyRef in the async function
-      console.log('[GameIframe] Cleanup for key:', initKey);
+      // Parameter-change detection handled via initKeyRef inside the async
+      // function — no abort needed here.
     };
-  }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId, menuId]);
+  }, [gameId, charID, charName, charImage, charDesc, delegateChar, sessionId, menuId, _preloadedMinigame, imperativeCtx]);
 
-  // Handle ESC key to close
+  // ESC to close + lock body scroll while open
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
-
     document.addEventListener('keydown', handleEscape);
-    // Prevent body scroll when iframe is open
     document.body.style.overflow = 'hidden';
-
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
     };
   }, [onClose]);
 
-  // Handle click outside (on overlay) to close
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === overlayRef.current) {
-      onClose();
-    }
+    if (e.target === overlayRef.current) onClose();
   };
 
-  // Calculate container height based on playableHeight prop (matches RN SDK logic)
+  // Calculate container height based on playableHeight prop (bottom sheet mode).
+  const handleOffset = !isDesktop ? HANDLE_HEIGHT : 0;
+
   const { containerHeight, isBottomSheet } = useMemo(() => {
     if (playableHeight === undefined || playableHeight === null) {
       return { containerHeight: null, isBottomSheet: false };
@@ -201,15 +249,14 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     const screenHeight = window.innerHeight;
 
     if (typeof playableHeight === 'number') {
-      // Treat values between 0 and 1 (exclusive) as percentages (e.g., 0.8 = 80%)
       if (playableHeight > 0 && playableHeight < 1) {
         if (playableHeight >= 0.95) {
           return { containerHeight: null, isBottomSheet: false };
         }
-        const computed = Math.max(Math.min(screenHeight * playableHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
+        const computed = Math.max(Math.min(screenHeight * playableHeight + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
         return { containerHeight: computed, isBottomSheet: true };
       }
-      const clamped = Math.max(Math.min(playableHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
+      const clamped = Math.max(Math.min(playableHeight + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
       if (clamped >= screenHeight * 0.95) {
         return { containerHeight: null, isBottomSheet: false };
       }
@@ -220,22 +267,19 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       if (playableHeight.toLowerCase() === 'auto') {
         return { containerHeight: null, isBottomSheet: false };
       }
-
       if (playableHeight.includes('%')) {
         const pct = parseFloat(playableHeight) / 100;
         if (!isNaN(pct)) {
           if (pct >= 0.95) {
             return { containerHeight: null, isBottomSheet: false };
           }
-          const computed = Math.max(Math.min(screenHeight * pct, screenHeight), MIN_PLAYABLE_HEIGHT);
+          const computed = Math.max(Math.min(screenHeight * pct + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
           return { containerHeight: computed, isBottomSheet: true };
         }
       }
-
-      // Numeric string without % (e.g., "600")
       const parsed = parseFloat(playableHeight);
       if (!isNaN(parsed)) {
-        const clamped = Math.max(Math.min(parsed, screenHeight), MIN_PLAYABLE_HEIGHT);
+        const clamped = Math.max(Math.min(parsed + handleOffset, screenHeight), MIN_PLAYABLE_HEIGHT);
         if (clamped >= screenHeight * 0.95) {
           return { containerHeight: null, isBottomSheet: false };
         }
@@ -244,15 +288,14 @@ export const GameIframe: React.FC<GameIframeProps> = ({
     }
 
     return { containerHeight: null, isBottomSheet: false };
-  }, [playableHeight]);
+  }, [playableHeight, MIN_PLAYABLE_HEIGHT, handleOffset]);
 
-  // Effective height: user-resized overrides calculated
-  const effectiveHeight = resizedHeight ?? containerHeight;
+  const baseHeight = resizedHeight ?? containerHeight;
+  const effectiveHeight = baseHeight;
 
   // Re-clamp resizedHeight on window resize
   useEffect(() => {
     if (resizedHeight === null) return;
-
     const handleResize = () => {
       const screenHeight = window.innerHeight;
       const clamped = Math.max(Math.min(resizedHeight, screenHeight), MIN_PLAYABLE_HEIGHT);
@@ -262,12 +305,11 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         setResizedHeight(clamped);
       }
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [resizedHeight]);
 
-  // Drag-to-resize handlers (Pointer Events for unified mouse+touch)
+  // Drag-to-resize handlers (mobile bottom sheet)
   const handleDragStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -279,22 +321,22 @@ export const GameIframe: React.FC<GameIframeProps> = ({
 
   const handleDragMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
-    const deltaY = dragStartY.current - e.clientY; // up = positive = taller
+    const deltaY = dragStartY.current - e.clientY;
     const screenHeight = window.innerHeight;
     const newHeight = Math.max(Math.min(dragStartHeight.current + deltaY, screenHeight), MIN_PLAYABLE_HEIGHT);
     setResizedHeight(newHeight);
-  }, [isDragging]);
+  }, [isDragging, MIN_PLAYABLE_HEIGHT]);
 
   const handleDragEnd = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     setIsDragging(false);
-
-    // Snap to fullscreen if >= 95% of screen height
     if (resizedHeight !== null && resizedHeight >= window.innerHeight * 0.95) {
       setResizedHeight(window.innerHeight);
     }
   }, [isDragging, resizedHeight]);
+
+  const shellReady = !loading && !error && iframeUrl;
 
   return (
     <div
@@ -309,7 +351,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         zIndex: 9999,
         display: 'flex',
-        alignItems: isBottomSheet ? 'flex-end' : 'center',
+        alignItems: isDesktop ? 'center' : (isBottomSheet ? 'flex-end' : 'center'),
         justifyContent: 'center',
         animation: 'fadeIn 0.2s ease-in',
       }}
@@ -318,41 +360,26 @@ export const GameIframe: React.FC<GameIframeProps> = ({
       aria-label="Game iframe"
     >
       <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes slideUp {
-          from {
-            transform: translateY(100%);
-          }
-          to {
-            transform: translateY(0);
-          }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
+
       <div
         style={{
           position: 'relative',
           width: '100%',
-          height: effectiveHeight !== null ? `${effectiveHeight}px` : '100%',
+          height: !isDesktop && effectiveHeight !== null ? `${effectiveHeight}px` : '100%',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: isBottomSheet ? 'flex-end' : 'center',
+          justifyContent: !isDesktop && isBottomSheet ? 'flex-end' : 'center',
           pointerEvents: 'none',
           transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-          ...(isBottomSheet ? {
-            animation: 'slideUp 0.3s ease-out',
-          } : {}),
+          ...(!isDesktop && isBottomSheet ? { animation: 'slideUp 0.3s ease-out' } : {}),
         }}
       >
-        {/* Bottom sheet header with draggable handle */}
-        {isBottomSheet && (
+        {/* Bottom-sheet drag handle (mobile only, when playableHeight is set) */}
+        {isBottomSheet && !isDesktop && (
           <div
             onPointerDown={handleDragStart}
             onPointerMove={handleDragMove}
@@ -389,9 +416,9 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           ariaLabel="Close game"
           style={{
             position: 'absolute',
-            top: isBottomSheet ? '44px' : 'max(16px, env(safe-area-inset-top, 16px))',
-            right: 'max(16px, env(safe-area-inset-right, 16px))',
-            zIndex: 10000,
+            top: '50px',
+            right: '16px',
+            zIndex: 10002,
             pointerEvents: 'auto',
           }}
         />
@@ -426,20 +453,24 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           </div>
         )}
 
-        {!loading && !error && iframeUrl && (
-          <iframe
-            src={iframeUrl}
+        {shellReady && (
+          <div
             style={{
               width: '100%',
               flex: 1,
-              border: 'none',
-              display: 'block',
+              minHeight: 0,
+              display: 'flex',
               pointerEvents: 'auto',
             }}
-            title={`Game: ${gameId}`}
-            allow="fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
-          />
+          >
+            <WidgetShell
+              variant="game"
+              gameUrl={iframeUrl!}
+              showBanner={showBanner}
+              serveId={serveId}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
         )}
       </div>
     </div>
