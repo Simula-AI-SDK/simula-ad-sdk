@@ -21,6 +21,7 @@ import type {
   SimulaEventHandler,
   SimulaEventType,
 } from './types';
+import { SIMULA_DEFAULT_CHARID } from './types';
 
 const LOAD_TIMEOUT_MS = 15000;
 
@@ -109,14 +110,20 @@ export class SimulaRewardedMiniGame {
 
   show(params: ImperativeShowParams): void {
     if (this.disposed) return;
-    if (!params || typeof params.charID !== 'string') {
+    if (!params || typeof params.charName !== 'string' || typeof params.charImage !== 'string') {
       // eslint-disable-next-line no-console
-      console.error('[SimulaRewardedMiniGame] show() requires { charID, charName, charImage }');
+      console.error('[SimulaRewardedMiniGame] show() requires { charName, charImage }');
       return;
     }
+    // PRD parity rows 3.1 / 3.6: `charID` is optional. Missing or
+    // non-string values normalize to SIMULA_DEFAULT_CHARID before any
+    // pending/current show state is recorded. Empty string is still a
+    // string and is passed through unchanged.
+    const normalizedCharID = typeof params.charID === 'string' ? params.charID : SIMULA_DEFAULT_CHARID;
+    const normalizedParams: ImperativeShowParams = { ...params, charID: normalizedCharID };
     if (this._visible) return;
 
-    this._pendingShowParams = params;
+    this._pendingShowParams = normalizedParams;
 
     if (!this._ready && !this._loadInFlight) {
       this.load();
@@ -346,7 +353,11 @@ export class SimulaRewardedMiniGame {
         React.createElement(RewardedMiniGame, {
           key: `show-${this._showNonce}`,
           isOpen: true,
-          charID: p.charID,
+          // `p` has already been normalized at the `.show()` boundary; the
+          // `??` is defense-in-depth so the declarative prop's
+          // `charID: string` requirement holds even if a future code path
+          // bypasses normalization.
+          charID: p.charID ?? SIMULA_DEFAULT_CHARID,
           charName: p.charName,
           charImage: p.charImage,
           charDesc: p.charDesc,

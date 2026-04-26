@@ -1,6 +1,14 @@
 import type { Message } from '../types';
 
 /**
+ * Default `charID` injected by imperative `.show()` when callers omit it
+ * (or pass a non-string). PRD parity rows 3.1 / 3.6: `charID` is optional
+ * with a Simula default fallback. Empty string is still a string and is
+ * passed through unchanged — only missing / non-string values normalize.
+ */
+export const SIMULA_DEFAULT_CHARID = 'simula-default';
+
+/**
  * PRD-grounded event catalog for the imperative ad API.
  * Shared events fire for both interstitial and rewarded managers; the last
  * two events are rewarded-only.
@@ -49,9 +57,13 @@ export interface RewardedInitConfig extends ImperativeInitConfigBase {}
 /**
  * Per-show parameters for both manager classes.
  * All character data travels on `.show()`, never `.init()`.
+ *
+ * `charID` is optional: when missing or non-string, the imperative
+ * managers normalize it to `SIMULA_DEFAULT_CHARID` before recording any
+ * pending/current show state. `charName` and `charImage` remain required.
  */
 export interface ImperativeShowParams {
-  charID: string;
+  charID?: string;
   charName: string;
   charImage: string;
   charDesc?: string;

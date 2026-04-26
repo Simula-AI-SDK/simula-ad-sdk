@@ -24,6 +24,7 @@ import type {
   SimulaEventHandler,
   SimulaEventType,
 } from './types';
+import { SIMULA_DEFAULT_CHARID } from './types';
 
 const LOAD_TIMEOUT_MS = 15000;
 
@@ -141,14 +142,20 @@ export class SimulaMiniGameInterstitial {
 
   show(params: ImperativeShowParams): void {
     if (this.disposed) return;
-    if (!params || typeof params.charID !== 'string') {
+    if (!params || typeof params.charName !== 'string' || typeof params.charImage !== 'string') {
       // eslint-disable-next-line no-console
-      console.error('[SimulaMiniGameInterstitial] show() requires { charID, charName, charImage }');
+      console.error('[SimulaMiniGameInterstitial] show() requires { charName, charImage }');
       return;
     }
+    // PRD parity rows 3.1 / 3.6: `charID` is optional. Missing or
+    // non-string values normalize to SIMULA_DEFAULT_CHARID before any
+    // pending/current show state is recorded. Empty string is still a
+    // string and is passed through unchanged.
+    const normalizedCharID = typeof params.charID === 'string' ? params.charID : SIMULA_DEFAULT_CHARID;
+    const normalizedParams: ImperativeShowParams = { ...params, charID: normalizedCharID };
     if (this._visible) return; // No-op while visible.
 
-    this._pendingShowParams = params;
+    this._pendingShowParams = normalizedParams;
 
     if (!this._ready && !this._loadInFlight) {
       // Lazy load triggered by show().
@@ -483,7 +490,11 @@ export class SimulaMiniGameInterstitial {
               this._closeFromTerminalGame();
             },
             charName: params.charName,
-            charID: params.charID,
+            // `params` has already been normalized at the `.show()` boundary;
+            // the `??` is defense-in-depth so the declarative prop's
+            // `charID: string` requirement holds even if a future code path
+            // bypasses normalization.
+            charID: params.charID ?? SIMULA_DEFAULT_CHARID,
             charImage: params.charImage,
             charDesc: params.charDesc,
             messages: params.messages,

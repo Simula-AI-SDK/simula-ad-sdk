@@ -9,6 +9,7 @@ export { RewardedMiniGame } from './components/miniGame/RewardedMiniGame';
 // Imperative API (additive; declarative exports above remain unchanged).
 export { SimulaMiniGameInterstitial } from './imperative/SimulaMiniGameInterstitial';
 export { SimulaRewardedMiniGame } from './imperative/SimulaRewardedMiniGame';
+export { SIMULA_DEFAULT_CHARID } from './imperative/types';
 export type {
   ImperativeInitConfigBase,
   InterstitialInitConfig,
