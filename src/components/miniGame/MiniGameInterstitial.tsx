@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { MiniGameInterstitialProps, MiniGameInterstitialTheme } from '../../types';
 import defaultBackgroundImage from '../../assets/minigame_interstitial_background.png';
+import { SimulaImperativeContext } from '../../imperative/SimulaImperativeContext';
 
 
 const defaultTheme: Required<MiniGameInterstitialTheme> = {
@@ -24,11 +25,21 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
   onClick,
   onClose,
 }) => {
+  const imperativeCtx = useContext(SimulaImperativeContext);
   const [imageError, setImageError] = useState(false);
   const [closedInternally, setClosedInternally] = useState(false);
   const appliedTheme = { ...defaultTheme, ...theme };
 
   const isVisible = isOpen && !closedInternally;
+
+  // Imperative-only: emit DISPLAYED exactly once on the first visible transition.
+  const displayedOnceRef = useRef(false);
+  useEffect(() => {
+    if (isVisible && !displayedOnceRef.current) {
+      displayedOnceRef.current = true;
+      imperativeCtx?.onEvent('DISPLAYED', null);
+    }
+  }, [isVisible, imperativeCtx]);
 
   // Reset internal close state when parent re-opens
   useEffect(() => {
@@ -44,14 +55,33 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
   }, [charImage]);
 
   const handleClose = useCallback(() => {
+    // Imperative owner fires CLOSED + tears down before the declarative path runs.
+    imperativeCtx?.onEvent('CLOSED', null);
+    imperativeCtx?.onImperativeClose();
     setClosedInternally(true);
     onClose?.();
-  }, [onClose]);
+  }, [onClose, imperativeCtx]);
 
   const handleCtaClick = useCallback(() => {
+    if (imperativeCtx) {
+      // Imperative flow: CTA emits CLICKED and hands off to the manager's
+      // phase machine. Per proposal #19 the manager now advances the
+      // `interstitial:cta` token directly from `interstitial` → `game`
+      // (the legacy `fullInvitation` modal is no longer in the imperative
+      // happy path). The manager unmounts this component by moving the
+      // tree forward; we intentionally do NOT emit CLOSED and do NOT call
+      // onImperativeClose here. Keeping `closedInternally` unset lets the
+      // manager decide when the declarative tree comes down.
+      imperativeCtx.onEvent('CLICKED', null);
+      imperativeCtx.onImperativeAdvance?.('interstitial:cta');
+      onClick();
+      return;
+    }
+    // Declarative flow unchanged: fire CTA callback and let the parent
+    // close via `isOpen=false`.
     setClosedInternally(true);
     onClick();
-  }, [onClick]);
+  }, [onClick, imperativeCtx]);
 
   // Prevent body scroll when visible
   useEffect(() => {
@@ -173,7 +203,7 @@ export const MiniGameInterstitial: React.FC<MiniGameInterstitialProps> = ({
 
         {/* CTA button */}
         <button
-          onClick={handleCtaClick}
+          onClick={(e) => { e.stopPropagation(); handleCtaClick(); }}
           style={{
             backgroundColor: appliedTheme.ctaColor,
             color: appliedTheme.ctaTextColor,

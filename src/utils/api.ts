@@ -1,21 +1,9 @@
-import { Message, AdData, InChatTheme, GameData, NativeContext } from '../types';
+import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
 
-const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-// const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
+export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
+// export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
-export interface FetchAdRequest {
-  messages: Message[];
-  apiKey: string;
-  slotId?: string;
-  theme?: InChatTheme;
-  sessionId?: string;
-  charDesc?: string;
-}
-
-export interface FetchAdResponse {
-  ad?: AdData;
-  error?: string;
-}
 
 // Create a server session and return its id
 export async function createSession(apiKey: string, devMode?: boolean, primaryUserID?: string): Promise<string | undefined> {
@@ -62,6 +50,25 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
       throw error;
     }
     return undefined;
+  }
+}
+
+// Update the primaryUserID (PPID) on an existing session
+export async function updateSessionPpid(sessionId: string, ppid: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/session/${sessionId}/ppid/${ppid}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to update session PPID: HTTP ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Failed to update session PPID:', error);
   }
 }
 
@@ -230,11 +237,6 @@ export const trackViewportExit = async (adId: string, apiKey: string): Promise<v
   }
 };
 
-export interface CatalogResponse {
-    menuId: string;
-    games: GameData[];
-}
-
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
     try {
         const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2`, {
@@ -290,32 +292,6 @@ export const fetchCatalog = async (): Promise<CatalogResponse> => {
     }
 }
 
-export interface InitMinigameRequest {
-    gameType: string;
-    sessionId: string;
-    convId?: string | null;
-    entryPoint?: string;
-    currencyMode?: boolean;
-    w: number;
-    h: number;
-    char_id?: string;
-    char_name?: string;
-    char_image?: string;
-    char_desc?: string;
-    messages?: Message[];
-    delegate_char?: boolean;
-    menuId?: string;
-}
-
-export interface MinigameResponse {
-    adType: 'minigame';
-    adInserted: boolean;
-    adResponse: {
-        ad_id: string;
-        iframe_url: string;
-    };
-}
-
 export const getMinigame = async (params: InitMinigameRequest): Promise<MinigameResponse> => {
     try {
         const requestBody: Record<string, any> = {
@@ -360,9 +336,9 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
     }
 }
 
-export const fetchAdForMinigame = async (aid: string): Promise<string | null> => {
+export const fetchAdForMinigame = async (aid: string, sessionId: string): Promise<string | null> => {
     try {
-        const response: Response = await fetch(`${API_BASE_URL}/minigames/fallback_ad/${aid}`, {
+        const response: Response = await fetch(`${API_BASE_URL}/minigames/fallback_ad/${aid}?session_id=${encodeURIComponent(sessionId)}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -386,20 +362,193 @@ export const fetchAdForMinigame = async (aid: string): Promise<string | null> =>
     }
 };
 
-// NativeBanner API
-export interface FetchNativeBannerRequest {
+// Rewarded MiniGame API
+export const initRewardedGame = async (params: {
   sessionId: string;
-  slot: string;
-  position: number;
-  context: NativeContext;
-  width?: number;
+  w: number;
+  h: number;
+  charId?: string;
+  charName?: string;
+  charImage?: string;
+  charDesc?: string;
+  messages?: Message[];
+  minPlayThreshold?: number;
+}): Promise<InitRewardedResponse> => {
+  try {
+    const requestBody: Record<string, any> = {
+      session_id: params.sessionId,
+      w: params.w,
+      h: params.h,
+      char_id: params.charId,
+      char_name: params.charName,
+      char_image: params.charImage,
+      char_desc: params.charDesc,
+      messages: params.messages,
+    };
+
+    if (params.minPlayThreshold !== undefined) {
+      requestBody.min_play_threshold = params.minPlayThreshold;
+    }
+
+    const response: Response = await fetch(`${API_BASE_URL}/minigames/init/rewarded`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to initialize rewarded game:', error);
+    throw error;
+  }
+};
+
+export const verifyReward = async (params: {
+  serveId: string;
+  sessionId: string;
+  elapsedPlayTime: number;
+}): Promise<VerifyRewardResponse> => {
+  try {
+    const response: Response = await fetch(`${API_BASE_URL}/minigames/verify-reward`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify({
+        serve_id: params.serveId,
+        session_id: params.sessionId,
+        elapsed_play_time: params.elapsedPlayTime,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to verify reward:', error);
+    throw error;
+  }
+};
+
+/**
+ * Best-effort claim-initiation trace. Fires when the user taps "Claim Reward"
+ * on the rewarded flow, BEFORE the verify-reward call. Tracing-only,
+ * unauthenticated, keepalive so it survives tab-close races. Never blocks
+ * the UI; logs errors only.
+ */
+export async function reportClaimInitiated(params: {
+  serveId: string;
+  sessionId: string;
+  ts: number;
+}): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/minigames/claim-initiated`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify({
+        serve_id: params.serveId,
+        session_id: params.sessionId,
+        ts: params.ts,
+      }),
+      keepalive: true,
+    });
+  } catch (error) {
+    console.error('[reportClaimInitiated] Failed:', error);
+  }
 }
 
-export interface FetchNativeAdResponse {
-    ad?: AdData;
-    error?: string;
-}
+export const reportAdInterstitial = async (params: {
+  serveId: string;
+  sessionId: string;
+  adSource: 'simula' | 'aditude' | 'none';
+  renderedFormat?: string;
+}): Promise<void> => {
+  try {
+    console.log('[reportAdInterstitial] fetching', params);
+    // keepalive: true — the close-flow variant of this call fires
+    // immediately before the user navigates away. Without keepalive the
+    // browser aborts the beacon on tab close / navigation, losing the
+    // impression. Worker:4 verified this race against dev.3.0 on
+    // coolaigames.com and recommended the flag.
+    const response = await fetch(`${API_BASE_URL}/minigames/play/${encodeURIComponent(params.serveId)}/ad-interstitial`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+      body: JSON.stringify({
+        session_id: params.sessionId,
+        ad_source: params.adSource,
+        rendered_format: params.renderedFormat ?? null,
+      }),
+      keepalive: true,
+    });
+    console.log('[reportAdInterstitial] response status:', response.status);
+  } catch (error) {
+    // Best-effort tracking — don't block the ad flow
+    console.error('[reportAdInterstitial] Failed:', error);
+  }
+};
 
+// Aditude API
+export const fetchAditudeConfig = async (domain: string): Promise<AditudeConfig | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/aditude/config?domain=${encodeURIComponent(domain)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: AditudeConfig = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch Aditude config:', error);
+    return null;
+  }
+};
+
+export const fetchAllAditudeConfigs = async (): Promise<AditudeConfig[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/aditude/config/all`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '1',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: AditudeConfig[] = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch all Aditude configs:', error);
+    return [];
+  }
+};
+
+// NativeBanner API
 export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Promise<FetchNativeAdResponse> => {
   try {
     const requestBody = {

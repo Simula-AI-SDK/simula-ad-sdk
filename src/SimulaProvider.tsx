@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { SimulaProviderProps, SimulaContextValue, AdData } from './types';
-import { createSession } from './utils/api';
+import { createSession, updateSessionPpid, fetchAditudeConfig } from './utils/api';
 import { validateSimulaProviderProps } from './utils/validation';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
@@ -29,11 +29,19 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
   } = props;
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
 
+  // aditude
+  const [aditudeReady, setAditudeReady] = useState<boolean>(false);
+  const [aditudeConfig, setAditudeConfig] = useState<import('./types').AditudeConfig | undefined>(undefined);
+
   // Ad caching infrastructure (matching Flutter SDK)
   const adCacheRef = useRef<Map<string, AdData>>(new Map());
   const heightCacheRef = useRef<Map<string, number>>(new Map());
   const noFillSetRef = useRef<Set<string>>(new Set());
 
+  // Track previous primaryUserID for change detection
+  const prevPrimaryUserIDRef = useRef<string | undefined>(primaryUserID);
+
+  // Effect 1: Create session on mount (or when apiKey/devMode change)
   useEffect(() => {
     let cancelled = false;
 
@@ -47,7 +55,52 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
 
     ensureSession();
     return () => { cancelled = true; };
-  }, [apiKey, devMode, primaryUserID, hasPrivacyConsent]);
+  }, [apiKey, devMode]);
+
+  // Effect 2: PATCH existing session when primaryUserID changes
+  useEffect(() => {
+    const effectiveUserID = hasPrivacyConsent ? primaryUserID : undefined;
+    const prev = prevPrimaryUserIDRef.current;
+    prevPrimaryUserIDRef.current = primaryUserID;
+
+    // Skip if no session yet, value hasn't actually changed, or no consent/value
+    if (!sessionId || effectiveUserID === prev || !effectiveUserID) return;
+
+    updateSessionPpid(sessionId, effectiveUserID).catch((err) => {
+      console.error('Failed to update session PPID:', err);
+    });
+  }, [primaryUserID, hasPrivacyConsent, sessionId]);
+
+  // Effect 3: Fetch Aditude config from API (skip in devMode).
+  //
+  // We no longer inject Aditude scripts into the publisher's page — the
+  // WidgetShell iframe owns the Aditude Cloud Wrapper inside its own
+  // document, which is what the shell route serves. The publisher's
+  // window.tude is never touched. All we need on the SDK side is the
+  // "is this domain Aditude-enabled?" gate for deciding whether to render
+  // WidgetShell medrecs at all.
+  useEffect(() => {
+    if (devMode) return;
+
+    let cancelled = false;
+
+    async function loadAditudeConfig() {
+      try {
+        const domain = window.location.hostname;
+        const config = await fetchAditudeConfig(domain);
+
+        if (cancelled || !config || !config.enabled) return;
+
+        setAditudeConfig(config);
+        setAditudeReady(true);
+      } catch {
+        // Silently disable Aditude — existing SDK behavior unchanged
+      }
+    }
+
+    loadAditudeConfig();
+    return () => { cancelled = true; };
+  }, [devMode])
 
   // Cache management functions
   const getCachedAd = useCallback((slot: string, position: number): AdData | null => {
@@ -92,6 +145,8 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     cacheHeight,
     hasNoFill,
     markNoFill,
+    aditudeConfig,
+    aditudeReady,
   }), [apiKey, devMode, sessionId, hasPrivacyConsent, getCachedAd, cacheAd, getCachedHeight, cacheHeight, hasNoFill, markNoFill]);
 
   return (
