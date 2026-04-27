@@ -414,6 +414,54 @@ export interface RewardedMiniGameProps {
   messages?: Message[];
 }
 
+// RewardInvitation types
+export type RewardInvitationAnimation = 'pop' | 'fade' | 'none';
+
+export interface RewardInvitationTheme {
+  /** Brand accent. Drives the avatar ring, label, top hairline, CTA gradient, and glow. Default: '#F45B69'. */
+  accentColor?: string;
+  /** Popup background. Accepts any CSS background value (color, gradient, etc.). */
+  backgroundColor?: string;
+  /** Backdrop overlay color. Default: 'rgba(0, 0, 0, 0.7)'. */
+  overlayColor?: string;
+  /** Popup border color. Default: 'rgba(255, 255, 255, 0.08)'. */
+  borderColor?: string;
+  /** Popup corner radius in px. Default: 24. */
+  cornerRadius?: number;
+  /** CTA button corner radius in px. Default: 9999 (pill). */
+  ctaCornerRadius?: number;
+  /** Character image corner radius in px. Default: 18. */
+  charImageCornerRadius?: number;
+  /** Primary text color. Default: '#FFFFFF'. */
+  textColor?: string;
+  /** Font family for all text. */
+  fontFamily?: string;
+}
+
+export interface RewardInvitationProps {
+  isOpen: boolean;
+  charImage: string;
+  charName: string;
+  /** Called when the user taps the CTA. */
+  onClick: () => void;
+  /** Called when the user dismisses (close text, backdrop, or ESC). */
+  onClose: () => void;
+  /** Small label above the character name. Default: 'Game Partner'. */
+  charLabel?: string;
+  titleText?: string;
+  subText?: string;
+  ctaText?: string;
+  closeText?: string;
+  /** Visual + animation customization. */
+  theme?: RewardInvitationTheme;
+  /** Entrance/exit animation. Default: 'pop'. */
+  animation?: RewardInvitationAnimation;
+  /** Whether clicking the dim backdrop dismisses the invitation. Default: true. */
+  dismissOnBackdrop?: boolean;
+  /** Whether the ESC key dismisses the invitation. Default: true. */
+  dismissOnEsc?: boolean;
+}
+
 // NativeBanner types
 export interface NativeContext {
   searchTerm?: string;
