@@ -73,4 +73,7 @@ export type {
   RewardedMiniGameProps,
   InitRewardedResponse,
   VerifyRewardResponse,
+  RewardInvitationProps,
+  RewardInvitationTheme,
+  RewardInvitationAnimation,
 } from './types';
