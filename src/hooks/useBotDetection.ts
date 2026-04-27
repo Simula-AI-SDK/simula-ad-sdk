@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { load } from '@fingerprintjs/botd';
 import { BotDetectionResult } from '../types';
+import { logger } from '../utils/logger';
 
 export const useBotDetection = (): BotDetectionResult => {
   const [result, setResult] = useState<BotDetectionResult>({
@@ -24,7 +25,7 @@ export const useBotDetection = (): BotDetectionResult => {
         });
       } catch (error) {
         // If BotD fails to load, assume human user (fail open for better UX)
-        console.warn('BotD detection failed, assuming human user:', error);
+        logger.debug('BotD detection failed, assuming human user:', error);
         
         setResult({
           isBot: false,

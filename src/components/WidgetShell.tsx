@@ -83,11 +83,6 @@ export const WidgetShell: React.FC<WidgetShellProps> = ({
       const currentServeId = serveIdRef.current;
       const currentSessionId = sessionIdRef.current;
       if (!currentServeId || !currentSessionId) {
-        console.warn('[WidgetShell] adServe received but serveId/sessionId missing', {
-          variant,
-          serveId: currentServeId,
-          sessionId: currentSessionId,
-        });
         return;
       }
 
@@ -99,12 +94,6 @@ export const WidgetShell: React.FC<WidgetShellProps> = ({
         return;
       }
       const renderedFormat = divIdToRenderedFormat(divId);
-      console.log('[WidgetShell] forwarding adServe to /ad-interstitial', {
-        variant,
-        divId,
-        renderedFormat,
-        serveId: currentServeId,
-      });
       reportAdInterstitial({
         serveId: currentServeId,
         sessionId: currentSessionId,
