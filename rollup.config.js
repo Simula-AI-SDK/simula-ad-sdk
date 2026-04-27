@@ -2,6 +2,7 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import image from '@rollup/plugin-image';
+import terser from '@rollup/plugin-terser';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import dts from 'rollup-plugin-dts';
 import { readFileSync } from 'fs';
@@ -34,6 +35,18 @@ export default [
         tsconfig: './tsconfig.json',
         exclude: ['**/*.test.*', '**/*.stories.*'],
         declarationDir: 'dist/types',
+      }),
+      // Strip raw console.log/console.debug from the shipped bundle so any
+      // stray developer log never reaches publishers' devtools. We deliberately
+      // keep console.warn/console.error (the production signal channel) and
+      // disable mangling so stack traces stay readable.
+      terser({
+        compress: {
+          drop_console: ['log', 'debug'],
+          pure_funcs: ['console.log', 'console.debug'],
+        },
+        mangle: false,
+        format: { comments: false },
       }),
     ],
     external: ['react', 'react-dom', 'react/jsx-runtime'],

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useRef,
 import { SimulaProviderProps, SimulaContextValue, AdData } from './types';
 import { createSession, updateSessionPpid, fetchAditudeConfig } from './utils/api';
 import { validateSimulaProviderProps } from './utils/validation';
+import { logger, setDebugMode } from './utils/logger';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
 
@@ -41,6 +42,12 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
   // Track previous primaryUserID for change detection
   const prevPrimaryUserIDRef = useRef<string | undefined>(primaryUserID);
 
+  // Sync logger verbosity with devMode so internal debug logs only appear
+  // when the publisher has explicitly opted in via <SimulaProvider devMode>.
+  useEffect(() => {
+    setDebugMode(devMode);
+  }, [devMode]);
+
   // Effect 1: Create session on mount (or when apiKey/devMode change)
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +74,7 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     if (!sessionId || effectiveUserID === prev || !effectiveUserID) return;
 
     updateSessionPpid(sessionId, effectiveUserID).catch((err) => {
-      console.error('Failed to update session PPID:', err);
+      logger.debug('Failed to update session PPID:', err);
     });
   }, [primaryUserID, hasPrivacyConsent, sessionId]);
 

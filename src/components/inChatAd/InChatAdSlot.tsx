@@ -7,6 +7,7 @@ import { useViewability } from '../../hooks/useViewability';
 import { fetchAd, trackImpression } from '../../utils/api';
 import { createInChatAdSlotCSS } from '../../utils/styling';
 import { validateInChatAdSlotProps } from '../../utils/validation';
+import { logger } from '../../utils/logger';
 import { InChatAdSlotProps, AdData } from '../../types';
 
 // Internal constant to prevent API abuse
@@ -78,7 +79,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     }
   });
 
-  const { isBot, reasons } = useBotDetection();
+  const { isBot } = useBotDetection();
 
   // Measure actual width once when element is ready
   useEffect(() => {
@@ -124,7 +125,6 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     // Block if sessionId is missing or invalid
     if (!sessionId) {
       setError('Session invalid, fetch ad request blocked');
-      console.error('Session invalid, fetch ad request blocked');
       return;
     }
 
@@ -138,7 +138,6 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
 
     // Block ad requests from detected bots
     if (isBot) {
-      console.warn('Bot detected, blocking ad request:', { reasons });
       return;
     }
 
@@ -169,7 +168,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
 
       // Validate minimum width if we have a concrete value
       if (widthValue !== null && widthValue < minWidth) {
-        console.error(`AdSlot width ${widthValue}px is below minimum ${minWidth}px. Skipping ad request.`);
+        logger.error(`AdSlot width ${widthValue}px is below minimum ${minWidth}px. Skipping ad request.`);
         setError(`Invalid width: ${widthValue}px (minimum: ${minWidth}px)`);
         setLoading(false);
         return;
@@ -206,7 +205,6 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
       });
 
       if (result.error) {
-        console.warn('🚫 Ad fetch failed:', result.error);
         setError(result.error);
         onError?.(new Error(result.error));
       } else if (result.ad) {
@@ -215,7 +213,6 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
         // Mark as triggered - this AdSlot will never fetch again
         setHasTriggered(true);
       } else {
-        console.warn('🚫 No ad returned from API - no fill or invalid response');
         setError('No ad available');
         onError?.(new Error('No ad available'));
       }
@@ -226,7 +223,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     } finally {
       setLoading(false);
     }
-  }, [hasBeenViewed, loading, hasTriggered, error, messages, apiKey, slotId, theme, onFill, onError, isBot, reasons, sessionId, measuredWidth]);
+  }, [hasBeenViewed, loading, hasTriggered, error, messages, apiKey, slotId, theme, onFill, onError, isBot, sessionId, measuredWidth]);
 
   useDebounce(
     () => {

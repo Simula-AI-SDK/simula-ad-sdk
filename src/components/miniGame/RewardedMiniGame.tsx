@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RewardedMiniGameProps } from '../../types';
 import { initRewardedGame, fetchAdForMinigame, verifyReward, reportAdInterstitial } from '../../utils/api';
+import { logger } from '../../utils/logger';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
 import { MiniGameMenu } from './MiniGameMenu';
@@ -46,7 +47,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
   // Clamp minPlayThreshold to [10, 30] with warning
   const clampedThreshold = (() => {
     if (minPlayThreshold < 10 || minPlayThreshold > 30) {
-      console.warn(
+      logger.warn(
         `[RewardedMiniGame] minPlayThreshold ${minPlayThreshold} is out of range [10, 30]. Clamping to ${Math.max(10, Math.min(30, minPlayThreshold))}.`
       );
     }
@@ -127,7 +128,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
         playStartRef.current = Date.now();
       } catch (err) {
         if (cancelled) return;
-        console.error('[RewardedMiniGame] Failed to initialize:', err);
+        logger.debug('[RewardedMiniGame] Failed to initialize:', err);
         setError('Failed to load game.');
         // PRD: game iframe fails to load → no session created; close button never appears
       }
@@ -210,8 +211,8 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
             adFetchingRef.current = false;
             return;
           }
-        } catch (err) {
-          console.error('[RewardedMiniGame] Failed to fetch ad:', err);
+        } catch {
+          // Swallow — falls through to aditude fallback below.
         }
       }
 
@@ -286,7 +287,7 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
         });
         return result.verified;
       } catch (err) {
-        console.error(`[RewardedMiniGame] SSV attempt ${retries + 1} failed:`, err);
+        logger.debug(`[RewardedMiniGame] SSV attempt ${retries + 1} failed:`, err);
         return false;
       }
     };

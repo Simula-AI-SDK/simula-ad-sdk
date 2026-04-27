@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { getMinigame } from '../../utils/api';
+import { logger } from '../../utils/logger';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
 import { CloseButton } from './CloseButton';
@@ -141,7 +142,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
         }
       } catch (err) {
         if (initKeyRef.current !== initKey) return;
-        console.error('Error initializing minigame:', err);
+        logger.debug('Error initializing minigame:', err);
         setError('Failed to load game. Please try again.');
       } finally {
         if (initKeyRef.current === initKey) {

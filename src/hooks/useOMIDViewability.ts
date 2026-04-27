@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { logger } from '../utils/logger';
 
 interface OMIDViewabilityResult {
   isViewable: boolean;
@@ -57,7 +58,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
 
         const sessionClient = window.omidSessionClient?.['1.0.0'];
         if (!sessionClient) {
-          console.warn('OMID Session Client not available, falling back to basic viewability');
+          logger.debug('OMID Session Client not available, falling back to basic viewability');
           initializeFallbackViewability();
           return;
         }
@@ -95,7 +96,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
               adEventsRef.current?.loaded();
               break;
             case 'sessionError':
-              console.error('OMID session error:', event.data);
+              logger.debug('OMID session error:', event.data);
               initializeFallbackViewability();
               break;
             case 'sessionFinish':
@@ -107,7 +108,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
         });
 
       } catch (error) {
-        console.warn('OMID initialization failed, using fallback:', error);
+        logger.debug('OMID initialization failed, using fallback:', error);
         initializeFallbackViewability();
       }
     };
@@ -216,8 +217,8 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
       if (omidSessionRef.current) {
         try {
           omidSessionRef.current.finish();
-        } catch (error) {
-          console.warn('Error finishing OMID session:', error);
+        } catch {
+          // Cleanup-path swallow — non-critical.
         }
       }
     };
@@ -253,7 +254,7 @@ export const useOMIDViewability = (options: OMIDOptions = {}): OMIDViewabilityRe
           onImpressionTracked(adId);
         }
       } catch (error) {
-        console.warn('OMID impression tracking failed:', error);
+        logger.debug('OMID impression tracking failed:', error);
         setImpressionTracked(true); // Mark as tracked to prevent retries
       }
     } else {

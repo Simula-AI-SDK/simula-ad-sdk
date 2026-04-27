@@ -170,8 +170,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
               })
           )
         );
-      } catch (error) {
-        console.error('Failed to load game catalog:', error);
+      } catch {
         setCatalogError(true);
         setGames([]);
         setMenuId(null);
@@ -262,7 +261,6 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   }, [isOpen, adIframeUrl]);
 
   const handleClose = useCallback(() => {
-    console.log('Menu closed');
     onClose();
   }, [onClose]);
 
@@ -296,28 +294,18 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   };
 
   const handleServeIdReceived = (serveId: string) => {
-    console.log('[MiniGameMenu] handleServeIdReceived:', serveId);
     setCurrentServeId(serveId);
   };
 
   // Fire-and-forget ad interstitial report
   const reportAd = useCallback((adSource: 'simula' | 'aditude' | 'none', renderedFormat?: string) => {
-    console.log('[MiniGameMenu] reportAd called', {
-      adSource,
-      renderedFormat,
-      currentServeId,
-      sessionId: sessionIdRef.current,
-    });
     if (currentServeId && sessionIdRef.current) {
-      console.log('[MiniGameMenu] reportAd firing HTTP call');
       reportAdInterstitial({
         serveId: currentServeId,
         sessionId: sessionIdRef.current,
         adSource,
         renderedFormat,
       });
-    } else {
-      console.warn('[MiniGameMenu] reportAd SKIPPED — missing serveId or sessionId');
     }
   }, [currentServeId]);
 
@@ -352,8 +340,8 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
             reportAd('simula');
             return; // Ad will be shown, onGameClose will be called when ad closes
           }
-        } catch (error) {
-          console.error('Error fetching ad:', error);
+        } catch {
+          // Fall through to aditude fallback below
         }
         adFetchingRef.current = false;
       }
