@@ -10,6 +10,7 @@ import { WidgetShell } from '../WidgetShell';
 type Phase = 'idle' | 'loading' | 'playing' | 'ad' | 'claim' | 'verifying' | 'done';
 
 const AD_DURATION = 5; // seconds — Simula-controlled, not publisher-configurable
+const MIN_GAME_HEIGHT = 500;
 
 export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
   isOpen,
@@ -43,6 +44,19 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
   const adTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adFetchingRef = useRef(false);
   const verifyingRef = useRef(false);
+
+  // Desktop detection for centered modal vs. mobile bottom-sheet layout.
+  // Mirrors GameIframe.tsx so the rewarded session uses the same phone-case
+  // shape as the regular minigame flow.
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  );
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isDesktop = viewportWidth >= 768;
 
   // Clamp minPlayThreshold to [10, 30] with warning
   const clampedThreshold = (() => {
@@ -345,6 +359,8 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
     );
   }
 
+  const inAdPhase = phase === 'ad' || phase === 'claim' || phase === 'verifying';
+
   return (
     <div
       style={{
@@ -401,31 +417,104 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
         </div>
       )}
 
-      {/* Phase: playing — game iframe with timer overlay */}
-      {phase === 'playing' && iframeUrl && (
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <iframe
-            src={iframeUrl}
-            style={{
-              width: '100%',
-              flex: 1,
-              border: 'none',
-              display: 'block',
-            }}
-            title="Rewarded game"
-            allow="fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
-          />
+      {/* Sized phone-case container — wraps the playing iframe AND the
+          ad/claim/verifying phase so the rewarded session looks structurally
+          identical to the regular GameIframe flow. Drag-handle from
+          GameIframe is intentionally dropped (rewarded is timer-locked). */}
+      {(phase === 'playing' || inAdPhase) && (
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Phase: playing — WidgetShell game variant inside the phone case. */}
+          {phase === 'playing' && iframeUrl && (
+            <div
+              style={{
+                width: '100%',
+                flex: 1,
+                minHeight: !isDesktop ? `${MIN_GAME_HEIGHT}px` : undefined,
+                display: 'flex',
+              }}
+            >
+              <WidgetShell
+                variant="game"
+                gameUrl={iframeUrl}
+                showBanner
+                serveId={serveId}
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
+          )}
 
-          {/* Timer / Close button overlay on top of iframe */}
-          {playCountdown > 0 ? (
-            // Countdown ring while timer is running
+          {/* Phase: ad / claim / verifying — real ad iframe or Aditude fallback
+              rendered into the same phone-case slot. */}
+          {inAdPhase && (
+            <div
+              style={{
+                width: '100%',
+                flex: 1,
+                minHeight: !isDesktop ? `${MIN_GAME_HEIGHT}px` : undefined,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+              }}
+            >
+              {/* Real ad iframe */}
+              {adIframeUrl && (
+                <iframe
+                  src={adIframeUrl}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    display: 'block',
+                  }}
+                  title="Advertisement"
+                  allow="fullscreen"
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
+                />
+              )}
+
+              {/* Aditude fallback ad — variant="medrec" mirrors MiniGameMenu's
+                  standalone Aditude path so it inherits the regular Aditude
+                  rail rendering. */}
+              {showAditude && !adIframeUrl && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <span
+                    style={{
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      fontSize: '11px',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Ad
+                  </span>
+                  <WidgetShell variant="medrec" serveId={serveId} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Overlays (countdown ring / close button / claim pill) live on top
+              of the sized container regardless of which inner phase content
+              is mounted — top-right corner is anchored to this container. */}
+
+          {/* Playing phase: countdown ring, then CloseButton */}
+          {phase === 'playing' && playCountdown > 0 && (
             <div
               style={{
                 position: 'absolute',
@@ -477,8 +566,9 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
                 {playCountdown}
               </span>
             </div>
-          ) : (
-            // Close button appears after timer elapses
+          )}
+
+          {phase === 'playing' && playCountdown === 0 && (
             <CloseButton
               onClick={handleGameClose}
               ariaLabel="Close game"
@@ -490,21 +580,8 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
               }}
             />
           )}
-        </div>
-      )}
 
-      {/* Phase: ad / claim / verifying — ad interstitial with Claim Reward */}
-      {(phase === 'ad' || phase === 'claim' || phase === 'verifying') && (
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          {/* Ad countdown timer (top-right, during ad phase) */}
+          {/* Ad-phase countdown ring */}
           {phase === 'ad' && adCountdown > 0 && (
             <div
               style={{
@@ -561,48 +638,8 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
             </div>
           )}
 
-          {/* Ad iframe (real ad) */}
-          {adIframeUrl && (
-            <iframe
-              src={adIframeUrl}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                display: 'block',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-              }}
-              title="Advertisement"
-              allow="fullscreen"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
-            />
-          )}
-
-          {/* Aditude fallback ad */}
-          {showAditude && !adIframeUrl && (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '8px',
-            }}>
-              <span
-                style={{
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontSize: '11px',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Ad
-              </span>
-              <WidgetShell variant="rewarded_medrec" serveId={serveId} />
-            </div>
-          )}
-
-          {/* Claim Reward button — appears after ad countdown ends */}
+          {/* Claim Reward button — appears after ad countdown ends. Restyled
+              3px-padding pill from commit 4be6390 preserved verbatim. */}
           {(phase === 'claim' || phase === 'verifying') && (
             <button
               onClick={handleClaimReward}
