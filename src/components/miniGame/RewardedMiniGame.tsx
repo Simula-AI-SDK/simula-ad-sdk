@@ -388,6 +388,42 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
           from { stroke-dashoffset: 0; }
           to { stroke-dashoffset: 81.68; }
         }
+        .simula-rgp-claim-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 6px 12px 6px 10px;
+          border: none;
+          border-radius: 9999px;
+          background-color: #FFFFFF;
+          color: #0F0F0F;
+          font-family: "Inter", -apple-system, "SF Pro Display", "SF Pro Text", system-ui, Roboto, Arial, sans-serif;
+          font-size: 12px;
+          font-weight: 600;
+          line-height: 1;
+          white-space: nowrap;
+          -webkit-tap-highlight-color: transparent;
+          transition: background-color 0.15s ease;
+        }
+        .simula-rgp-claim-btn:hover:not(:disabled) {
+          background-color: #E8E8E8;
+        }
+        .simula-rgp-claim-btn:active:not(:disabled) {
+          background-color: #DCDCDC;
+        }
+        .simula-rgp-claim-btn:disabled {
+          cursor: default;
+        }
+        .simula-rgp-claim-spinner {
+          width: 11px;
+          height: 11px;
+          border: 1.5px solid rgba(0, 0, 0, 0.25);
+          border-top-color: #0F0F0F;
+          border-radius: 50%;
+          animation: simula-rgp-spin 0.8s linear infinite;
+          display: inline-block;
+          box-sizing: border-box;
+        }
       `}</style>
 
       {/* Phase: loading */}
@@ -638,44 +674,47 @@ export const RewardedMiniGame: React.FC<RewardedMiniGameProps> = ({
             </div>
           )}
 
-          {/* Claim Reward button — appears after ad countdown ends. Restyled
-              3px-padding pill from commit 4be6390 preserved verbatim. */}
+          {/* Claim Reward button — appears after ad countdown ends. Flat
+              utilitarian pill in the spirit of AdMob/AppLovin/YouTube reward
+              CTAs: white background, dark text, single small icon, no
+              gradient/shimmer/glow. */}
           {(phase === 'claim' || phase === 'verifying') && (
             <button
+              type="button"
               onClick={handleClaimReward}
               disabled={phase === 'verifying'}
+              className="simula-rgp-claim-btn"
+              aria-label={phase === 'verifying' ? 'Verifying reward' : 'Claim reward'}
               style={{
                 position: 'absolute',
-                top: '8px',
-                right: '8px',
+                top: 'max(12px, env(safe-area-inset-top, 12px))',
+                right: 'max(12px, env(safe-area-inset-right, 12px))',
                 zIndex: 10001,
-                padding: '3px 6px',
-                fontSize: '10px',
-                fontWeight: '700',
-                color: '#000000',
-                backgroundColor: '#FFFFFF',
-                border: 'none',
-                borderRadius: '1000px',
                 cursor: phase === 'verifying' ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'background-color 0.2s ease',
-                whiteSpace: 'nowrap',
-                opacity: phase === 'verifying' ? 0.6 : 1,
+                opacity: phase === 'verifying' ? 0.7 : 1,
               }}
             >
-              {phase === 'verifying' && (
-                <div style={{
-                  width: '10px',
-                  height: '10px',
-                  border: '2px solid rgba(0, 0, 0, 0.3)',
-                  borderTop: '2px solid #000000',
-                  borderRadius: '50%',
-                  animation: 'simula-rgp-spin 1s linear infinite',
-                }} />
+              {phase === 'verifying' ? (
+                <span className="simula-rgp-claim-spinner" aria-hidden="true" />
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
               )}
-              {phase === 'verifying' ? 'Verifying...' : 'Claim Reward'}
+              <span>
+                {phase === 'verifying' ? 'Verifying' : 'Claim Reward'}
+              </span>
             </button>
           )}
         </div>
