@@ -59,7 +59,7 @@ export function RewardInvitation({
   theme,
   animation = 'pop',
   dismissOnBackdrop = true,
-  dismissOnEsc = true,
+  dismissOnEsc = false,
 }: RewardInvitationProps) {
   const [shouldRender, setShouldRender] = useState(false);
   const [isClosing, setIsClosing] = useState(false);

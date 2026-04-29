@@ -458,7 +458,7 @@ export interface RewardInvitationProps {
   animation?: RewardInvitationAnimation;
   /** Whether clicking the dim backdrop dismisses the invitation. Default: true. */
   dismissOnBackdrop?: boolean;
-  /** Whether the ESC key dismisses the invitation. Default: true. */
+  /** Whether the ESC key dismisses the invitation. Default: false. */
   dismissOnEsc?: boolean;
 }
 
