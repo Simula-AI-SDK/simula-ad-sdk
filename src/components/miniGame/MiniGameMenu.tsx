@@ -3,7 +3,7 @@ import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
 import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick, reportAdInterstitial } from '../../utils/api';
-import { prefetchMinigame, clearMinigamePrefetchCache } from '../../utils/minigamePrefetch';
+import { prefetchMinigame, peekMinigame, clearMinigamePrefetchCache } from '../../utils/minigamePrefetch';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
@@ -49,6 +49,11 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const [catalogError, setCatalogError] = useState(false);
   const [adFetched, setAdFetched] = useState(false);
   const [adIframeUrl, setAdIframeUrl] = useState<string | null>(null);
+  // Map of gameId → resolved init payload. Each entry triggers a hidden
+  // WidgetShell to mount and start booting the game off-screen, so the
+  // click-to-show transition is instant.
+  type PrewarmedEntry = { iframeUrl: string; serveId: string | null; adId: string };
+  const [prewarmedShells, setPrewarmedShells] = useState<Map<string, PrewarmedEntry>>(new Map());
   const [currentAdId, setCurrentAdId] = useState<string | null>(null);
   const [currentServeId, setCurrentServeId] = useState<string | null>(null);
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
@@ -155,6 +160,60 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         const catalogResponse = await fetchCatalog();
         setGames(catalogResponse.games);
         setMenuId(catalogResponse.menuId || null);
+
+        // Fire-and-forget: prefetch every game's iframe in parallel, then as
+        // each /minigames/init resolves, push the iframe URL into prewarmedShells
+        // so a hidden WidgetShell mounts and starts booting the game off-screen.
+        // The click-to-show transition is then a CSS toggle, not a fresh load.
+        const currentSessionId = sessionIdRef.current;
+        if (currentSessionId) {
+          const currentMenuId = catalogResponse.menuId || null;
+          for (const g of catalogResponse.games) {
+            prefetchMinigame({
+              gameType: g.id,
+              sessionId: currentSessionId,
+              convId: convId,
+              entryPoint: entryPoint,
+              currencyMode: false,
+              w: window.innerWidth,
+              h: window.innerHeight,
+              char_id: charID,
+              char_name: charName,
+              char_image: charImage,
+              char_desc: charDesc,
+              messages: messages,
+              delegate_char: delegateChar,
+              menuId: currentMenuId ?? undefined,
+            });
+            const cached = peekMinigame(g.id);
+            if (cached) {
+              cached
+                .then((response) => {
+                  // eslint-disable-next-line no-console
+                  console.info('[simula-prewarm] resolved', g.id, response.adResponse.iframe_url);
+                  setPrewarmedShells((prev) => {
+                    if (prev.has(g.id)) return prev;
+                    const next = new Map(prev);
+                    next.set(g.id, {
+                      iframeUrl: response.adResponse.iframe_url,
+                      serveId: response.adResponse.serve_id ?? null,
+                      adId: response.adResponse.ad_id,
+                    });
+                    // eslint-disable-next-line no-console
+                    console.info('[simula-prewarm] pool size now', next.size);
+                    return next;
+                  });
+                })
+                .catch((err) => {
+                  // eslint-disable-next-line no-console
+                  console.warn('[simula-prewarm] failed', g.id, err);
+                });
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn('[simula-prewarm] peek returned null for', g.id);
+            }
+          }
+        }
 
         const imageUrls = catalogResponse.games
           .map((g: GameData) => g.gifCover || g.iconUrl)
@@ -271,34 +330,17 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     }
   };
 
-  // Drop any prefetched-but-unused entries when the menu closes so a later
-  // open with different params (e.g. fresh messages) starts clean.
+  // Tear down prewarmed iframes (and the prefetch cache) only when the
+  // user has fully exited the menu+game flow — i.e. menu closed AND no
+  // game playing AND no ad showing. isOpen flips to false when a game is
+  // selected too, so we can't key on that alone or we'd wipe the prewarm
+  // mid-launch.
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen && !selectedGameId && !adIframeUrl && !shouldFetchAditude) {
       clearMinigamePrefetchCache();
+      setPrewarmedShells(new Map());
     }
-  }, [isOpen]);
-
-  const handleGameHover = useCallback((gameId: string) => {
-    const currentSessionId = sessionIdRef.current;
-    if (!currentSessionId) return;
-    prefetchMinigame({
-      gameType: gameId,
-      sessionId: currentSessionId,
-      convId: convId,
-      entryPoint: entryPoint,
-      currencyMode: false,
-      w: window.innerWidth,
-      h: window.innerHeight,
-      char_id: charID,
-      char_name: charName,
-      char_image: charImage,
-      char_desc: charDesc,
-      messages: messages,
-      delegate_char: delegateChar,
-      menuId: menuId ?? undefined,
-    });
-  }, [convId, entryPoint, charID, charName, charImage, charDesc, messages, delegateChar, menuId]);
+  }, [isOpen, selectedGameId, adIframeUrl, shouldFetchAditude]);
 
   const handleGameSelect = (gameId: string, gameName: string, gameDescription: string) => {
     // Track menu game click if menuId is available
@@ -311,10 +353,22 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     handleClose();
     setSelectedGameId(gameId);
     setSelectedGameName(gameName);
-    // Reset ad tracking when a new game is selected
+    // Reset ad tracking when a new game is selected, then immediately
+    // hydrate from the prewarm if we have it (so the ad-close flow has
+    // ad/serve ids without waiting on a fresh fetch).
     setAdFetched(false);
-    setCurrentAdId(null);
-    setCurrentServeId(null);
+    const prewarm = prewarmedShells.get(gameId);
+    // eslint-disable-next-line no-console
+    console.info(
+      '[simula-prewarm] click',
+      gameId,
+      'prewarmed?',
+      !!prewarm,
+      'pool keys:',
+      Array.from(prewarmedShells.keys()),
+    );
+    setCurrentAdId(prewarm?.adId ?? null);
+    setCurrentServeId(prewarm?.serveId ?? null);
     adFetchingRef.current = false;
     onGameOpen?.(gameName, gameDescription);
   };
@@ -422,8 +476,61 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
 
   return (
     <>
-      {/* Game Iframe */}
-      {selectedGameId && (
+      {/* Prewarmed game iframe pool. Each entry is a hidden, full-screen
+       *  fixed-position WidgetShell that has been booting in the
+       *  background since /minigames/init resolved. When the user picks
+       *  a game we slide the matching shell into view via a CSS
+       *  transform — the iframe stays mounted, so the game continues
+       *  running and the click-to-show transition is effectively free. */}
+      {Array.from(prewarmedShells.entries()).map(([gameId, entry]) => {
+        const isActive = selectedGameId === gameId;
+        return (
+          <div
+            key={`prewarm-${gameId}`}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: isActive ? 9999 : 9000,
+              // Off-screen via transform keeps the iframe at full viewport
+              // size with valid window.innerWidth/innerHeight, while not
+              // being visible or interactive.
+              transform: isActive ? 'translateX(0)' : 'translateX(-100vw)',
+              pointerEvents: isActive ? 'auto' : 'none',
+              backgroundColor: isActive ? 'rgba(0, 0, 0, 0.8)' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-hidden={!isActive}
+          >
+            <WidgetShell
+              variant="game"
+              gameUrl={entry.iframeUrl}
+              showBanner={showBanner}
+              serveId={entry.serveId}
+              style={{ width: '100%', height: '100%' }}
+            />
+            {isActive && (
+              <CloseButton
+                onClick={handleIframeClose}
+                ariaLabel="Close game"
+                style={{
+                  position: 'absolute',
+                  top: '50px',
+                  right: '16px',
+                  zIndex: 10002,
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      {/* Fallback: GameIframe handles the rare case where the user
+       *  clicked a card before its prewarm finished (sessionId race,
+       *  network blip, etc.). It does its own /minigames/init fetch and
+       *  shows a loading spinner. */}
+      {selectedGameId && !prewarmedShells.has(selectedGameId) && (
         <GameIframe
             gameId={selectedGameId}
             charID={charID}
@@ -1032,7 +1139,6 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   charID={charID}
                   theme={appliedTheme}
                   onGameSelect={handleGameSelect}
-                  onGameHover={handleGameHover}
                   menuId={menuId}
                   navigationType={navigationType}
                 />

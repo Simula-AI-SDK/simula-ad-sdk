@@ -4,13 +4,13 @@ import { GameData } from '../../types';
 interface CoverCardProps {
   game: GameData;
   onGameSelect: (gameId: string) => void;
-  onHover?: (gameId: string) => void;
   style?: React.CSSProperties;
 }
 
 const fallbackEmojis = ['🎲', '🎮', '🎰', '🧩', '🎯'];
 
-export const CoverCard: React.FC<CoverCardProps> = ({ game, onGameSelect, onHover, style }) => {
+export const CoverCard: React.FC<CoverCardProps> = ({ game, onGameSelect, style }) => {
+
   const [imageError, setImageError] = useState(false);
   const [usedFallbackIcon, setUsedFallbackIcon] = useState(false);
   const [randomEmoji] = useState(() =>
@@ -34,9 +34,6 @@ export const CoverCard: React.FC<CoverCardProps> = ({ game, onGameSelect, onHove
   return (
     <div
       onClick={() => onGameSelect(game.id)}
-      onMouseEnter={onHover ? () => onHover(game.id) : undefined}
-      onFocus={onHover ? () => onHover(game.id) : undefined}
-      onTouchStart={onHover ? () => onHover(game.id) : undefined}
       style={{
         position: 'relative',
         borderRadius: '18px',

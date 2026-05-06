@@ -14,7 +14,6 @@ interface GameGridProps {
   charID: string;
   theme: MiniGameTheme;
   onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
-  onGameHover?: (gameId: string) => void;
   menuId?: string | null;
   navigationType?: 'dot' | 'arrow' | 'pagination';
 }
@@ -66,11 +65,10 @@ const getDotOpacity = (pageIndex: number, currentPage: number): number => {
 interface MobileCarouselProps {
   games: GameData[];
   onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
-  onGameHover?: (gameId: string) => void;
   accentColor: string;
 }
 
-const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, onGameHover, accentColor }) => {
+const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, accentColor }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -300,7 +298,6 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, on
                   <CoverCard
                     game={game}
                     onGameSelect={(id) => onGameSelect(id, game.name, game.description)}
-                    onHover={onGameHover}
                     style={{
                       width: `${cardWidth}px`,
                       maxWidth: `${cardWidth}px`,
@@ -325,11 +322,10 @@ interface DesktopGridProps {
   games: GameData[];
   theme: MiniGameTheme;
   onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
-  onGameHover?: (gameId: string) => void;
   navigationType: 'dot' | 'arrow' | 'pagination';
 }
 
-const DesktopGrid: React.FC<DesktopGridProps> = ({ games, theme, onGameSelect, onGameHover, navigationType }) => {
+const DesktopGrid: React.FC<DesktopGridProps> = ({ games, theme, onGameSelect, navigationType }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
@@ -504,7 +500,6 @@ const DesktopGrid: React.FC<DesktopGridProps> = ({ games, theme, onGameSelect, o
             key={game.id}
             game={game}
             onGameSelect={(id) => onGameSelect(id, game.name, game.description)}
-            onHover={onGameHover}
             style={{
               width: cardWidth ? `${cardWidth}px` : undefined,
               maxWidth: cardWidth ? `${cardWidth}px` : undefined,
@@ -603,7 +598,6 @@ export const GameGrid: React.FC<GameGridProps> = ({
   charID,
   theme,
   onGameSelect,
-  onGameHover,
   menuId,
   navigationType = 'dot',
 }) => {
@@ -626,7 +620,6 @@ export const GameGrid: React.FC<GameGridProps> = ({
       <MobileCarousel
         games={games}
         onGameSelect={onGameSelect}
-        onGameHover={onGameHover}
         accentColor={accentColor}
       />
     );
@@ -637,7 +630,6 @@ export const GameGrid: React.FC<GameGridProps> = ({
       games={games}
       theme={theme}
       onGameSelect={onGameSelect}
-      onGameHover={onGameHover}
       navigationType={navigationType}
     />
   );

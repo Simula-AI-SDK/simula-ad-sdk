@@ -78,6 +78,32 @@ export const WidgetShell: React.FC<WidgetShellProps> = ({
       const data = e.data;
       if (!data || typeof data !== 'object') return;
       if (data.source !== 'simula-widget-shell') return;
+
+      // Relayed timing messages from the game iframe (e.g. property_pursuit
+      // boot marks). The shell wraps them as {type: 'relay', data: <inner>}.
+      if (data.type === 'relay' && data.data && data.data.source === 'simula-pp-timing') {
+        const inner = data.data;
+        if (inner.kind === 'mark') {
+          // eslint-disable-next-line no-console
+          console.log(
+            '[pp-timing]',
+            inner.label,
+            't=' + Number(inner.t).toFixed(1) + 'ms',
+            '(+' + Number(inner.delta).toFixed(1) + 'ms)',
+          );
+        } else if (inner.kind === 'summary' && Array.isArray(inner.marks)) {
+          // eslint-disable-next-line no-console
+          console.table(
+            inner.marks.map((m: { label: string; t: number; delta: number }) => ({
+              label: m.label,
+              't (ms)': m.t.toFixed(1),
+              'delta (ms)': m.delta.toFixed(1),
+            })),
+          );
+        }
+        return;
+      }
+
       if (data.type !== 'adServe') return;
 
       const currentServeId = serveIdRef.current;
