@@ -3,6 +3,7 @@ import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
 import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick, reportAdInterstitial } from '../../utils/api';
+import { prefetchMinigame, clearMinigamePrefetchCache } from '../../utils/minigamePrefetch';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
@@ -269,6 +270,35 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       handleClose();
     }
   };
+
+  // Drop any prefetched-but-unused entries when the menu closes so a later
+  // open with different params (e.g. fresh messages) starts clean.
+  useEffect(() => {
+    if (!isOpen) {
+      clearMinigamePrefetchCache();
+    }
+  }, [isOpen]);
+
+  const handleGameHover = useCallback((gameId: string) => {
+    const currentSessionId = sessionIdRef.current;
+    if (!currentSessionId) return;
+    prefetchMinigame({
+      gameType: gameId,
+      sessionId: currentSessionId,
+      convId: convId,
+      entryPoint: entryPoint,
+      currencyMode: false,
+      w: window.innerWidth,
+      h: window.innerHeight,
+      char_id: charID,
+      char_name: charName,
+      char_image: charImage,
+      char_desc: charDesc,
+      messages: messages,
+      delegate_char: delegateChar,
+      menuId: menuId ?? undefined,
+    });
+  }, [convId, entryPoint, charID, charName, charImage, charDesc, messages, delegateChar, menuId]);
 
   const handleGameSelect = (gameId: string, gameName: string, gameDescription: string) => {
     // Track menu game click if menuId is available
@@ -1002,6 +1032,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   charID={charID}
                   theme={appliedTheme}
                   onGameSelect={handleGameSelect}
+                  onGameHover={handleGameHover}
                   menuId={menuId}
                   navigationType={navigationType}
                 />

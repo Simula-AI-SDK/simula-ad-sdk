@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { getMinigame } from '../../utils/api';
+import { consumeMinigame } from '../../utils/minigamePrefetch';
 import { logger } from '../../utils/logger';
 import { Message } from '../../types';
 import { useSimula } from '../../SimulaProvider';
@@ -111,7 +112,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
 
       try {
         setLoading(true);
-        const response = await getMinigame({
+        const fetchFresh = () => getMinigame({
           gameType: gameId,
           sessionId: currentSessionId,
           convId: convId,
@@ -127,6 +128,17 @@ export const GameIframe: React.FC<GameIframeProps> = ({
           delegate_char: delegateChar,
           menuId: menuId ?? undefined,
         });
+        const prefetched = consumeMinigame(gameId);
+        let response;
+        if (prefetched) {
+          try {
+            response = await prefetched;
+          } catch {
+            response = await fetchFresh();
+          }
+        } else {
+          response = await fetchFresh();
+        }
 
         if (initKeyRef.current !== initKey) return;
 
