@@ -2,7 +2,7 @@ import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, 
 
 // export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
-export const API_BASE_URL = 'http://localhost:8000'
+export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
 
 // Create a server session and return its id
