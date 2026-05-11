@@ -70,6 +70,28 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   const [aditudeCountdown, setAditudeCountdown] = useState<number | null>(null);
   const aditudeCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Carousel-aware prewarming. On mobile we only warm the centered card +
+  // immediate neighbors so we don't boot N hidden game iframes in parallel.
+  // Desktop shows all 4 cards at once, so it keeps warming everything.
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Stash prewarm args in a ref so the prewarm effect doesn't have to list
+  // every prop (and re-run on every parent re-render of `messages` etc.).
+  const prewarmArgsRef = useRef({ convId, entryPoint, charID, charName, charImage, charDesc, messages, delegateChar });
+  prewarmArgsRef.current = { convId, entryPoint, charID, charName, charImage, charDesc, messages, delegateChar };
+
   // Aditude countdown timer
   useEffect(() => {
     if (shouldFetchAditude) {
@@ -161,75 +183,25 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
         setGames(catalogResponse.games);
         setMenuId(catalogResponse.menuId || null);
 
-        // Fire-and-forget: prefetch every game's iframe in parallel, then as
-        // each /minigames/init resolves, push the iframe URL into prewarmedShells
-        // so a hidden WidgetShell mounts and starts booting the game off-screen.
-        // The click-to-show transition is then a CSS toggle, not a fresh load.
-        const currentSessionId = sessionIdRef.current;
-        if (currentSessionId) {
-          const currentMenuId = catalogResponse.menuId || null;
-          for (const g of catalogResponse.games) {
-            prefetchMinigame({
-              gameType: g.id,
-              sessionId: currentSessionId,
-              convId: convId,
-              entryPoint: entryPoint,
-              currencyMode: false,
-              w: window.innerWidth,
-              h: window.innerHeight,
-              char_id: charID,
-              char_name: charName,
-              char_image: charImage,
-              char_desc: charDesc,
-              messages: messages,
-              delegate_char: delegateChar,
-              menuId: currentMenuId ?? undefined,
-            });
-            const cached = peekMinigame(g.id);
-            if (cached) {
-              cached
-                .then((response) => {
-                  // eslint-disable-next-line no-console
-                  console.info('[simula-prewarm] resolved', g.id, response.adResponse.iframe_url);
-                  setPrewarmedShells((prev) => {
-                    if (prev.has(g.id)) return prev;
-                    const next = new Map(prev);
-                    next.set(g.id, {
-                      iframeUrl: response.adResponse.iframe_url,
-                      serveId: response.adResponse.serve_id ?? null,
-                      adId: response.adResponse.ad_id,
-                    });
-                    // eslint-disable-next-line no-console
-                    console.info('[simula-prewarm] pool size now', next.size);
-                    return next;
-                  });
-                })
-                .catch((err) => {
-                  // eslint-disable-next-line no-console
-                  console.warn('[simula-prewarm] failed', g.id, err);
-                });
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('[simula-prewarm] peek returned null for', g.id);
-            }
-          }
-        }
+        // Prewarming is now driven by the windowed effect below — it warms
+        // only the games near the carousel's active index instead of every
+        // game in the catalog.
 
-        const imageUrls = catalogResponse.games
-          .map((g: GameData) => g.gifCover || g.iconUrl)
-          .filter(Boolean) as string[];
+        // const imageUrls = catalogResponse.games
+        //   .map((g: GameData) => g.gifCover || g.iconUrl)
+        //   .filter(Boolean) as string[];
 
-        await Promise.all(
-          imageUrls.map(
-            (url) =>
-              new Promise<void>((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve();
-                img.onerror = () => resolve();
-                img.src = url;
-              })
-          )
-        );
+        // await Promise.all(
+        //   imageUrls.map(
+        //     (url) =>
+        //       new Promise<void>((resolve) => {
+        //         const img = new Image();
+        //         img.onload = () => resolve();
+        //         img.onerror = () => resolve();
+        //         img.src = url;
+        //       })
+        //   )
+        // );
       } catch {
         setCatalogError(true);
         setGames([]);
@@ -241,6 +213,63 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
 
     loadCatalog();
   }, [isOpen]);
+
+  // Windowed prewarm: warm only the games near the carousel's active index
+  // on mobile; warm everything on desktop (all 4 cards visible per page).
+  useEffect(() => {
+    if (!isOpen || games.length === 0) return;
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+
+    const n = games.length;
+    const targetIds = new Set<string>();
+    if (isMobile) {
+      const radius = 1; // [i-1, i, i+1]
+      for (let offset = -radius; offset <= radius; offset++) {
+        const idx = ((activeIndex + offset) % n + n) % n;
+        targetIds.add(games[idx].id);
+      }
+    } else {
+      for (const g of games) targetIds.add(g.id);
+    }
+
+    const args = prewarmArgsRef.current;
+    for (const gameId of targetIds) {
+      if (prewarmedShells.has(gameId)) continue;
+      prefetchMinigame({
+        gameType: gameId,
+        sessionId: sid,
+        convId: args.convId,
+        entryPoint: args.entryPoint,
+        currencyMode: false,
+        w: window.innerWidth,
+        h: window.innerHeight,
+        char_id: args.charID,
+        char_name: args.charName,
+        char_image: args.charImage,
+        char_desc: args.charDesc,
+        messages: args.messages,
+        delegate_char: args.delegateChar,
+        menuId: menuId ?? undefined,
+      });
+      const cached = peekMinigame(gameId);
+      if (!cached) continue;
+      cached
+        .then((response) => {
+          setPrewarmedShells((prev) => {
+            if (prev.has(gameId)) return prev;
+            const next = new Map(prev);
+            next.set(gameId, {
+              iframeUrl: response.adResponse.iframe_url,
+              serveId: response.adResponse.serve_id ?? null,
+              adId: response.adResponse.ad_id,
+            });
+            return next;
+          });
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, games, activeIndex, isMobile, menuId, prewarmedShells]);
 
   // Handle ESC key
   useEffect(() => {
@@ -339,6 +368,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     if (!isOpen && !selectedGameId && !adIframeUrl && !shouldFetchAditude) {
       clearMinigamePrefetchCache();
       setPrewarmedShells(new Map());
+      setActiveIndex(0);
     }
   }, [isOpen, selectedGameId, adIframeUrl, shouldFetchAditude]);
 
@@ -358,15 +388,6 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     // ad/serve ids without waiting on a fresh fetch).
     setAdFetched(false);
     const prewarm = prewarmedShells.get(gameId);
-    // eslint-disable-next-line no-console
-    console.info(
-      '[simula-prewarm] click',
-      gameId,
-      'prewarmed?',
-      !!prewarm,
-      'pool keys:',
-      Array.from(prewarmedShells.keys()),
-    );
     setCurrentAdId(prewarm?.adId ?? null);
     setCurrentServeId(prewarm?.serveId ?? null);
     adFetchingRef.current = false;
@@ -1141,6 +1162,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
                   onGameSelect={handleGameSelect}
                   menuId={menuId}
                   navigationType={navigationType}
+                  onActiveIndexChange={setActiveIndex}
                 />
               )}
             </div>

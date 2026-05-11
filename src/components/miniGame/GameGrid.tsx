@@ -16,6 +16,7 @@ interface GameGridProps {
   onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
   menuId?: string | null;
   navigationType?: 'dot' | 'arrow' | 'pagination';
+  onActiveIndexChange?: (index: number) => void;
 }
 
 const calculateVisibleDots = (currentPage: number, totalPages: number) => {
@@ -66,9 +67,10 @@ interface MobileCarouselProps {
   games: GameData[];
   onGameSelect: (gameId: string, gameName: string, gameDescription: string) => void;
   accentColor: string;
+  onActiveIndexChange?: (index: number) => void;
 }
 
-const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, accentColor }) => {
+const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, accentColor, onActiveIndexChange }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -222,6 +224,10 @@ const MobileCarousel: React.FC<MobileCarouselProps> = ({ games, onGameSelect, ac
       cancelAnimationFrame(rafId.current);
     };
   }, [onScroll]);
+
+  useEffect(() => {
+    onActiveIndexChange?.(currentIndex);
+  }, [currentIndex, onActiveIndexChange]);
 
   const scrollToIndex = useCallback((index: number) => {
     const carousel = carouselRef.current;
@@ -600,6 +606,7 @@ export const GameGrid: React.FC<GameGridProps> = ({
   onGameSelect,
   menuId,
   navigationType = 'dot',
+  onActiveIndexChange,
 }) => {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
@@ -621,6 +628,7 @@ export const GameGrid: React.FC<GameGridProps> = ({
         games={games}
         onGameSelect={onGameSelect}
         accentColor={accentColor}
+        onActiveIndexChange={onActiveIndexChange}
       />
     );
   }

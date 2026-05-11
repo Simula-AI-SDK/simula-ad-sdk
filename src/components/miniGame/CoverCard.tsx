@@ -63,6 +63,7 @@ export const CoverCard: React.FC<CoverCardProps> = ({ game, onGameSelect, style 
         <img
           src={imageSrc}
           alt=""
+          loading="lazy"
           onError={handleImageError}
           draggable={false}
           style={{
