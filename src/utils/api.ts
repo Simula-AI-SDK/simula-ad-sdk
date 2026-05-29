@@ -1,8 +1,8 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
 
-export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+// export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
-// export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
+export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
 
 // Create a server session and return its id
@@ -229,8 +229,9 @@ export const trackViewportExit = async (adId: string, apiKey: string): Promise<v
   }
 };
 
-export const fetchCatalog = async (): Promise<CatalogResponse> => {
-    const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2`, {
+export const fetchCatalog = async (sessionId: string): Promise<CatalogResponse> => {
+    const qs = new URLSearchParams({ session_id: sessionId }).toString();
+    const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2?${qs}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',

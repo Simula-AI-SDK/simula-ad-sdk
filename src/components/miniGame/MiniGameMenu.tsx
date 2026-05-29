@@ -146,12 +146,13 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
   // Fetch catalog when menu opens
   useEffect(() => {
     if (!isOpen) return;
+    if (!sessionId) return;
 
     const loadCatalog = async () => {
       setCatalogLoading(true);
       setCatalogError(false);
       try {
-        const catalogResponse = await fetchCatalog();
+        const catalogResponse = await fetchCatalog(sessionId);
         setGames(catalogResponse.games);
         setMenuId(catalogResponse.menuId || null);
 
@@ -180,7 +181,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     };
 
     loadCatalog();
-  }, [isOpen]);
+  }, [isOpen, sessionId]);
 
   // Handle ESC key
   useEffect(() => {
