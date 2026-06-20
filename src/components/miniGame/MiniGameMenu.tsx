@@ -151,7 +151,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
       setCatalogLoading(true);
       setCatalogError(false);
       try {
-        const catalogResponse = await fetchCatalog();
+        const catalogResponse = await fetchCatalog(sessionId, charID);
         setGames(catalogResponse.games);
         setMenuId(catalogResponse.menuId || null);
 
@@ -180,7 +180,7 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
     };
 
     loadCatalog();
-  }, [isOpen]);
+  }, [isOpen, sessionId, charID]);
 
   // Handle ESC key
   useEffect(() => {

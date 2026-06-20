@@ -1,6 +1,6 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
 
-export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
+export const API_BASE_URL = 'http://127.0.0.1:8000';
 // export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
 // export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
@@ -229,8 +229,16 @@ export const trackViewportExit = async (adId: string, apiKey: string): Promise<v
   }
 };
 
-export const fetchCatalog = async (): Promise<CatalogResponse> => {
-    const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2`, {
+export const fetchCatalog = async (sessionId?: string, charId?: string): Promise<CatalogResponse> => {
+    // The /minigames/catalogv2 route requires session_id (it creates and
+    // persists a menu record keyed to the session). Omitting it returns a
+    // 422 and the menu renders as "no games available".
+    const params = new URLSearchParams();
+    if (sessionId) params.append('session_id', sessionId);
+    if (charId) params.append('char_id', charId);
+    const queryString = params.toString();
+
+    const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2${queryString ? `?${queryString}` : ''}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
