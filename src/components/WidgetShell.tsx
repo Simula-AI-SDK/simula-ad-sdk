@@ -13,6 +13,10 @@ export interface WidgetShellProps {
   /** Minigame play serve_id. When provided, Aditude serves rendered inside
    *  this shell are reported back to /minigames/play/:serve_id/ad-interstitial. */
   serveId?: string | null;
+  /** Fired once when the nested game posts a `GAME_COMPLETE` message (the
+   *  playable signalling game-over). Used to trigger the end-of-game ad reveal
+   *  without waiting for a manual close. Game variant only. */
+  onGameComplete?: () => void;
   /** Override styles on the outer iframe. */
   style?: React.CSSProperties;
 }
@@ -44,6 +48,7 @@ export const WidgetShell: React.FC<WidgetShellProps> = ({
   gameUrl,
   showBanner = true,
   serveId,
+  onGameComplete,
   style,
 }) => {
   const { devMode, sessionId } = useSimula();
@@ -55,6 +60,13 @@ export const WidgetShell: React.FC<WidgetShellProps> = ({
   const sessionIdRef = useRef<string | undefined>(sessionId);
   useEffect(() => { serveIdRef.current = serveId; }, [serveId]);
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+
+  // GAME_COMPLETE arrives at most once per play; keep the callback in a ref so
+  // the single message listener stays stable, and a fired-flag so a game that
+  // emits the event more than once only triggers the ad reveal a single time.
+  const onGameCompleteRef = useRef<(() => void) | undefined>(onGameComplete);
+  useEffect(() => { onGameCompleteRef.current = onGameComplete; }, [onGameComplete]);
+  const gameCompleteFiredRef = useRef(false);
 
   const src = React.useMemo(() => {
     const domain = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -78,6 +90,22 @@ export const WidgetShell: React.FC<WidgetShellProps> = ({
       const data = e.data;
       if (!data || typeof data !== 'object') return;
       if (data.source !== 'simula-widget-shell') return;
+
+      // The shell relays the nested game's own postMessages up as
+      // {type:"relay", data:<game message>}. A {type:"GAME_COMPLETE"} payload
+      // means the playable hit game-over — fire the end-of-game ad reveal once.
+      if (data.type === 'relay') {
+        const inner = data.data;
+        if (
+          inner && typeof inner === 'object' && inner.type === 'GAME_COMPLETE' &&
+          !gameCompleteFiredRef.current
+        ) {
+          gameCompleteFiredRef.current = true;
+          onGameCompleteRef.current?.();
+        }
+        return;
+      }
+
       if (data.type !== 'adServe') return;
 
       const currentServeId = serveIdRef.current;

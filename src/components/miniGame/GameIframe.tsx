@@ -408,6 +408,7 @@ export const GameIframe: React.FC<GameIframeProps> = ({
               gameUrl={iframeUrl!}
               showBanner={showBanner}
               serveId={serveId}
+              onGameComplete={onClose}
               style={{ width: '100%', height: '100%' }}
             />
           </div>
