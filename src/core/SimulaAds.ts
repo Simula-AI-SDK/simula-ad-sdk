@@ -4,13 +4,30 @@ import { validateNativeContext } from '../utils/validation';
 import { checkFrequencyCapStatus } from '../utils/api';
 import { SessionManager } from './session';
 import { SimulaStorage } from './storage';
+import {
+  SimulaPrivacy,
+  SimulaPrivacyConfig,
+  allowsPrimaryUserID,
+} from '../privacy/SimulaPrivacy';
+import { primeConnectionType } from './connectionType';
+import { primeDeviceSignals } from './deviceSignals';
+import { Telemetry } from '../telemetry/telemetry';
+import { BeaconQueue } from './beaconQueue';
+import { fireIpv4Beacon, onIpv4Logout, IPV4_REASON_INIT, IPV4_REASON_PPID_UPDATE } from './ipv4Beacon';
 
 export interface SimulaInitConfig {
   apiKey: string;
   devMode?: boolean;
   primaryUserID?: string;
-  /** Privacy consent flag. When false, suppresses collection of PII (primaryUserID). Defaults to true. */
+  /**
+   * Legacy coarse consent flag. When false, suppresses PII (primaryUserID).
+   * Defaults to true. `privacy` takes precedence when both are supplied.
+   */
   hasPrivacyConsent?: boolean;
+  /** Granular consent config (GDPR/TCF/CCPA/GPP/COPPA) — takes precedence over `hasPrivacyConsent`. */
+  privacy?: SimulaPrivacyConfig;
+  /** Opt out of SDK telemetry. Defaults to true (telemetry enabled). */
+  telemetryEnabled?: boolean;
   adContext?: NativeContext;
 }
 
@@ -27,11 +44,11 @@ let initialized = false;
 let apiKey = '';
 let devMode = false;
 let primaryUserID: string | undefined;
-let hasPrivacyConsent = true;
 let adContext: NativeContext | null = null;
 
+/** The forwardable PPID under the CURRENT resolved consent snapshot (live read — COPPA/consent gated). */
 function effectiveUserID(): string | undefined {
-  return hasPrivacyConsent ? primaryUserID : undefined;
+  return allowsPrimaryUserID(SimulaPrivacy.current) ? primaryUserID : undefined;
 }
 
 /** Local calendar day stamp — frequency-cap results are attributed to the day the check started. */
@@ -63,12 +80,58 @@ function initialize(config: SimulaInitConfig): boolean {
       typeof config.primaryUserID === 'string' && config.primaryUserID.trim()
         ? config.primaryUserID
         : undefined;
-    hasPrivacyConsent = config.hasPrivacyConsent !== false;
     adContext = initContext;
     initialized = true;
 
     setDebugMode(devMode);
-    SessionManager.configure(apiKey, devMode, effectiveUserID());
+
+    // ── Privacy (attach CMP auto-read, apply explicit config — the granular
+    // `privacy` object takes precedence over the legacy flag, native parity) ──
+    SimulaPrivacy.attach();
+    SimulaPrivacy.apply({
+      hasPrivacyConsent: config.hasPrivacyConsent !== false,
+      ...config.privacy,
+    });
+
+    // ── Signals (off critical path, TTL-cached, zero per-request cost) ──
+    primeConnectionType();
+    primeDeviceSignals();
+
+    // ── Session ──
+    SessionManager.configure(apiKey, devMode, effectiveUserID(), {
+      onSessionInstalled: (sessionId, ppid) => {
+        Telemetry.recordOperation('session_created', { success: true });
+        fireIpv4Beacon(apiKey, sessionId, ppid, IPV4_REASON_INIT);
+      },
+      onPpidReconciled: (ppid) => {
+        // The PATCH landed — the sid genuinely represents the new ppid server-side
+        fireIpv4Beacon(apiKey, SessionManager.getSessionId(), ppid, IPV4_REASON_PPID_UPDATE);
+      },
+      onLogout: () => {
+        onIpv4Logout();
+      },
+      onTelemetryDirective: (directive) => {
+        Telemetry.applyServerDirective(directive.telemetryEnabled, directive.telemetrySampleRate);
+      },
+    });
+
+    // ── Telemetry ──
+    Telemetry.install({
+      apiKey,
+      devMode,
+      enabled: config.telemetryEnabled !== false,
+      identity: () => ({ ppid: effectiveUserID() }),
+    });
+
+    // ── Consent changes: re-gate PII, then re-create the session with fresh
+    // privacy signals (SimulaPrivacy already debounces 300ms — native parity) ──
+    SimulaPrivacy.subscribe(() => {
+      SessionManager.resync(effectiveUserID());
+    });
+
+    // ── Recover durable queues from a previous page load ──
+    BeaconQueue.triggerProcessQueue();
+
     // Warm the session off the critical path — never awaited, never throws.
     void SessionManager.ensureSession();
     return true;
@@ -105,7 +168,7 @@ function getContext(): NativeContext | null {
 function updatePrimaryUserID(id: string | null): void {
   if (!initialized) return;
   primaryUserID = typeof id === 'string' && id.trim() ? id : undefined;
-  SessionManager.updatePrimaryUserID(primaryUserID ?? null, hasPrivacyConsent);
+  SessionManager.updatePrimaryUserID(primaryUserID ?? null, allowsPrimaryUserID(SimulaPrivacy.current));
 }
 
 /**
@@ -147,11 +210,11 @@ async function checkFrequencyCap(adUnitId: string, userID?: string | null): Prom
  * `primaryUserID` / `hasPrivacyConsent` change after mount).
  * @internal
  */
-function _syncIdentity(userID: string | undefined, consent: boolean): void {
+function _syncIdentity(userID: string | undefined, legacyConsentFlag: boolean): void {
   if (!initialized) return;
-  hasPrivacyConsent = consent;
   primaryUserID = typeof userID === 'string' && userID.trim() ? userID : undefined;
-  SessionManager.updatePrimaryUserID(primaryUserID ?? null, hasPrivacyConsent);
+  SimulaPrivacy.update({ hasPrivacyConsent: legacyConsentFlag });
+  SessionManager.updatePrimaryUserID(primaryUserID ?? null, allowsPrimaryUserID(SimulaPrivacy.current));
 }
 
 /** Test hook. Not public API. */
@@ -160,7 +223,6 @@ function _resetForTests(): void {
   apiKey = '';
   devMode = false;
   primaryUserID = undefined;
-  hasPrivacyConsent = true;
   adContext = null;
 }
 

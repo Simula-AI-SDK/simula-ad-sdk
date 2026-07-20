@@ -1,6 +1,18 @@
-import { createSession, updateSessionPpid } from '../utils/api';
+import { createSession, updateSessionPpid, SessionTelemetryDirective } from '../utils/api';
 
 export type SessionListener = (sessionId: string | undefined) => void;
+
+/** Lifecycle hooks wired by SimulaAds (IPv4 beacon, telemetry directive). */
+export interface SessionHooks {
+  /** A fresh session was installed (carries the identity the session represents). */
+  onSessionInstalled?: (sessionId: string, ppid: string | undefined) => void;
+  /** A queued PPID reconcile PATCH landed server-side. */
+  onPpidReconciled?: (ppid: string) => void;
+  /** The PPID was cleared (logout) — local-only, the backend can't express an empty id. */
+  onLogout?: () => void;
+  /** Server telemetry directive from the /session/create response. */
+  onTelemetryDirective?: (directive: SessionTelemetryDirective) => void;
+}
 
 /**
  * SessionManager — process-wide session lifecycle (mirrors `SimulaSessionStore`
@@ -8,8 +20,8 @@ export type SessionListener = (sessionId: string | undefined) => void;
  *
  * - `ensureSession()` coalesces concurrent callers into a single in-flight
  *   create and reuses the live session afterwards
- * - generation tag: an apiKey change bumps the generation so a stale in-flight
- *   create can never install its session
+ * - generation tag: an apiKey change or a consent-driven resync bumps the
+ *   generation so a stale in-flight create can never install its session
  * - PPID updates are serialized through a promise chain; logout (null) is
  *   local-only — the backend `PATCH …/ppid/{ppid}` path can't express an empty
  *   id (same semantics as the native SDKs)
@@ -28,8 +40,9 @@ class SessionManagerImpl {
   private pendingUserID: string | undefined;
   private ppidChain: Promise<void> = Promise.resolve();
   private listeners = new Set<SessionListener>();
+  private hooks: SessionHooks = {};
 
-  configure(apiKey: string, devMode: boolean, primaryUserID?: string): void {
+  configure(apiKey: string, devMode: boolean, primaryUserID?: string, hooks: SessionHooks = {}): void {
     if (this.apiKey && this.apiKey !== apiKey) {
       // apiKey change — everything about the old session is stale
       this.generation++;
@@ -38,6 +51,7 @@ class SessionManagerImpl {
     this.apiKey = apiKey;
     this.devMode = devMode;
     this.pendingUserID = primaryUserID;
+    this.hooks = hooks;
   }
 
   getSessionId(): string | undefined {
@@ -55,10 +69,13 @@ class SessionManagerImpl {
     const generationAtStart = this.generation;
     const ppid = this.pendingUserID;
     const promise = createSession(this.apiKey, this.devMode, ppid)
-      .then((id) => {
+      .then((result) => {
         if (this.inflight === promise) this.inflight = null;
+        this.hooks.onTelemetryDirective?.(result.directive);
+        const id = result.sessionId;
         if (id && generationAtStart === this.generation) {
           this.setSession(id, ppid);
+          this.hooks.onSessionInstalled?.(id, ppid);
           return id;
         }
         return undefined;
@@ -72,17 +89,31 @@ class SessionManagerImpl {
   }
 
   /**
+   * Consent-driven session re-sync (native parity): the resolved consent state
+   * changed, so the current session no longer carries valid privacy signals.
+   * Drops the session and re-creates with the fresh privacy context.
+   */
+  resync(newPrimaryUserID?: string): void {
+    this.pendingUserID = newPrimaryUserID;
+    this.generation++;
+    this.setSession(undefined, undefined);
+    void this.ensureSession();
+  }
+
+  /**
    * Serialized, best-effort. Mirrors Kotlin `SimulaAds.updatePrimaryUserID`:
    * the value the next session/create carries is always updated; a live
    * session is PATCHed only on login/switch (never on logout, which the
    * backend path can't express — the session identity is then treated stale).
    */
-  updatePrimaryUserID(id: string | null, hasConsent: boolean): void {
-    const normalized = hasConsent && id && id.trim() ? id : null;
+  updatePrimaryUserID(id: string | null, allowsPpid: boolean): void {
+    const normalized = allowsPpid && id && id.trim() ? id : null;
     this.pendingUserID = normalized ?? undefined;
 
     if (normalized === null) {
+      const hadIdentity = this.sessionUserID !== undefined || this.pendingUserID !== undefined;
       this.sessionUserID = undefined;
+      if (hadIdentity) this.hooks.onLogout?.();
       return;
     }
     if (!this.sessionId) return; // next createSession carries the value
@@ -94,7 +125,10 @@ class SessionManagerImpl {
       // The world may have moved on while this update sat in the queue
       if (this.sessionId !== sid || this.pendingUserID !== ppid) return;
       await updateSessionPpid(sid, ppid);
-      if (this.sessionId === sid) this.sessionUserID = ppid;
+      if (this.sessionId === sid) {
+        this.sessionUserID = ppid;
+        this.hooks.onPpidReconciled?.(ppid);
+      }
     });
   }
 
@@ -128,6 +162,7 @@ class SessionManagerImpl {
     this.pendingUserID = undefined;
     this.ppidChain = Promise.resolve();
     this.listeners.clear();
+    this.hooks = {};
   }
 }
 

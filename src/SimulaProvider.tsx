@@ -62,6 +62,8 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     devMode = false,
     primaryUserID,
     hasPrivacyConsent = true,
+    privacy,
+    telemetryEnabled,
   } = props;
   const [sessionId, setSessionId] = useState<string | undefined>(() => SimulaAds.getSessionId());
 
@@ -85,7 +87,7 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
   // points share the same core, mirroring the native SDKs).
   useEffect(() => {
     if (!propsValid) return;
-    SimulaAds.initialize({ apiKey, devMode, primaryUserID, hasPrivacyConsent });
+    SimulaAds.initialize({ apiKey, devMode, primaryUserID, hasPrivacyConsent, privacy, telemetryEnabled });
     setSessionId(SessionManager.getSessionId());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, devMode, propsValid]);

@@ -1,28 +1,49 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
 import { SDK_HEADER_VALUE } from '../core/version';
 import { logger } from './logger';
+import { SimulaPrivacy, consentHeaders, privacyJson } from '../privacy/SimulaPrivacy';
+import { deviceSignalHeaders } from '../core/deviceSignals';
+import { connectionTypeValue } from '../core/connectionType';
+import { BeaconQueue } from '../core/beaconQueue';
 
 export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
 // export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
 /**
- * Central request-headers builder. Every backend request carries the SDK
- * identity header (`X-Simula-SDK`) — the web equivalent of the native SDKs'
- * custom User-Agent, which browsers forbid setting from fetch.
+ * Central request-headers builder — the SDK's single header chokepoint
+ * (native parity: SimulaApiClient.makeHeaders). Every backend request carries:
+ * - `X-Simula-SDK` — SDK identity (web equivalent of the native custom User-Agent)
+ * - `X-Connection-Type` — live OpenRTB connection type
+ * - device-signal headers — TTL-cached snapshot, zero per-request cost
+ * - consent headers — read LIVE from SimulaPrivacy at request time, never cached
  */
 function buildHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'X-Simula-SDK': SDK_HEADER_VALUE,
+    'X-Connection-Type': String(connectionTypeValue()),
+    ...deviceSignalHeaders(),
+    ...consentHeaders(SimulaPrivacy.current),
     ...extra,
   };
 }
 
-// Create a server session and return its id. Never throws — an invalid API
-// key is logged loudly for the publisher and resolves to undefined (no
-// session) instead of an uncaught rejection in the host page.
-export async function createSession(apiKey: string, devMode?: boolean, primaryUserID?: string): Promise<string | undefined> {
+/** Server telemetry directive embedded in the /session/create response. */
+export interface SessionTelemetryDirective {
+  telemetryEnabled?: boolean;
+  telemetrySampleRate?: number;
+}
+
+export interface CreateSessionResult {
+  sessionId?: string;
+  directive: SessionTelemetryDirective;
+}
+
+// Create a server session and return its id + server directives. Never throws —
+// an invalid API key is logged loudly for the publisher and resolves to no
+// session instead of an uncaught rejection in the host page.
+export async function createSession(apiKey: string, devMode?: boolean, primaryUserID?: string): Promise<CreateSessionResult> {
   try {
     const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
 
@@ -41,23 +62,28 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
     const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({}),
+      // Consent signals block (native parity: ConsentSnapshot.privacyJson)
+      body: JSON.stringify({ privacy: privacyJson(SimulaPrivacy.current) }),
     });
 
     if (!response.ok) {
       if (response.status === 401) {
         logger.error('Invalid API key (please check dashboard or contact Simula team for a valid API key)');
       }
-      return undefined;
+      return { directive: {} };
     }
 
     const data = await response.json();
+    const directive: SessionTelemetryDirective = {
+      telemetryEnabled: typeof data?.telemetry_enabled === 'boolean' ? data.telemetry_enabled : undefined,
+      telemetrySampleRate: typeof data?.telemetry_sample_rate === 'number' ? data.telemetry_sample_rate : undefined,
+    };
     if (data && typeof data.sessionId === 'string' && data.sessionId) {
-      return data.sessionId;
+      return { sessionId: data.sessionId, directive };
     }
-    return undefined;
+    return { directive };
   } catch {
-    return undefined;
+    return { directive: {} };
   }
 }
 
@@ -193,66 +219,47 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
 };
 
 export const trackImpression = async (adId: string, apiKey: string): Promise<void> => {
-  try {
-    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
-
-    await fetch(`${API_BASE_URL}/track/engagement/impression/${adId}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({}),
-    });
-  } catch {
-    // Best-effort tracking
-  }
+  // Durable: enqueued for guaranteed delivery (survives offline / tab close)
+  BeaconQueue.enqueue({
+    url: `${API_BASE_URL}/track/engagement/impression/${adId}`,
+    method: 'POST',
+    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    body: JSON.stringify({}),
+  });
 };
 
 export const trackMenuGameClick = async (menuId: string, gameName: string, apiKey: string): Promise<void> => {
-  try {
-    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
-
-    await fetch(`${API_BASE_URL}/minigames/menu/track/click`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        menu_id: menuId,
-        game_name: gameName,
-      }),
-    });
-  } catch {
-    // Best-effort tracking
-  }
+  BeaconQueue.enqueue({
+    url: `${API_BASE_URL}/minigames/menu/track/click`,
+    method: 'POST',
+    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    body: JSON.stringify({
+      menu_id: menuId,
+      game_name: gameName,
+    }),
+  });
 };
 
 export const trackViewportEntry = async (adId: string, apiKey: string): Promise<void> => {
-  try {
-    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
-
-    await fetch(`${API_BASE_URL}/track/engagement/viewport_entry/${adId}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        timestamp: new Date().toISOString(),
-      }),
-    });
-  } catch {
-    // Best-effort tracking
-  }
+  BeaconQueue.enqueue({
+    url: `${API_BASE_URL}/track/engagement/viewport_entry/${adId}`,
+    method: 'POST',
+    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    body: JSON.stringify({
+      timestamp: new Date().toISOString(),
+    }),
+  });
 };
 
 export const trackViewportExit = async (adId: string, apiKey: string): Promise<void> => {
-  try {
-    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
-
-    await fetch(`${API_BASE_URL}/track/engagement/viewport_exit/${adId}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        timestamp: new Date().toISOString(),
-      }),
-    });
-  } catch {
-    // Best-effort tracking
-  }
+  BeaconQueue.enqueue({
+    url: `${API_BASE_URL}/track/engagement/viewport_exit/${adId}`,
+    method: 'POST',
+    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    body: JSON.stringify({
+      timestamp: new Date().toISOString(),
+    }),
+  });
 };
 
 export const fetchCatalog = async (): Promise<CatalogResponse> => {

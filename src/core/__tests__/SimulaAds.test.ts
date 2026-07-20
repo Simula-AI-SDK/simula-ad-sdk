@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SimulaAds } from '../SimulaAds';
 import { SessionManager } from '../session';
 import { SimulaStorage } from '../storage';
+import { SimulaPrivacy } from '../../privacy/SimulaPrivacy';
+import { Telemetry } from '../../telemetry/telemetry';
+import { BeaconQueue } from '../beaconQueue';
+import { _resetIpv4BeaconForTests } from '../ipv4Beacon';
 
 function stubFetch(freqCapHandler?: (url: string) => any) {
   const calls: string[] = [];
@@ -26,6 +30,10 @@ describe('SimulaAds', () => {
     SimulaAds._resetForTests();
     SessionManager._resetForTests();
     SimulaStorage._resetForTests();
+    SimulaPrivacy._resetForTests();
+    Telemetry._resetForTests();
+    BeaconQueue._resetForTests();
+    _resetIpv4BeaconForTests();
   });
 
   afterEach(() => {

@@ -24,7 +24,7 @@ const isPixelWidth = (width: any): boolean => typeof width === 'string' && /^\d+
  * Validates SimulaProvider props. Returns false (or throws when strict) on invalid props.
  */
 export const validateSimulaProviderProps = (props: any, strict = false): boolean => {
-  const validProps = ['apiKey', 'children', 'devMode', 'primaryUserID', 'hasPrivacyConsent'];
+  const validProps = ['apiKey', 'children', 'devMode', 'primaryUserID', 'hasPrivacyConsent', 'privacy', 'telemetryEnabled'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -57,6 +57,14 @@ export const validateSimulaProviderProps = (props: any, strict = false): boolean
 
   if (props.hasPrivacyConsent !== undefined && typeof props.hasPrivacyConsent !== 'boolean') {
     return fail(`Invalid "hasPrivacyConsent" prop type: "${typeof props.hasPrivacyConsent}". Must be a boolean`, strict);
+  }
+
+  if (props.privacy !== undefined && (typeof props.privacy !== 'object' || props.privacy === null)) {
+    return fail(`Invalid "privacy" prop type: "${typeof props.privacy}". Must be a SimulaPrivacyConfig object`, strict);
+  }
+
+  if (props.telemetryEnabled !== undefined && typeof props.telemetryEnabled !== 'boolean') {
+    return fail(`Invalid "telemetryEnabled" prop type: "${typeof props.telemetryEnabled}". Must be a boolean`, strict);
   }
 
   return true;

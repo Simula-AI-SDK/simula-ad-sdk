@@ -1,3 +1,5 @@
+import type { SimulaPrivacyConfig } from './privacy/SimulaPrivacy';
+
 export type AccentOption = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan' | 'transparent' | 'image';
 export type FontOption = 'sans-serif' | 'serif' | 'monospace';
 
@@ -64,8 +66,12 @@ export interface SimulaProviderProps {
   children: React.ReactNode;
   devMode?: boolean;
   primaryUserID?: string;
-  /** Privacy consent flag. When false, suppresses collection of PII (primaryUserID). Defaults to true. */
+  /** Privacy consent flag. When false, suppresses collection of PII (primaryUserID). Defaults to true. `privacy` takes precedence when both are supplied. */
   hasPrivacyConsent?: boolean;
+  /** Granular consent config (GDPR/TCF/CCPA/GPP/COPPA) — takes precedence over `hasPrivacyConsent`. */
+  privacy?: SimulaPrivacyConfig;
+  /** Opt out of SDK telemetry. Defaults to true (telemetry enabled). */
+  telemetryEnabled?: boolean;
 }
 
 export interface SimulaContextValue {
