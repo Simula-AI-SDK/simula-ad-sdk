@@ -1,25 +1,60 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { SimulaProviderProps, SimulaContextValue, AdData } from './types';
-import { createSession, updateSessionPpid, fetchAditudeConfig } from './utils/api';
+import { fetchAditudeConfig } from './utils/api';
 import { validateSimulaProviderProps } from './utils/validation';
 import { logger, setDebugMode } from './utils/logger';
+import { SimulaAds } from './core/SimulaAds';
+import { SessionManager } from './core/session';
 
 const SimulaContext = createContext<SimulaContextValue | undefined>(undefined);
 
 // Helper to create cache key from slot and position
 const getCacheKey = (slot: string, position: number): string => `${slot}:${position}`;
 
+// Inert context returned when useSimula is consumed outside a SimulaProvider.
+// The SDK renders blank instead of crashing the host app (native prime
+// directive: degrade to blank UI, never throw into host code).
+const INERT_CONTEXT: SimulaContextValue = {
+  apiKey: '',
+  devMode: false,
+  sessionId: undefined,
+  hasPrivacyConsent: false,
+  getCachedAd: () => null,
+  cacheAd: () => {},
+  getCachedHeight: () => null,
+  cacheHeight: () => {},
+  hasNoFill: () => false,
+  markNoFill: () => {},
+  aditudeReady: false,
+  aditudeConfig: undefined,
+};
+
+let warnedOutsideProvider = false;
+
 export const useSimula = (): SimulaContextValue => {
   const context = useContext(SimulaContext);
   if (!context) {
-    throw new Error('useSimula must be used within a SimulaProvider');
+    if (!warnedOutsideProvider) {
+      warnedOutsideProvider = true;
+      logger.warn(
+        'useSimula was used outside a <SimulaProvider> — Simula ad surfaces will render blank. ' +
+        'Wrap your app in <SimulaProvider> or call SimulaAds.initialize first.'
+      );
+    }
+    return INERT_CONTEXT;
   }
   return context;
 };
 
 export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
-  // Validate props early
-  validateSimulaProviderProps(props);
+  // Validate props once (first render). Strict mode (devMode) throws; in
+  // production an invalid config logs and leaves the SDK inert — children
+  // always render.
+  const propsValidRef = useRef<boolean | null>(null);
+  if (propsValidRef.current === null) {
+    propsValidRef.current = validateSimulaProviderProps(props, props.devMode === true);
+  }
+  const propsValid = propsValidRef.current;
 
   const {
     apiKey,
@@ -28,7 +63,7 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     primaryUserID,
     hasPrivacyConsent = true,
   } = props;
-  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [sessionId, setSessionId] = useState<string | undefined>(() => SimulaAds.getSessionId());
 
   // aditude
   const [aditudeReady, setAditudeReady] = useState<boolean>(false);
@@ -39,44 +74,31 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
   const heightCacheRef = useRef<Map<string, number>>(new Map());
   const noFillSetRef = useRef<Set<string>>(new Set());
 
-  // Track previous primaryUserID for change detection
-  const prevPrimaryUserIDRef = useRef<string | undefined>(primaryUserID);
-
   // Sync logger verbosity with devMode so internal debug logs only appear
   // when the publisher has explicitly opted in via <SimulaProvider devMode>.
   useEffect(() => {
     setDebugMode(devMode);
   }, [devMode]);
 
-  // Effect 1: Create session on mount (or when apiKey/devMode change)
+  // Initialize the SDK core. First valid call wins — this is a no-op when
+  // the host already called SimulaAds.initialize imperatively (both entry
+  // points share the same core, mirroring the native SDKs).
   useEffect(() => {
-    let cancelled = false;
+    if (!propsValid) return;
+    SimulaAds.initialize({ apiKey, devMode, primaryUserID, hasPrivacyConsent });
+    setSessionId(SessionManager.getSessionId());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, devMode, propsValid]);
 
-    async function ensureSession() {
-      const effectiveUserID = hasPrivacyConsent ? primaryUserID : undefined;
-      const id = await createSession(apiKey, devMode, effectiveUserID);
-      if (!cancelled && id) {
-        setSessionId(id);
-      }
-    }
-
-    ensureSession();
-    return () => { cancelled = true; };
-  }, [apiKey, devMode]);
-
-  // Effect 2: PATCH existing session when primaryUserID changes
+  // Keep runtime identity props in sync: mid-session login/logout/switch
+  // (PPID reconcile) and consent flips, serialized inside the core.
   useEffect(() => {
-    const effectiveUserID = hasPrivacyConsent ? primaryUserID : undefined;
-    const prev = prevPrimaryUserIDRef.current;
-    prevPrimaryUserIDRef.current = primaryUserID;
+    if (!propsValid || !SimulaAds.isInitialized()) return;
+    SimulaAds._syncIdentity(primaryUserID, hasPrivacyConsent);
+  }, [primaryUserID, hasPrivacyConsent, propsValid]);
 
-    // Skip if no session yet, value hasn't actually changed, or no consent/value
-    if (!sessionId || effectiveUserID === prev || !effectiveUserID) return;
-
-    updateSessionPpid(sessionId, effectiveUserID).catch((err) => {
-      logger.debug('Failed to update session PPID:', err);
-    });
-  }, [primaryUserID, hasPrivacyConsent, sessionId]);
+  // Subscribe to the shared session lifecycle
+  useEffect(() => SessionManager.subscribe(setSessionId), []);
 
   // Effect 3: Fetch Aditude config from API (skip in devMode).
   //

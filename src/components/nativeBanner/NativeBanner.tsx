@@ -11,9 +11,6 @@ import { parseWidth, needsWidthMeasurement } from '../../utils/parseWidth';
 const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
 
 export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
-  // Validate props early
-  validateNativeBannerProps(props);
-
   const {
     slot,
     width,
@@ -23,15 +20,24 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     onError,
   } = props;
 
-  const { 
-    apiKey, 
-    sessionId, 
+  const {
+    apiKey,
+    sessionId,
     hasPrivacyConsent,
+    devMode,
     getCachedAd,
     cacheAd,
     hasNoFill,
     markNoFill,
   } = useSimula();
+
+  // Validate props once (first render). Strict mode (devMode) throws; in
+  // production invalid props log and the slot renders null (never crashes).
+  const propsValidRef = useRef<boolean | null>(null);
+  if (propsValidRef.current === null) {
+    propsValidRef.current = validateNativeBannerProps(props, devMode);
+  }
+  const propsValid = propsValidRef.current;
 
   // Minimal state - only what's needed for rendering
   const [ad, setAd] = useState<AdData | null>(null);
@@ -43,7 +49,6 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   const hasFetchedRef = useRef(false);
   const lastFetchTimeRef = useRef<number>(0);
   const impressionTrackedRef = useRef(false);
-  const viewableStartTimeRef = useRef<number | null>(null);
   const hasMetDurationRef = useRef(false);
   const wasInViewportRef = useRef(false);
   const adIdRef = useRef<string | null>(null);
@@ -86,29 +91,49 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
     return () => resizeObserver.disconnect();
   }, [width, measuredWidth]);
 
-  // Viewability and impression tracking (using refs, no re-renders)
+  // Viewability and impression tracking (using refs, no re-renders).
+  // MRC-compliant: >=50% visible for 1 CONTINUOUS second. Timeout-based —
+  // no polling interval (the previous 100ms setInterval burned cycles for
+  // the lifetime of every mounted slot).
   useEffect(() => {
-    if (!ad || !elementRef.current || isBot || !adIdRef.current || impressionTrackedRef.current) return;
+    if (!propsValid || !ad || !elementRef.current || isBot || !adIdRef.current || impressionTrackedRef.current) return;
 
     const threshold = 0.5;
     const durationMs = 1000; // 1 second for MRC compliance
     const currentAdId = adIdRef.current;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         const viewable = entry.intersectionRatio >= threshold;
-        const now = Date.now();
-        
+
         if (viewable) {
-          if (viewableStartTimeRef.current === null) {
-            viewableStartTimeRef.current = now;
+          if (timer === null && !hasMetDurationRef.current) {
+            timer = setTimeout(() => {
+              timer = null;
+              hasMetDurationRef.current = true;
+              if (!impressionTrackedRef.current && currentAdId) {
+                impressionTrackedRef.current = true;
+                trackImpression(currentAdId, apiKey);
+                // Use ref to get current ad value (avoid stale closure)
+                const currentAd = adRef.current;
+                if (currentAd && onImpressionRef.current) {
+                  onImpressionRef.current(currentAd);
+                }
+              }
+            }, durationMs);
           }
         } else {
-          viewableStartTimeRef.current = null;
+          // Dropped out of view before the duration elapsed — reset the
+          // continuous-visibility requirement.
+          if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+          }
           hasMetDurationRef.current = false;
         }
       },
-      { 
+      {
         threshold,
         rootMargin: '0px'
       }
@@ -116,30 +141,11 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
     observer.observe(elementRef.current);
 
-    // Check periodically for duration
-    const intervalId = setInterval(() => {
-      if (viewableStartTimeRef.current !== null && !hasMetDurationRef.current) {
-        const elapsed = Date.now() - viewableStartTimeRef.current;
-        if (elapsed >= durationMs) {
-          hasMetDurationRef.current = true;
-          if (!impressionTrackedRef.current && currentAdId) {
-            impressionTrackedRef.current = true;
-            trackImpression(currentAdId, apiKey);
-            // Use ref to get current ad value (avoid stale closure)
-            const currentAd = adRef.current;
-            if (currentAd && onImpressionRef.current) {
-              onImpressionRef.current(currentAd);
-            }
-          }
-        }
-      }
-    }, 100);
-
     return () => {
       observer.disconnect();
-      clearInterval(intervalId);
+      if (timer !== null) clearTimeout(timer);
     };
-  }, [ad, isBot, apiKey]);
+  }, [ad, isBot, apiKey, propsValid]);
 
   // Viewport entry/exit tracking (using refs, no re-renders)
   useEffect(() => {
@@ -183,7 +189,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
 
   // Fetch ad once
   useEffect(() => {
-    if (hasFetchedRef.current || !sessionId || error || ad) return;
+    if (!propsValid || hasFetchedRef.current || !sessionId || error || ad) return;
 
     // Check cache first
     const cachedAd = getCachedAd(slot, position);
@@ -291,7 +297,7 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
         }
       }
     });
-  }, [sessionId, slot, position, context, width, measuredWidth, error, ad, apiKey, isBot, hasPrivacyConsent, onError, getCachedAd, cacheAd, hasNoFill, markNoFill]);
+  }, [sessionId, slot, position, context, width, measuredWidth, error, ad, apiKey, isBot, hasPrivacyConsent, onError, getCachedAd, cacheAd, hasNoFill, markNoFill, propsValid]);
 
   // Calculate container dimensions (memoized, no re-renders)
   const containerWidth = useMemo(() => {
@@ -308,6 +314,8 @@ export const NativeBanner: React.FC<NativeBannerProps> = React.memo((props) => {
   }, [width]);
 
   // Render once, never changes
+  if (!propsValid) return null;
+
   if (error) return null;
 
   if (!ad) {

@@ -1,4 +1,6 @@
 export { SimulaProvider, useSimula } from './SimulaProvider';
+export { SimulaAds } from './core/SimulaAds';
+export { SDK_NAME, SDK_VERSION } from './core/version';
 export { InChatAdSlot } from './components/inChatAd/InChatAdSlot';
 export { MiniGameMenu } from './components/miniGame/MiniGameMenu';
 export { MiniGameInvitation } from './components/miniGame/MiniGameInvitation';
@@ -41,6 +43,9 @@ export {
 
 // Privacy utilities
 export { filterContextForPrivacy } from './types';
+
+// Core imperative API types
+export type { SimulaInitConfig } from './core/SimulaAds';
 
 export type {
   InChatTheme,

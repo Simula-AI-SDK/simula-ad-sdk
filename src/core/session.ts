@@ -1,0 +1,134 @@
+import { createSession, updateSessionPpid } from '../utils/api';
+
+export type SessionListener = (sessionId: string | undefined) => void;
+
+/**
+ * SessionManager — process-wide session lifecycle (mirrors `SimulaSessionStore`
+ * in the Kotlin SDK).
+ *
+ * - `ensureSession()` coalesces concurrent callers into a single in-flight
+ *   create and reuses the live session afterwards
+ * - generation tag: an apiKey change bumps the generation so a stale in-flight
+ *   create can never install its session
+ * - PPID updates are serialized through a promise chain; logout (null) is
+ *   local-only — the backend `PATCH …/ppid/{ppid}` path can't express an empty
+ *   id (same semantics as the native SDKs)
+ * - memory-only: a page reload creates a fresh session, matching the native
+ *   per-process behavior
+ */
+class SessionManagerImpl {
+  private sessionId: string | undefined;
+  /** Identity the live session represents server-side (may lag pendingUserID while a PATCH is queued). */
+  private sessionUserID: string | undefined;
+  private generation = 0;
+  private inflight: Promise<string | undefined> | null = null;
+  private apiKey = '';
+  private devMode = false;
+  /** Value the NEXT session/create carries. */
+  private pendingUserID: string | undefined;
+  private ppidChain: Promise<void> = Promise.resolve();
+  private listeners = new Set<SessionListener>();
+
+  configure(apiKey: string, devMode: boolean, primaryUserID?: string): void {
+    if (this.apiKey && this.apiKey !== apiKey) {
+      // apiKey change — everything about the old session is stale
+      this.generation++;
+      this.setSession(undefined, undefined);
+    }
+    this.apiKey = apiKey;
+    this.devMode = devMode;
+    this.pendingUserID = primaryUserID;
+  }
+
+  getSessionId(): string | undefined {
+    return this.sessionId;
+  }
+
+  getSessionUserID(): string | undefined {
+    return this.sessionUserID;
+  }
+
+  ensureSession(): Promise<string | undefined> {
+    if (this.sessionId) return Promise.resolve(this.sessionId);
+    if (this.inflight) return this.inflight;
+
+    const generationAtStart = this.generation;
+    const ppid = this.pendingUserID;
+    const promise = createSession(this.apiKey, this.devMode, ppid)
+      .then((id) => {
+        if (this.inflight === promise) this.inflight = null;
+        if (id && generationAtStart === this.generation) {
+          this.setSession(id, ppid);
+          return id;
+        }
+        return undefined;
+      })
+      .catch(() => {
+        if (this.inflight === promise) this.inflight = null;
+        return undefined; // createSession never throws — belt and braces
+      });
+    this.inflight = promise;
+    return promise;
+  }
+
+  /**
+   * Serialized, best-effort. Mirrors Kotlin `SimulaAds.updatePrimaryUserID`:
+   * the value the next session/create carries is always updated; a live
+   * session is PATCHed only on login/switch (never on logout, which the
+   * backend path can't express — the session identity is then treated stale).
+   */
+  updatePrimaryUserID(id: string | null, hasConsent: boolean): void {
+    const normalized = hasConsent && id && id.trim() ? id : null;
+    this.pendingUserID = normalized ?? undefined;
+
+    if (normalized === null) {
+      this.sessionUserID = undefined;
+      return;
+    }
+    if (!this.sessionId) return; // next createSession carries the value
+    if (this.sessionUserID === normalized) return;
+
+    const sid = this.sessionId;
+    const ppid = normalized;
+    this.ppidChain = this.ppidChain.then(async () => {
+      // The world may have moved on while this update sat in the queue
+      if (this.sessionId !== sid || this.pendingUserID !== ppid) return;
+      await updateSessionPpid(sid, ppid);
+      if (this.sessionId === sid) this.sessionUserID = ppid;
+    });
+  }
+
+  subscribe(listener: SessionListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private setSession(id: string | undefined, userID: string | undefined): void {
+    this.sessionId = id;
+    this.sessionUserID = userID;
+    this.listeners.forEach((listener) => {
+      try {
+        listener(id);
+      } catch {
+        // A broken host listener must never break the SDK
+      }
+    });
+  }
+
+  /** Test hook. Not public API. */
+  _resetForTests(): void {
+    this.sessionId = undefined;
+    this.sessionUserID = undefined;
+    this.generation = 0;
+    this.inflight = null;
+    this.apiKey = '';
+    this.devMode = false;
+    this.pendingUserID = undefined;
+    this.ppidChain = Promise.resolve();
+    this.listeners.clear();
+  }
+}
+
+export const SessionManager = new SessionManagerImpl();

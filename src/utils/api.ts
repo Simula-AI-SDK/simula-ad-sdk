@@ -1,18 +1,30 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
+import { SDK_HEADER_VALUE } from '../core/version';
+import { logger } from './logger';
 
 export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
 // export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
+/**
+ * Central request-headers builder. Every backend request carries the SDK
+ * identity header (`X-Simula-SDK`) — the web equivalent of the native SDKs'
+ * custom User-Agent, which browsers forbid setting from fetch.
+ */
+function buildHeaders(extra?: Record<string, string>): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'X-Simula-SDK': SDK_HEADER_VALUE,
+    ...extra,
+  };
+}
 
-// Create a server session and return its id
+// Create a server session and return its id. Never throws — an invalid API
+// key is logged loudly for the publisher and resolves to undefined (no
+// session) instead of an uncaught rejection in the host page.
 export async function createSession(apiKey: string, devMode?: boolean, primaryUserID?: string): Promise<string | undefined> {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'ngrok-skip-browser-warning': '1',
-    };
+    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
 
     // Build query parameters
     const params = new URLSearchParams();
@@ -34,7 +46,7 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
 
     if (!response.ok) {
       if (response.status === 401) {
-        throw new Error('Invalid API key (please check dashboard or contact Simula team for a valid API key)');
+        logger.error('Invalid API key (please check dashboard or contact Simula team for a valid API key)');
       }
       return undefined;
     }
@@ -44,11 +56,7 @@ export async function createSession(apiKey: string, devMode?: boolean, primaryUs
       return data.sessionId;
     }
     return undefined;
-  } catch (error) {
-    // Re-throw 401 errors with our custom message
-    if (error instanceof Error && error.message.includes('Invalid API key')) {
-      throw error;
-    }
+  } catch {
     return undefined;
   }
 }
@@ -58,14 +66,52 @@ export async function updateSessionPpid(sessionId: string, ppid: string): Promis
   try {
     await fetch(`${API_BASE_URL}/session/${sessionId}/ppid/${ppid}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': '1',
-      },
+      headers: buildHeaders(),
     });
   } catch {
     // Best-effort PPID update — failure is non-fatal
   }
+}
+
+// In-flight dedup for idempotent reads (native parity: SimulaApiClient.coalesce)
+const inFlightReads = new Map<string, Promise<boolean>>();
+
+/**
+ * `GET /frequency-cap/status` — read-only check, records no impression.
+ * Wire contract (native parity): `?ad_unit_id=…[&ppid=…][&session_id=…]`,
+ * response `{"capped": true|false}`. Fails open: non-2xx, unparseable body,
+ * or network failure resolves to `false`.
+ */
+export function checkFrequencyCapStatus(
+  apiKey: string,
+  adUnitId: string,
+  ppid?: string,
+  sessionId?: string,
+): Promise<boolean> {
+  let url = `${API_BASE_URL}/frequency-cap/status?ad_unit_id=${encodeURIComponent(adUnitId)}`;
+  if (ppid) url += `&ppid=${encodeURIComponent(ppid)}`;
+  if (sessionId) url += `&session_id=${encodeURIComponent(sessionId)}`;
+
+  const inFlight = inFlightReads.get(url);
+  if (inFlight) return inFlight;
+
+  const promise = (async () => {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+      });
+      if (!response.ok) return false;
+      const data = await response.json();
+      return data && data.capped === true;
+    } catch {
+      return false;
+    } finally {
+      inFlightReads.delete(url);
+    }
+  })();
+  inFlightReads.set(url, promise);
+  return promise;
 }
 
 export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse> => {
@@ -92,11 +138,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
       char_desc: request.charDesc,
     } as const;
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${request.apiKey}`,
-      'ngrok-skip-browser-warning': '1',
-    };
+    const headers = buildHeaders({ 'Authorization': `Bearer ${request.apiKey}` });
 
     const response = await fetch(`${API_BASE_URL}/render_ad/ssp`, {
       method: 'POST',
@@ -152,11 +194,7 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
 
 export const trackImpression = async (adId: string, apiKey: string): Promise<void> => {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'ngrok-skip-browser-warning': '1',
-    };
+    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
 
     await fetch(`${API_BASE_URL}/track/engagement/impression/${adId}`, {
       method: 'POST',
@@ -170,11 +208,7 @@ export const trackImpression = async (adId: string, apiKey: string): Promise<voi
 
 export const trackMenuGameClick = async (menuId: string, gameName: string, apiKey: string): Promise<void> => {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'ngrok-skip-browser-warning': '1',
-    };
+    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
 
     await fetch(`${API_BASE_URL}/minigames/menu/track/click`, {
       method: 'POST',
@@ -191,11 +225,7 @@ export const trackMenuGameClick = async (menuId: string, gameName: string, apiKe
 
 export const trackViewportEntry = async (adId: string, apiKey: string): Promise<void> => {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'ngrok-skip-browser-warning': '1',
-    };
+    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
 
     await fetch(`${API_BASE_URL}/track/engagement/viewport_entry/${adId}`, {
       method: 'POST',
@@ -211,11 +241,7 @@ export const trackViewportEntry = async (adId: string, apiKey: string): Promise<
 
 export const trackViewportExit = async (adId: string, apiKey: string): Promise<void> => {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'ngrok-skip-browser-warning': '1',
-    };
+    const headers = buildHeaders({ 'Authorization': `Bearer ${apiKey}` });
 
     await fetch(`${API_BASE_URL}/track/engagement/viewport_exit/${adId}`, {
       method: 'POST',
@@ -232,10 +258,7 @@ export const trackViewportExit = async (adId: string, apiKey: string): Promise<v
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
     const response: Response = await fetch(`${API_BASE_URL}/minigames/catalogv2`, {
         method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': '1',
-        },
+        headers: buildHeaders(),
     });
 
     if (!response.ok) {
@@ -298,10 +321,7 @@ export const getMinigame = async (params: InitMinigameRequest): Promise<Minigame
 
     const response: Response = await fetch(`${API_BASE_URL}/minigames/init`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': '1',
-        },
+        headers: buildHeaders(),
         body: JSON.stringify(requestBody),
     });
 
@@ -366,10 +386,7 @@ export const initRewardedGame = async (params: {
 
   const response: Response = await fetch(`${API_BASE_URL}/minigames/init/rewarded`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': '1',
-    },
+    headers: buildHeaders(),
     body: JSON.stringify(requestBody),
   });
 
@@ -387,10 +404,7 @@ export const verifyReward = async (params: {
 }): Promise<VerifyRewardResponse> => {
   const response: Response = await fetch(`${API_BASE_URL}/minigames/verify-reward`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': '1',
-    },
+    headers: buildHeaders(),
     body: JSON.stringify({
       serve_id: params.serveId,
       session_id: params.sessionId,
@@ -418,10 +432,7 @@ export const reportAdInterstitial = async (params: {
     // impression.
     await fetch(`${API_BASE_URL}/minigames/play/${encodeURIComponent(params.serveId)}/ad-interstitial`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': '1',
-      },
+      headers: buildHeaders(),
       body: JSON.stringify({
         session_id: params.sessionId,
         ad_source: params.adSource,
@@ -439,10 +450,7 @@ export const fetchAditudeConfig = async (domain: string): Promise<AditudeConfig 
   try {
     const response = await fetch(`${API_BASE_URL}/aditude/config?domain=${encodeURIComponent(domain)}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': '1',
-      },
+      headers: buildHeaders(),
     });
 
     if (!response.ok) {
@@ -453,27 +461,6 @@ export const fetchAditudeConfig = async (domain: string): Promise<AditudeConfig 
     return data;
   } catch {
     return null;
-  }
-};
-
-export const fetchAllAditudeConfigs = async (): Promise<AditudeConfig[]> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/aditude/config/all`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': '1',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data: AditudeConfig[] = await response.json();
-    return data;
-  } catch {
-    return [];
   }
 };
 
@@ -488,10 +475,7 @@ export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Pr
       width: request.width,
     };
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': '1',
-    };
+    const headers = buildHeaders();
 
     const response = await fetch(`${API_BASE_URL}/render_ad/ssp/native`, {
       method: 'POST',
