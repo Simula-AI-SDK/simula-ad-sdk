@@ -4,7 +4,7 @@
  * sync with package.json on every release.
  */
 export const SDK_NAME = 'simula-ad-sdk-web';
-export const SDK_VERSION = '1.4.2-dev.3';
+export const SDK_VERSION = '2.0.0-dev.1';
 
 /**
  * Value stamped on every backend request as the `X-Simula-SDK` header.

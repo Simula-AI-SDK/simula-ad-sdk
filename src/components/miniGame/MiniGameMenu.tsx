@@ -3,6 +3,7 @@ import { MiniGameMenuProps, MiniGameTheme, GameData } from '../../types';
 import { GameGrid } from './GameGrid';
 import { GameIframe } from './GameIframe';
 import { fetchCatalog, fetchAdForMinigame, trackMenuGameClick, reportAdInterstitial } from '../../utils/api';
+import { preloadImages } from '../../utils/imagePreloader';
 import gamesUnavailableImage from '../../assets/games-unavailable.png';
 import gameIconImage from '../../assets/game icon.png';
 import { useSimula } from '../../SimulaProvider';
@@ -159,17 +160,9 @@ export const MiniGameMenu: React.FC<MiniGameMenuProps> = ({
           .map((g: GameData) => g.gifCover || g.iconUrl)
           .filter(Boolean) as string[];
 
-        await Promise.all(
-          imageUrls.map(
-            (url) =>
-              new Promise<void>((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve();
-                img.onerror = () => resolve();
-                img.src = url;
-              })
-          )
-        );
+        // In-flight deduped: repeated menu opens / recycled rows never
+        // re-fetch the same cover concurrently
+        await preloadImages(imageUrls);
       } catch {
         setCatalogError(true);
         setGames([]);

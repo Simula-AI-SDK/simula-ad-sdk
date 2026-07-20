@@ -49,6 +49,16 @@ export function presentFullscreenAd(opts: {
   const delaySeconds = behavior.delaySeconds;
   const mountedAt = Date.now();
 
+  // One fullscreen ad at a time: a stale overlay from a previous mount (e.g.
+  // the host tore down without closing) is removed before presenting, so its
+  // scroll lock can never leak.
+  try {
+    document.querySelectorAll('[data-simula-fullscreen-ad]').forEach((el) => el.remove());
+    document.documentElement.style.overflow = '';
+  } catch {
+    // Best-effort cleanup
+  }
+
   let closed = false;
   let impressionTimer: ReturnType<typeof setTimeout> | null = null;
   let gateInterval: ReturnType<typeof setInterval> | null = null;
