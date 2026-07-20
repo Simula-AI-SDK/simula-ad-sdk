@@ -3,6 +3,13 @@ export { SimulaAds } from './core/SimulaAds';
 export { SimulaPrivacy } from './privacy/SimulaPrivacy';
 export { SDK_NAME, SDK_VERSION } from './core/version';
 export { adValueFromBidCpm } from './core/adValue';
+export {
+  SimulaInterstitialAd,
+  SimulaRewardedAd,
+  SimulaAdError,
+  SimulaAdEventType,
+  SimulaRewardedAdEventType,
+} from './ads';
 export { InChatAdSlot } from './components/inChatAd/InChatAdSlot';
 export { MiniGameMenu } from './components/miniGame/MiniGameMenu';
 export { MiniGameInvitation } from './components/miniGame/MiniGameInvitation';
@@ -47,9 +54,22 @@ export {
 export { filterContextForPrivacy } from './types';
 
 // Core imperative API types
-export type { SimulaInitConfig } from './core/SimulaAds';
+export type { SimulaInitConfig, PreloadNativeAdOptions } from './core/SimulaAds';
 export type { SimulaPrivacyConfig, ConsentSnapshot } from './privacy/SimulaPrivacy';
 export type { AdValue } from './core/adValue';
+export type {
+  SimulaAdErrorCode,
+  NativeAdError,
+  NativeAdErrorCode,
+  AnyAdEventType,
+  SimulaAdEvent,
+  SimulaAdEventListener,
+  SimulaUnsubscribe,
+  SimulaAdLoadOptions,
+  InterstitialPreviewOptions,
+  RewardedPreviewOptions,
+} from './ads';
+export type { NativeAdData, NativeAdProps, SimulaNativeAdTheme } from './nativeAd/types';
 
 export type {
   InChatTheme,

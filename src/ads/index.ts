@@ -1,0 +1,11 @@
+export { SimulaAdError, mapHttpError, nativeAdError } from './errors';
+export type { SimulaAdErrorCode, NativeAdErrorCode, NativeAdError } from './errors';
+export { SimulaAdEventType, SimulaRewardedAdEventType } from './events';
+export type { AnyAdEventType, SimulaAdEvent, SimulaAdEventListener, SimulaUnsubscribe } from './events';
+export { SimulaInterstitialAd } from './SimulaInterstitialAd';
+export type { InterstitialPreviewOptions } from './SimulaInterstitialAd';
+export { SimulaRewardedAd } from './SimulaRewardedAd';
+export type { RewardedPreviewOptions } from './SimulaRewardedAd';
+export type { SimulaAdLoadOptions } from './SimulaBaseAd';
+export { MAX_CLOSE_DELAY_SECONDS } from './adBehavior';
+export type { AdBehavior, CloseBehavior, CloseTreatment, ClosePosition } from './adBehavior';

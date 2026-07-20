@@ -496,30 +496,5 @@ export const filterContextForPrivacy = (context: NativeContext, hasPrivacyConsen
   return filtered;
 };
 
-export interface NativeBannerProps {
-  slot: string; // Placement identifier (e.g., 'feed', 'explore')
-  /**
-   * Ad width. Supports multiple formats:
-   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
-   * - number >= 1: pixels (e.g., 500 = 500px)
-   * - string with %: percentage (e.g., "10%" = 10%)
-   * - string with number: pixels (e.g., "500" = 500px)
-   * - "auto" or null: fills container width (min 130px)
-   */
-  width?: number | string | null;
-  position: number;
-  context: NativeContext;
-  /**
-   * Custom loading component to display while the ad is loading.
-   * - undefined: uses the default RadialLinesSpinner
-   * - null: disables the loading indicator entirely
-   * - React.ComponentType: renders your custom component
-   */
-  loadingComponent?: React.ComponentType | null;
-  /** Called when the ad content has finished loading and is ready to display */
-  onLoad?: (ad: AdData) => void;
-  /** Called when the ad has been viewable for 1 second (MRC standard) */
-  onImpression?: (ad: AdData) => void;
-  /** Called when an error occurs fetching or loading the ad */
-  onError?: (error: Error) => void;
-}
+/** Back-compat alias — the component props now live in the native ad module. */
+export type NativeBannerProps = import('./nativeAd/types').NativeAdProps;

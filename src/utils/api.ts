@@ -5,6 +5,8 @@ import { SimulaPrivacy, consentHeaders, privacyJson } from '../privacy/SimulaPri
 import { deviceSignalHeaders } from '../core/deviceSignals';
 import { connectionTypeValue } from '../core/connectionType';
 import { BeaconQueue } from '../core/beaconQueue';
+import { SimulaAdError, mapHttpError } from '../ads/errors';
+import { AdBehavior, Creative, Experiment, parseAdBehavior, parseCreative, parseExperiment } from '../ads/adBehavior';
 
 export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
 // export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
@@ -470,6 +472,236 @@ export const fetchAditudeConfig = async (domain: string): Promise<AditudeConfig 
     return null;
   }
 };
+
+// ── Native-contract load endpoints (Phase 2 — parity with Kotlin/Swift) ────────
+
+/** A loaded creative in the native wire shape (shared by interstitial/rewarded/native). */
+export interface LoadedCreative {
+  impressionId: string;
+  iframeUrl?: string;
+  renderedHtml?: string;
+  destination: string;
+  trackingUrl?: string;
+  /** Raw, unwrapped store link — deterministic CTA fallback (`android_store_url`). */
+  storeUrl?: string;
+  /** Cleared bid (estimated CPM) — drives `AdValue` on the paid event. */
+  bidAmt: number;
+  adBehavior: AdBehavior | null;
+  creative?: Creative | null;
+  experiment?: Experiment | null;
+  /** Native only: wire `ad_format` (e.g. "character_ad"). */
+  adFormat?: string;
+  adUnitId?: string;
+}
+
+export interface LoadAdResult {
+  creative?: LoadedCreative;
+  error?: SimulaAdError;
+}
+
+export interface CharacterTargeting {
+  charId?: string;
+  charName?: string;
+  charImage?: string;
+  charDesc?: string;
+}
+
+/** The wire `NativeContext` object — camelCase keys (native parity: NativeContextBody). */
+function contextBody(context?: NativeContext | null): Record<string, unknown> | undefined {
+  if (!context) return undefined;
+  return {
+    searchTerm: context.searchTerm,
+    tags: context.tags,
+    category: context.category,
+    title: context.title,
+    description: context.description,
+    userProfile: context.userProfile,
+    userEmail: context.userEmail,
+    customContext: context.customContext,
+    nsfw: context.nsfw === true,
+  };
+}
+
+function webCapabilities(): Record<string, unknown> {
+  let osVersion = '';
+  try {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const m = ua.match(/Windows NT ([\d.]+)/) ?? ua.match(/Mac OS X ([\d_]+)/) ?? ua.match(/Android ([\d.]+)/) ?? ua.match(/OS ([\d_]+)/);
+    osVersion = m ? m[1].replace(/_/g, '.') : '';
+  } catch {
+    // empty
+  }
+  return {
+    os_version: osVersion,
+    api_level: 0,
+    play_services_available: false,
+    install_referrer_available: false,
+  };
+}
+
+/** Shared non-2xx handling for load endpoints: structured `{code}` body → AdUnitNotFound, else Network. */
+async function loadErrorFrom(response: Response): Promise<SimulaAdError> {
+  let body: any = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  return mapHttpError(response.status, body);
+}
+
+function parseLoadedCreative(data: any, opts: { requireId?: boolean } = {}): LoadAdResult {
+  const impressionId = typeof data?.impression_id === 'string' && data.impression_id ? data.impression_id : undefined;
+  const adInserted = data?.ad_inserted === true || (opts.requireId === false && !!impressionId);
+  if (!adInserted || (!impressionId && opts.requireId !== false)) {
+    return { error: SimulaAdError.noFill() };
+  }
+  const iframeUrl = typeof data.iframe_url === 'string' && data.iframe_url ? data.iframe_url : undefined;
+  const renderedHtml = typeof data.rendered_html === 'string' && data.rendered_html ? data.rendered_html : undefined;
+  if (!iframeUrl && !renderedHtml) {
+    return { error: SimulaAdError.noFill() };
+  }
+  return {
+    creative: {
+      impressionId: impressionId ?? '',
+      iframeUrl,
+      renderedHtml,
+      destination: typeof data.destination === 'string' ? data.destination : 'appstore',
+      trackingUrl: typeof data.tracking_url === 'string' && data.tracking_url ? data.tracking_url : undefined,
+      storeUrl: typeof data.android_store_url === 'string' && data.android_store_url ? data.android_store_url : undefined,
+      bidAmt: typeof data.bid_amt === 'number' && Number.isFinite(data.bid_amt) ? data.bid_amt : 0,
+      adBehavior: parseAdBehavior(data.ad_behavior),
+      creative: parseCreative(data.creative),
+      experiment: parseExperiment(data.experiment),
+      adFormat: typeof data.ad_format === 'string' ? data.ad_format : undefined,
+      adUnitId: typeof data.ad_unit_id === 'string' ? data.ad_unit_id : undefined,
+    },
+  };
+}
+
+async function postLoad(path: string, body: Record<string, unknown>, apiKey: string): Promise<LoadAdResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      return { error: await loadErrorFrom(response) };
+    }
+    const data = await response.json();
+    return parseLoadedCreative(data);
+  } catch (error) {
+    return { error: SimulaAdError.network(error) };
+  }
+}
+
+/** `POST /load/interstitial` (native parity: SimulaApiClient.loadAd). */
+export function loadInterstitialAd(params: {
+  apiKey: string;
+  adUnitId: string;
+  sessionId: string;
+  targeting?: CharacterTargeting;
+  context?: NativeContext | null;
+}): Promise<LoadAdResult> {
+  return postLoad('/load/interstitial', {
+    ad_unit_id: params.adUnitId,
+    session_id: params.sessionId,
+    char_id: params.targeting?.charId,
+    char_name: params.targeting?.charName,
+    char_image: params.targeting?.charImage,
+    char_desc: params.targeting?.charDesc,
+    context: contextBody(params.context),
+    capabilities: webCapabilities(),
+  }, params.apiKey);
+}
+
+/** `POST /load/rewarded` (native parity: SimulaApiClient.loadRewarded). */
+export function loadRewardedAd(params: {
+  apiKey: string;
+  adUnitId: string;
+  sessionId: string;
+  targeting?: CharacterTargeting;
+  context?: NativeContext | null;
+}): Promise<LoadAdResult> {
+  return postLoad('/load/rewarded', {
+    ad_unit_id: params.adUnitId,
+    session_id: params.sessionId,
+    char_id: params.targeting?.charId,
+    char_name: params.targeting?.charName,
+    char_image: params.targeting?.charImage,
+    char_desc: params.targeting?.charDesc,
+    context: contextBody(params.context),
+  }, params.apiKey);
+}
+
+/** `POST /load/native` (native parity: SimulaApiClient.loadNative). */
+export function loadNativeAd(params: {
+  apiKey: string;
+  position: number;
+  sessionId: string;
+  adUnitId?: string;
+  context?: NativeContext | null;
+  width?: string;
+  /** Resolved theme: "light" | "dark" (null omits the key — backend defaults to light). */
+  theme?: string;
+  targeting?: Omit<CharacterTargeting, 'charImage'>;
+}): Promise<LoadAdResult> {
+  return postLoad('/load/native', {
+    position: params.position,
+    session_id: params.sessionId,
+    ad_unit_id: params.adUnitId,
+    context: contextBody(params.context),
+    width: params.width,
+    theme: params.theme,
+    char_id: params.targeting?.charId,
+    char_name: params.targeting?.charName,
+    char_desc: params.targeting?.charDesc,
+  }, params.apiKey);
+}
+
+export interface VerifyRewardWireResult {
+  /** HTTP status, or 0 on connectivity failure. */
+  status: number;
+  verified?: boolean;
+  token?: string;
+}
+
+/**
+ * Low-level `POST /minigames/verify-reward` for the durable queue: never throws,
+ * returns the raw status so the queue can apply its semantics (409 → success,
+ * other 4xx → permanent drop, 5xx/network → retry).
+ */
+export async function postVerifyReward(params: {
+  serveId: string;
+  sessionId: string;
+  elapsedPlayTime: number;
+  adUnitId?: string;
+}): Promise<VerifyRewardWireResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/minigames/verify-reward`, {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify({
+        serve_id: params.serveId,
+        session_id: params.sessionId,
+        elapsed_play_time: params.elapsedPlayTime,
+        ad_unit_id: params.adUnitId ?? '',
+      }),
+    });
+    if (!response.ok) {
+      return { status: response.status };
+    }
+    const data = await response.json();
+    return {
+      status: response.status,
+      verified: data?.verified === true,
+      token: typeof data?.token === 'string' ? data.token : undefined,
+    };
+  } catch {
+    return { status: 0 };
+  }
+}
 
 // NativeBanner API
 export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Promise<FetchNativeAdResponse> => {

@@ -335,7 +335,7 @@ export const validateNativeContext = (context: any, strict = false): boolean => 
  * Validates NativeBanner props. Returns false (or throws when strict) on invalid props.
  */
 export const validateNativeBannerProps = (props: any, strict = false): boolean => {
-  const validProps = ['slot', 'width', 'position', 'context', 'loadingComponent', 'onLoad', 'onImpression', 'onError'];
+  const validProps = ['slot', 'width', 'position', 'context', 'theme', 'preloadedAdId', 'previewHtml', 'loadingComponent', 'onLoad', 'onImpression', 'onPaid', 'onClick', 'onError'];
   const receivedProps = Object.keys(props);
 
   // Check for unknown props
@@ -399,12 +399,22 @@ export const validateNativeBannerProps = (props: any, strict = false): boolean =
     return fail(`Invalid "position" prop value: "${props.position}". Must be a non-negative number`, strict);
   }
 
-  // Validate context (required)
-  if (props.context === undefined) {
-    return fail('NativeBanner requires a "context" prop (NativeContext object)', strict);
-  }
-  if (!validateNativeContext(props.context, strict)) {
+  // Validate context (optional — merged over the global SimulaAds context when omitted)
+  if (props.context !== undefined && !validateNativeContext(props.context, strict)) {
     return false;
+  }
+
+  // Validate theme (optional)
+  if (props.theme !== undefined && props.theme !== 'dark' && props.theme !== 'light' && props.theme !== 'system') {
+    return fail(`Invalid "theme" prop value: "${props.theme}". Must be "dark", "light", or "system"`, strict);
+  }
+
+  // Validate preloadedAdId / previewHtml (optional strings)
+  if (props.preloadedAdId !== undefined && typeof props.preloadedAdId !== 'string') {
+    return fail(`Invalid "preloadedAdId" prop type: "${typeof props.preloadedAdId}". Must be a string`, strict);
+  }
+  if (props.previewHtml !== undefined && typeof props.previewHtml !== 'string') {
+    return fail(`Invalid "previewHtml" prop type: "${typeof props.previewHtml}". Must be a string`, strict);
   }
 
   // Validate callbacks (optional)
@@ -414,6 +424,14 @@ export const validateNativeBannerProps = (props: any, strict = false): boolean =
 
   if (props.onImpression !== undefined && typeof props.onImpression !== 'function') {
     return fail(`Invalid "onImpression" prop type: "${typeof props.onImpression}". Must be a function`, strict);
+  }
+
+  if (props.onPaid !== undefined && typeof props.onPaid !== 'function') {
+    return fail(`Invalid "onPaid" prop type: "${typeof props.onPaid}". Must be a function`, strict);
+  }
+
+  if (props.onClick !== undefined && typeof props.onClick !== 'function') {
+    return fail(`Invalid "onClick" prop type: "${typeof props.onClick}". Must be a function`, strict);
   }
 
   if (props.onError !== undefined && typeof props.onError !== 'function') {

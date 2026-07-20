@@ -14,6 +14,16 @@ import { primeDeviceSignals } from './deviceSignals';
 import { Telemetry } from '../telemetry/telemetry';
 import { BeaconQueue } from './beaconQueue';
 import { fireIpv4Beacon, onIpv4Logout, IPV4_REASON_INIT, IPV4_REASON_PPID_UPDATE } from './ipv4Beacon';
+import { RewardVerificationQueue } from '../ads/rewardVerificationQueue';
+import { loadNativeAd } from '../utils/api';
+import { generateId } from '../utils/id';
+import {
+  preloadCapacityAvailable,
+  storePreloadedAd,
+  destroyPreloadedAd as removePreloadedAd,
+} from '../nativeAd/preloadCache';
+import { invalidateNativeAd as invalidateNativeAdEntry, invalidateAllNativeAds } from '../nativeAd/nativeAdCache';
+import { resolveNativeAdTheme, SimulaNativeAdTheme } from '../nativeAd/theme';
 
 export interface SimulaInitConfig {
   apiKey: string;
@@ -131,6 +141,7 @@ function initialize(config: SimulaInitConfig): boolean {
 
     // ── Recover durable queues from a previous page load ──
     BeaconQueue.triggerProcessQueue();
+    RewardVerificationQueue.triggerProcessQueue();
 
     // Warm the session off the critical path — never awaited, never throws.
     void SessionManager.ensureSession();
@@ -206,6 +217,73 @@ async function checkFrequencyCap(adUnitId: string, userID?: string | null): Prom
 }
 
 /**
+ * Options for `SimulaAds.preloadNativeAd` (native parity).
+ */
+export interface PreloadNativeAdOptions {
+  adUnitId?: string;
+  position?: number;
+  theme?: SimulaNativeAdTheme;
+}
+
+/**
+ * Preloads a native ad for instant rendering (native parity). Holds at most 5
+ * preloaded ads; each is consumed once via `<NativeBanner preloadedAdId>`.
+ * Returns the `preloadedAdId`, or null when uninitialized / capped / no-fill.
+ * Fails open: a preload failure never throws — the slot simply live-loads.
+ */
+async function preloadNativeAd(options: PreloadNativeAdOptions = {}): Promise<string | null> {
+  if (!initialized) return null;
+  try {
+    if (!preloadCapacityAvailable()) {
+      Telemetry.recordOperation('native_preload_capped', { success: false });
+      return null;
+    }
+    const sessionId = await SessionManager.ensureSession();
+    if (!sessionId) return null;
+    const position = options.position ?? 0;
+    const theme = resolveNativeAdTheme(options.theme ?? null);
+    const result = await loadNativeAd({
+      apiKey,
+      position,
+      sessionId,
+      adUnitId: options.adUnitId,
+      context: adContext,
+      theme,
+    });
+    if (!result.creative) return null;
+    const preloadedAdId = generateId();
+    storePreloadedAd({ preloadedAdId, creative: result.creative, adUnitId: options.adUnitId, position, theme });
+    Telemetry.recordLifecycle('load_success', {
+      adFormat: 'native',
+      adUnitId: options.adUnitId,
+      adId: result.creative.impressionId,
+      cacheSource: 'preload',
+    });
+    return preloadedAdId;
+  } catch {
+    return null;
+  }
+}
+
+/** Destroys a preloaded native ad that won't be used (native parity). */
+function destroyPreloadedAd(preloadedAdId: string): void {
+  if (!initialized || !preloadedAdId) return;
+  removePreloadedAd(preloadedAdId);
+}
+
+/** Invalidates the cached ad for one (adUnitId, position) slot — the next render re-fetches. */
+function invalidateNativeAd(options: { adUnitId?: string; position?: number } = {}): void {
+  if (!initialized) return;
+  invalidateNativeAdEntry(options.adUnitId, options.position ?? 0);
+}
+
+/** Invalidates every cached native ad. */
+function invalidateNativeAds(): void {
+  if (!initialized) return;
+  invalidateAllNativeAds();
+}
+
+/**
  * Keeps runtime identity props in sync (used by `<SimulaProvider>` when
  * `primaryUserID` / `hasPrivacyConsent` change after mount).
  * @internal
@@ -226,6 +304,11 @@ function _resetForTests(): void {
   adContext = null;
 }
 
+/** Internal accessor for SDK layers (ads/telemetry) that must sign requests. @internal */
+function _getApiKey(): string {
+  return apiKey;
+}
+
 export const SimulaAds = {
   initialize,
   isInitialized,
@@ -234,6 +317,11 @@ export const SimulaAds = {
   getContext,
   updatePrimaryUserID,
   checkFrequencyCap,
+  preloadNativeAd,
+  destroyPreloadedAd,
+  invalidateNativeAd,
+  invalidateNativeAds,
   _syncIdentity,
   _resetForTests,
+  _getApiKey,
 };
