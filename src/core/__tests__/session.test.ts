@@ -95,6 +95,15 @@ describe('SessionManager', () => {
     expect(SessionManager.getSessionUserID()).toBeUndefined();
   });
 
+  it('logout fires the hook even when identity was only pending (no session yet)', async () => {
+    stubSessionFetch();
+    const onLogout = vi.fn();
+    SessionManager.configure('key-1', false, 'user-1', { onLogout });
+    // No ensureSession — identity exists only as pendingUserID
+    SessionManager.updatePrimaryUserID(null, true);
+    expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+
   it('notifies subscribers on session install', async () => {
     stubSessionFetch();
     SessionManager.configure('key-1', false);

@@ -87,6 +87,33 @@ describe('RewardVerificationQueue (native parity: durable idempotent SSV)', () =
     expect(RewardVerificationQueue.size()).toBe(1);
   });
 
+  it('retries backed-off items automatically when due (PR #12 thread #17)', async () => {
+    vi.useFakeTimers(); // fakes Date + timers; microtasks still flush between advances
+    try {
+      let attempt = 0;
+      const calls = stubVerifyFetch(() => {
+        attempt++;
+        return attempt === 1 ? { status: 500 } : { status: 200, json: { verified: true, token: 'tok-1' } };
+      });
+      const seen: string[] = [];
+      RewardVerificationQueue.enqueue(params, { onVerified: () => seen.push('verified'), onFailed: () => seen.push('failed') });
+
+      // First attempt fails (500) → item stays queued with a 5s backoff
+      await vi.advanceTimersByTimeAsync(20);
+      expect(calls).toHaveLength(1);
+      expect(RewardVerificationQueue.size()).toBe(1);
+
+      // The queue schedules its own retry — no new enqueue or reload needed
+      await vi.advanceTimersByTimeAsync(5100);
+
+      expect(calls.length).toBeGreaterThanOrEqual(2);
+      expect(seen).toEqual(['verified']);
+      expect(RewardVerificationQueue.size()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('dedupes by serveId', async () => {
     const calls = stubVerifyFetch(() => ({ status: 200, json: { verified: true } }));
     RewardVerificationQueue.enqueue(params, { onVerified: () => {}, onFailed: () => {} });

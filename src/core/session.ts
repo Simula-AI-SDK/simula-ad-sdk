@@ -108,10 +108,13 @@ class SessionManagerImpl {
    */
   updatePrimaryUserID(id: string | null, allowsPpid: boolean): void {
     const normalized = allowsPpid && id && id.trim() ? id : null;
+    // Capture identity BEFORE overwriting — the logout hook must fire even when
+    // the identity was only pending (session not yet created), so the IPv4
+    // beacon's dedup state resets for the next login.
+    const hadIdentity = this.sessionUserID !== undefined || this.pendingUserID !== undefined;
     this.pendingUserID = normalized ?? undefined;
 
     if (normalized === null) {
-      const hadIdentity = this.sessionUserID !== undefined || this.pendingUserID !== undefined;
       this.sessionUserID = undefined;
       if (hadIdentity) this.hooks.onLogout?.();
       return;

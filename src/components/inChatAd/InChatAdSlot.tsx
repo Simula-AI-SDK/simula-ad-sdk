@@ -40,13 +40,16 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
 
   const { apiKey, sessionId, devMode } = useSimula();
 
-  // Validate props once (first render). Strict mode (devMode) throws; in
-  // production invalid props log and the slot renders null (never crashes).
-  const propsValidRef = useRef<boolean | null>(null);
-  if (propsValidRef.current === null) {
-    propsValidRef.current = validateInChatAdSlotProps(props, devMode);
-  }
-  const propsValid = propsValidRef.current;
+  // Validate props, memoized on the messages REFERENCE: the validator iterates
+  // the whole array, and a live chat re-renders per keystroke — only re-validate
+  // when the array identity (or another validated input) actually changes.
+  // A slot mounted with temporarily-invalid props still recovers once they
+  // become valid; each unique failure logs only once (devMode throws).
+  const propsValid = useMemo(
+    () => validateInChatAdSlotProps(props, devMode),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.messages, props.theme, props.debounceMs, props.charDesc, devMode]
+  );
 
   // Generate a stable slotId for this component instance
   const slotId = useMemo(() => `slot-${generateId()}`, []);

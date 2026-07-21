@@ -33,6 +33,9 @@ export class SimulaRewardedAd extends SimulaBaseAd {
   protected readonly adFormat = 'rewarded' as const;
   protected readonly adUnitType: AdUnitType = 'rewarded';
 
+  /** Impressions whose reward gate elapsed (the only ones worth verifying). */
+  private earnedImpressionIds = new Set<string>();
+
   constructor(adUnitId: string) {
     super(adUnitId);
   }
@@ -52,6 +55,7 @@ export class SimulaRewardedAd extends SimulaBaseAd {
 
   /** The client-side reward gate elapsed (native parity: onAdEarnedReward). */
   protected onRewardGateElapsed(ad: { creative: LoadedCreative }): void {
+    this.earnedImpressionIds.add(ad.creative.impressionId);
     this.emit(SimulaRewardedAdEventType.EARNED_REWARD);
     Telemetry.recordLifecycle('reward_earned', {
       adFormat: this.adFormat,
@@ -60,40 +64,48 @@ export class SimulaRewardedAd extends SimulaBaseAd {
     });
   }
 
-  /** On close: enqueue the durable SSV verification, then auto-preload the next ad. */
+  /**
+   * On close: verify ONLY when the reward gate elapsed (Kotlin parity:
+   * `onRewardCompleted` returns early when `!earned`) — a pre-gate close
+   * grants nothing, so it must not POST a wasted verification nor surface a
+   * spurious REWARD_VERIFICATION_FAILED. Then auto-preload the next ad.
+   */
   protected onAdClosed(
     ad: { creative: LoadedCreative; sessionId: string },
     elapsedSeconds: number,
   ): void {
-    RewardVerificationQueue.enqueue(
-      {
-        serveId: ad.creative.impressionId,
-        sessionId: ad.sessionId,
-        elapsedPlayTime: elapsedSeconds,
-        adUnitId: this.adUnitId,
-      },
-      {
-        onVerified: (token) => {
-          this.emit(SimulaRewardedAdEventType.REWARD_VERIFIED, { rewardToken: token });
-          Telemetry.recordLifecycle('reward_verified', {
-            adFormat: this.adFormat,
-            adUnitId: this.adUnitId,
-            adId: ad.creative.impressionId,
-          });
+    const earned = this.earnedImpressionIds.delete(ad.creative.impressionId);
+    if (earned) {
+      RewardVerificationQueue.enqueue(
+        {
+          serveId: ad.creative.impressionId,
+          sessionId: ad.sessionId,
+          elapsedPlayTime: elapsedSeconds,
+          adUnitId: this.adUnitId,
         },
-        onFailed: (error) => {
-          this.emit(SimulaRewardedAdEventType.REWARD_VERIFICATION_FAILED, {
-            error: SimulaAdError.network(error),
-          });
-          Telemetry.recordLifecycle('reward_verification_failed', {
-            adFormat: this.adFormat,
-            adUnitId: this.adUnitId,
-            adId: ad.creative.impressionId,
-            errorCode: 'network',
-          });
+        {
+          onVerified: (token) => {
+            this.emit(SimulaRewardedAdEventType.REWARD_VERIFIED, { rewardToken: token });
+            Telemetry.recordLifecycle('reward_verified', {
+              adFormat: this.adFormat,
+              adUnitId: this.adUnitId,
+              adId: ad.creative.impressionId,
+            });
+          },
+          onFailed: (error) => {
+            this.emit(SimulaRewardedAdEventType.REWARD_VERIFICATION_FAILED, {
+              error: SimulaAdError.network(error),
+            });
+            Telemetry.recordLifecycle('reward_verification_failed', {
+              adFormat: this.adFormat,
+              adUnitId: this.adUnitId,
+              adId: ad.creative.impressionId,
+              errorCode: 'network',
+            });
+          },
         },
-      },
-    );
+      );
+    }
     // Auto-preload the next ad on close (native parity)
     this.preloadNext();
   }

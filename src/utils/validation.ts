@@ -7,12 +7,27 @@ import { logger } from './logger';
  * console.error and return `false` so the caller renders a safe default
  * (null / blank). Pass `strict = true` (wired to `devMode`) to throw during
  * integration, matching the previous always-throw behavior.
+ *
+ * Validation is safe to run on EVERY render (components re-validate as props
+ * change, so a surface mounted with temporarily-invalid props — e.g. an
+ * empty `messages` array while chat history loads — recovers once props
+ * become valid): each unique failure message is logged only once per page.
  */
+
+const loggedMessages = new Set<string>();
 
 const fail = (message: string, strict: boolean): false => {
   if (strict) throw new Error(message);
-  logger.error(message);
+  if (!loggedMessages.has(message)) {
+    loggedMessages.add(message);
+    logger.error(message);
+  }
   return false;
+};
+
+/** Test hook. Not public API. */
+export const _resetValidationWarningsForTests = (): void => {
+  loggedMessages.clear();
 };
 
 // Helper functions for width validation

@@ -1,4 +1,4 @@
-import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, FetchNativeBannerRequest, FetchNativeAdResponse, InitRewardedResponse, VerifyRewardResponse } from '../types';
+import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, InitRewardedResponse, VerifyRewardResponse } from '../types';
 import { SDK_HEADER_VALUE } from '../core/version';
 import { logger } from './logger';
 import { SimulaPrivacy, consentHeaders, privacyJson } from '../privacy/SimulaPrivacy';
@@ -9,8 +9,6 @@ import { SimulaAdError, mapHttpError } from '../ads/errors';
 import { AdBehavior, Creative, Experiment, parseAdBehavior, parseCreative, parseExperiment } from '../ads/adBehavior';
 
 export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app';
-// export const API_BASE_URL = 'https://splittable-unpatient-maxine.ngrok-free.dev';
-// export const API_BASE_URL = 'https://simula-dev-ad.ngrok.app'
 
 /**
  * Central request-headers builder — the SDK's single header chokepoint
@@ -20,7 +18,7 @@ export const API_BASE_URL = 'https://simula-api-701226639755.us-central1.run.app
  * - device-signal headers — TTL-cached snapshot, zero per-request cost
  * - consent headers — read LIVE from SimulaPrivacy at request time, never cached
  */
-function buildHeaders(extra?: Record<string, string>): Record<string, string> {
+export function buildHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'X-Simula-SDK': SDK_HEADER_VALUE,
@@ -221,11 +219,12 @@ export const fetchAd = async (request: FetchAdRequest): Promise<FetchAdResponse>
 };
 
 export const trackImpression = async (adId: string, apiKey: string): Promise<void> => {
-  // Durable: enqueued for guaranteed delivery (survives offline / tab close)
+  // Durable: enqueued for guaranteed delivery (survives offline / tab close).
+  // Headers are rebuilt at send time — never persisted.
   BeaconQueue.enqueue({
     url: `${API_BASE_URL}/track/engagement/impression/${adId}`,
     method: 'POST',
-    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    auth: true,
     body: JSON.stringify({}),
   });
 };
@@ -234,7 +233,7 @@ export const trackMenuGameClick = async (menuId: string, gameName: string, apiKe
   BeaconQueue.enqueue({
     url: `${API_BASE_URL}/minigames/menu/track/click`,
     method: 'POST',
-    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    auth: true,
     body: JSON.stringify({
       menu_id: menuId,
       game_name: gameName,
@@ -246,7 +245,7 @@ export const trackViewportEntry = async (adId: string, apiKey: string): Promise<
   BeaconQueue.enqueue({
     url: `${API_BASE_URL}/track/engagement/viewport_entry/${adId}`,
     method: 'POST',
-    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    auth: true,
     body: JSON.stringify({
       timestamp: new Date().toISOString(),
     }),
@@ -257,7 +256,7 @@ export const trackViewportExit = async (adId: string, apiKey: string): Promise<v
   BeaconQueue.enqueue({
     url: `${API_BASE_URL}/track/engagement/viewport_exit/${adId}`,
     method: 'POST',
-    headers: buildHeaders({ 'Authorization': `Bearer ${apiKey}` }),
+    auth: true,
     body: JSON.stringify({
       timestamp: new Date().toISOString(),
     }),
@@ -702,54 +701,3 @@ export async function postVerifyReward(params: {
     return { status: 0 };
   }
 }
-
-// NativeBanner API
-export const fetchNativeBannerAd = async (request: FetchNativeBannerRequest): Promise<FetchNativeAdResponse> => {
-  try {
-    const requestBody = {
-      session_id: request.sessionId,
-      slot: request.slot,
-      position: request.position,
-      context: request.context,
-      width: request.width,
-    };
-
-    const headers = buildHeaders();
-
-    const response = await fetch(`${API_BASE_URL}/render_ad/ssp/native`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    // Check if response is HTML
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
-      const html = await response.text();
-      // Extract ad_id from response headers (FastAPI sends it as "aid" header)
-      const adId = response.headers.get('aid');
-      return {
-        ad: {
-          id: adId ?? '',
-          format: "native",
-          html: html
-        }
-      };
-    }
-    // Fallback
-    return {
-        ad: {
-          id: '',
-          format: '',
-          html: ''
-        }
-      };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : 'Failed to fetch native banner ad'
-    };
-  }
-};

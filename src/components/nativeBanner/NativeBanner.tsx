@@ -25,8 +25,6 @@ import { NativeAdProps, NativeAdData } from '../../nativeAd/types';
 import { RadialLinesSpinner } from './RadialLinesSpinner';
 import { parseWidth, needsWidthMeasurement } from '../../utils/parseWidth';
 
-// Internal constant to prevent API abuse
-const MIN_FETCH_INTERVAL_MS = 1000; // 1 second minimum between fetches
 // Native parity: the card enforces a 300px minimum width
 const MIN_WIDTH_PX = 300;
 // Cross-origin creatives can't be measured from the parent — sensible default
@@ -67,13 +65,10 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
     cacheHeight,
   } = useSimula();
 
-  // Validate props once (first render). Strict mode (devMode) throws; in
-  // production invalid props log and the slot renders null (never crashes).
-  const propsValidRef = useRef<boolean | null>(null);
-  if (propsValidRef.current === null) {
-    propsValidRef.current = validateNativeBannerProps(props, devMode);
-  }
-  const propsValid = propsValidRef.current;
+  // Validate props on EVERY render: a slot mounted with temporarily-invalid
+  // props recovers once they become valid; each unique failure logs only once
+  // (strict mode — devMode — throws during integration).
+  const propsValid = validateNativeBannerProps(props, devMode);
 
   // Minimal state - only what's needed for rendering
   const [creative, setCreative] = useState<LoadedCreative | null>(null);
@@ -86,7 +81,6 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
   const elementRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const hasFetchedRef = useRef(false);
-  const lastFetchTimeRef = useRef<number>(0);
   const impressionTrackedRef = useRef(false);
   const hasMetDurationRef = useRef(false);
   const creativeRef = useRef<LoadedCreative | null>(null);
@@ -97,6 +91,27 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
   const onLoadRef = useRef(onLoad);
   const onClickRef = useRef(onClick);
   const detachBridgeRef = useRef<(() => void) | null>(null);
+  // Dedup window for a single tap seen by BOTH the DOM-capture path (same-origin
+  // fallback) and the bridge CTA_CLICK path — one tap, one click event.
+  const lastClickAtRef = useRef(0);
+
+  const fireClick = useCallback((c: LoadedCreative, openTarget: boolean) => {
+    const now = Date.now();
+    if (now - lastClickAtRef.current < 300) return;
+    lastClickAtRef.current = now;
+    onClickRef.current?.();
+    Telemetry.recordLifecycle('click', { adFormat: 'native', adUnitId: slot, adId: c.impressionId });
+    if (openTarget) {
+      const target = c.trackingUrl ?? c.storeUrl;
+      if (target) {
+        try {
+          window.open(target, '_blank', 'noopener');
+        } catch {
+          // Popup blocked — click already recorded
+        }
+      }
+    }
+  }, [slot]);
 
   useEffect(() => {
     onImpressionRef.current = onImpression;
@@ -210,12 +225,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
     const needsMeasurement = needsWidthMeasurement(width);
     if (needsMeasurement && measuredWidth === null) return;
 
-    // Rate limiting
-    const now = Date.now();
-    if (now - lastFetchTimeRef.current < MIN_FETCH_INTERVAL_MS) return;
-
     hasFetchedRef.current = true;
-    lastFetchTimeRef.current = now;
 
     const startedAt = Date.now();
     const mergedContext = context ?? SimulaAds.getContext() ?? undefined;
@@ -266,7 +276,9 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
       setLoaded(true);
       onLoadRef.current?.(nativeAdData(creative));
 
-      // srcdoc (same-origin): measure content height + capture CTA taps directly
+      // srcdoc (same-origin fallback): measure content height + capture CTA
+      // taps directly. Inoperable when the sandbox gives an opaque origin —
+      // height/clicks then arrive over the bridge (below).
       if (creative.renderedHtml) {
         try {
           const doc = iframe.contentDocument;
@@ -276,13 +288,10 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
               reportHeight(doc.body.scrollHeight || doc.documentElement.scrollHeight);
             });
             resizeObserver.observe(doc.body);
-            doc.addEventListener('click', () => {
-              onClickRef.current?.();
-              Telemetry.recordLifecycle('click', { adFormat: 'native', adUnitId: slot, adId: creative.impressionId });
-            }, true);
+            doc.addEventListener('click', () => fireClick(creative, false), true);
           }
         } catch {
-          // Cross-origin guard — fall back to the default height
+          // Cross-origin guard — fall back to the bridge paths
         }
       }
     };
@@ -291,18 +300,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
 
     // Cross-origin creatives: CTA + sizing arrive over the bridge
     detachBridgeRef.current = attachCreativeBridge(iframe, {
-      onCtaClick: () => {
-        onClickRef.current?.();
-        Telemetry.recordLifecycle('click', { adFormat: 'native', adUnitId: slot, adId: creative.impressionId });
-        const target = creative.trackingUrl ?? creative.storeUrl;
-        if (target) {
-          try {
-            window.open(target, '_blank', 'noopener');
-          } catch {
-            // Popup blocked — click already recorded
-          }
-        }
-      },
+      onCtaClick: () => fireClick(creative, true),
     });
 
     // Web sizing extension: creatives can post { type: 'SIMULA_AD_SIZE', payload: { height } }
@@ -326,7 +324,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
       detachBridgeRef.current = null;
       window.removeEventListener('message', onMessage);
     };
-  }, [creative, slot, position, cacheHeight, nativeAdData]);
+  }, [creative, slot, position, cacheHeight, nativeAdData, fireClick]);
 
   // Viewability → billable impression (MRC: ≥50% visible, 1 continuous second)
   useEffect(() => {
@@ -424,7 +422,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
   }
 
   const isSrcdoc = !!creative.renderedHtml;
-  const height = iframeHeight ?? getCachedHeight(slot, position) ?? (isSrcdoc ? DEFAULT_IFRAME_HEIGHT : DEFAULT_IFRAME_HEIGHT);
+  const height = iframeHeight ?? getCachedHeight(slot, position) ?? DEFAULT_IFRAME_HEIGHT;
 
   return (
     <div
@@ -444,7 +442,13 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
         title={`Simula native ad ${creative.impressionId}`}
         className="simula-native-banner-frame"
         style={{ display: 'block', width: '100%', height: '100%', border: 0, margin: 0, padding: 0, opacity: loaded ? 1 : 0, transition: 'opacity 120ms ease-in' }}
-        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        // srcdoc creatives get an OPAQUE origin (no allow-same-origin): the
+        // creative can never touch the host page's DOM/cookies/storage. Height
+        // and clicks flow over the bridge (SIMULA_AD_SIZE / CTA_CLICK); the
+        // direct-DOM paths above remain as a guarded fallback only.
+        sandbox={isSrcdoc
+          ? 'allow-scripts allow-popups allow-popups-to-escape-sandbox'
+          : 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox'}
         {...(isSrcdoc ? { srcDoc: creative.renderedHtml } : { src: creative.iframeUrl })}
       />
     </div>

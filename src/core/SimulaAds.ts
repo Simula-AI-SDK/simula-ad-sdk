@@ -1,7 +1,7 @@
 import { NativeContext } from '../types';
 import { logger, setDebugMode } from '../utils/logger';
 import { validateNativeContext } from '../utils/validation';
-import { checkFrequencyCapStatus } from '../utils/api';
+import { checkFrequencyCapStatus, buildHeaders } from '../utils/api';
 import { SessionManager } from './session';
 import { SimulaStorage } from './storage';
 import {
@@ -139,6 +139,12 @@ function initialize(config: SimulaInitConfig): boolean {
       SessionManager.resync(effectiveUserID());
     });
 
+    // ── Beacons: headers built at SEND time with the live consent state and
+    // current API key (never persisted to storage) ──
+    BeaconQueue.configure({
+      headersProvider: (auth) => buildHeaders(auth ? { Authorization: `Bearer ${apiKey}` } : undefined),
+    });
+
     // ── Recover durable queues from a previous page load ──
     BeaconQueue.triggerProcessQueue();
     RewardVerificationQueue.triggerProcessQueue();
@@ -194,11 +200,14 @@ async function checkFrequencyCap(adUnitId: string, userID?: string | null): Prom
   if (!initialized || !adUnitId || !adUnitId.trim()) return false;
   try {
     const ppid = userID && userID.trim() ? userID : effectiveUserID();
-    const cacheKey = `freqcap:${localDayStamp()}`;
     const cacheId = `${adUnitId}|${ppid ?? ''}`;
 
-    const cached = SimulaStorage.getJSON<Record<string, boolean>>(cacheKey);
-    if (cached && cached[cacheId] === true) return true;
+    // Single fixed storage key holding { day, entries } — day-scoped, so
+    // yesterday's entries are dropped on first read (no key accumulation).
+    const today = localDayStamp();
+    const stored = SimulaStorage.getJSON<{ day: string; entries: Record<string, boolean> }>('freqcap');
+    const entries = stored && stored.day === today ? stored.entries : {};
+    if (entries[cacheId] === true) return true;
 
     // Attach the session id only when it represents the same identity we're
     // checking — a stale session id could make the backend evaluate the cap
@@ -208,7 +217,7 @@ async function checkFrequencyCap(adUnitId: string, userID?: string | null): Prom
 
     const capped = await checkFrequencyCapStatus(apiKey, adUnitId, ppid, sessionId);
     if (capped) {
-      SimulaStorage.setJSON(cacheKey, { ...(cached ?? {}), [cacheId]: true });
+      SimulaStorage.setJSON('freqcap', { day: today, entries: { ...entries, [cacheId]: true } });
     }
     return capped;
   } catch {

@@ -77,4 +77,57 @@ describe('BeaconQueue', () => {
     expect(calls).toEqual(['https://api.test/beacon/old']);
     expect(BeaconQueue.size()).toBe(0);
   });
+
+  it('never loses entries enqueued WHILE a drain is awaiting (merge-on-save)', async () => {
+    // First beacon's send hangs; a second beacon enqueues mid-drain
+    let resolveFirst: (() => void) | null = null;
+    let firstResolved = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: any) => {
+        const url = String(input);
+        if (url.includes('/beacon/a') && !firstResolved) {
+          await new Promise<void>((resolve) => {
+            resolveFirst = resolve;
+          });
+        }
+        return { ok: true, status: 200 } as any;
+      }),
+    );
+
+    BeaconQueue.enqueue({ url: 'https://api.test/beacon/a', method: 'POST', body: '{}' });
+    await new Promise((r) => setTimeout(r, 5)); // drain is now awaiting A's send
+    BeaconQueue.enqueue({ url: 'https://api.test/beacon/b', method: 'POST', body: '{}' });
+
+    firstResolved = true;
+    resolveFirst!();
+    await new Promise((r) => setTimeout(r, 20));
+
+    // B must survive the drain's save — delivered, not clobbered
+    expect(BeaconQueue.size()).toBe(0);
+  });
+
+  it('builds headers at SEND time via the registered provider (nothing persisted)', async () => {
+    const provider = vi.fn((auth: boolean): Record<string, string> =>
+      auth ? { Authorization: 'Bearer live-key', 'X-Live': '1' } : {},
+    );
+    BeaconQueue.configure({ headersProvider: provider });
+
+    const seen: any[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: any, init?: any) => {
+        seen.push(init?.headers);
+        return { ok: true, status: 200 } as any;
+      }),
+    );
+
+    BeaconQueue.enqueue({ url: 'https://api.test/beacon/auth', method: 'POST', auth: true, body: '{}' });
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(provider).toHaveBeenCalledWith(true);
+    expect(seen[0]).toMatchObject({ Authorization: 'Bearer live-key' });
+    // No Authorization value is ever written to storage
+    expect(JSON.stringify(SimulaStorage.get('beacon_queue'))).not.toContain('Bearer');
+  });
 });

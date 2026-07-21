@@ -128,8 +128,10 @@ function restore(): void {
  * Schedule an eager flush on the next tick. Deferred (not synchronous) so a
  * burst of events recorded in the same task aggregates in the buffer first —
  * mirrors the native behavior of enqueueing the flush on an IO dispatcher.
+ * The buffer is persisted here (not on every push) to cut main-thread churn.
  */
 function scheduleFlush(): void {
+  persist();
   if (flushScheduled) return;
   flushScheduled = true;
   setTimeout(() => {
@@ -141,7 +143,6 @@ function scheduleFlush(): void {
 function push(event: TelemetryEventRecord): void {
   buffer.push(event);
   if (buffer.length > BUFFER_CAP) buffer = buffer.slice(-BUFFER_CAP);
-  persist();
   if (event.type === 'error' || buffer.length >= FLUSH_EVENT_COUNT) {
     scheduleFlush(); // eager flush on error / threshold
   }
@@ -206,7 +207,7 @@ function recordError(signature: string, opts: { message?: string; breadcrumb?: s
     const existing = buffer.find((e) => e.type === 'error' && e.name === signature);
     if (existing) {
       existing.count = (existing.count ?? 1) + 1;
-      persist();
+      scheduleFlush(); // persist happens in scheduleFlush, not per push
       return;
     }
     const signatureCount = buffer.filter((e) => e.type === 'error').length;
@@ -253,24 +254,28 @@ function parseDeviceModel(ua: string): string {
   }
 }
 
-async function buildEnvelope(events: TelemetryEventRecord[]): Promise<TelemetryEnvelope> {
+async function buildEnvelope(events: TelemetryEventRecord[], opts: { skipBattery?: boolean } = {}): Promise<TelemetryEnvelope> {
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   const snapshot = SimulaPrivacy.current;
   const identity = identityProvider();
 
   let batteryLevel: number | undefined;
   let batteryCharging: boolean | undefined;
-  try {
-    const getBattery = typeof navigator !== 'undefined' ? (navigator as any).getBattery : undefined;
-    if (typeof getBattery === 'function') {
-      const battery = await getBattery.call(navigator);
-      if (battery) {
-        if (typeof battery.level === 'number') batteryLevel = Math.round(battery.level * 100) / 100;
-        if (typeof battery.charging === 'boolean') batteryCharging = battery.charging;
+  // On the unload path (keepalive) the battery await would likely never
+  // resolve — skip it so the flush actually starts.
+  if (!opts.skipBattery) {
+    try {
+      const getBattery = typeof navigator !== 'undefined' ? (navigator as any).getBattery : undefined;
+      if (typeof getBattery === 'function') {
+        const battery = await getBattery.call(navigator);
+        if (battery) {
+          if (typeof battery.level === 'number') batteryLevel = Math.round(battery.level * 100) / 100;
+          if (typeof battery.charging === 'boolean') batteryCharging = battery.charging;
+        }
       }
+    } catch {
+      // Omitted on failure
     }
-  } catch {
-    // Omitted on failure
   }
 
   let deviceRamMb: number | undefined;
@@ -313,7 +318,7 @@ async function flush(keepalive = false): Promise<void> {
   const batch = buffer.splice(0, buffer.length);
   const stamped = batch.map((e) => ({ ...e, event_age_ms: now - e.timestamp }));
   try {
-    const envelope = await buildEnvelope(stamped);
+    const envelope = await buildEnvelope(stamped, { skipBattery: keepalive });
     const response = await fetch(`${API_BASE_URL}/telemetry/events`, {
       method: 'POST',
       headers: {

@@ -158,19 +158,6 @@ export interface AditudeConfig {
   mappings: AditudeSlotMapping[];
 }
 
-export interface FetchNativeBannerRequest {
-  sessionId: string;
-  slot: string;
-  position: number;
-  context: NativeContext;
-  width?: number;
-}
-
-export interface FetchNativeAdResponse {
-  ad?: AdData;
-  error?: string;
-}
-
 export interface BotDetectionResult {
   isBot: boolean;
   reasons: string[];

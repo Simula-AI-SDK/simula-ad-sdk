@@ -7,7 +7,7 @@ import { Telemetry } from '../../telemetry/telemetry';
 import { SimulaInterstitialAd } from '../SimulaInterstitialAd';
 import { SimulaRewardedAd } from '../SimulaRewardedAd';
 import { SimulaAdEvent } from '../events';
-import { _resetAdDedupForTests } from '../SimulaBaseAd';
+import { _resetFullscreenForTests } from '../fullscreenPresenter';
 import { RewardVerificationQueue } from '../rewardVerificationQueue';
 
 const CREATIVE = {
@@ -56,7 +56,7 @@ describe('Imperative full-screen ads (native parity state machine)', () => {
     SimulaPrivacy._resetForTests();
     Telemetry._resetForTests();
     RewardVerificationQueue._resetForTests();
-    _resetAdDedupForTests();
+    _resetFullscreenForTests();
   });
 
   afterEach(() => {
@@ -159,6 +159,42 @@ describe('Imperative full-screen ads (native parity state machine)', () => {
     expect(dup.error?.code).toBe('duplicate_request');
     expect(dup.error?.retryInSeconds).toBeGreaterThan(290);
     expect(dup.error?.retryInSeconds).toBeLessThanOrEqual(300);
+  });
+
+  it('a DIFFERENT key supersedes the ready ad and loads fresh (Kotlin parity)', async () => {
+    stubFetch();
+    SimulaAds.initialize({ apiKey: 'key-1' });
+    await new Promise((r) => setTimeout(r, 5));
+
+    const ad = new SimulaInterstitialAd('unit-1');
+    const events = collectEvents(ad);
+    ad.load({ charId: 'char-a' });
+    await new Promise((r) => setTimeout(r, 10));
+    ad.load({ charId: 'char-b' }); // different key → supersedes, no duplicate_request
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(events.map((e) => e.type)).toEqual(['LOADED', 'LOADED']);
+    expect(ad.loaded).toBe(true);
+  });
+
+  it('same-key re-load AFTER the 5-min window proceeds', async () => {
+    stubFetch();
+    SimulaAds.initialize({ apiKey: 'key-1' });
+    await new Promise((r) => setTimeout(r, 5));
+
+    const ad = new SimulaInterstitialAd('unit-1');
+    const events = collectEvents(ad);
+    ad.load();
+    await new Promise((r) => setTimeout(r, 10));
+
+    vi.useFakeTimers({ now: Date.now() + 6 * 60 * 1000, toFake: ['Date'] });
+    try {
+      ad.load();
+      await new Promise((r) => setTimeout(r, 10));
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(events.map((e) => e.type)).toEqual(['LOADED', 'LOADED']);
   });
 
   it('stale loaded ad (1h+) → DISPLAY_FAILED stale', async () => {

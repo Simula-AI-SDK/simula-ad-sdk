@@ -36,6 +36,8 @@ const BASE_BACKOFF_MS = 5_000;
 const MAX_BACKOFF_MS = 60_000;
 
 let processing = false;
+let scheduledTimer: ReturnType<typeof setTimeout> | null = null;
+let listenersAttached = false;
 const callbacks = new Map<string, VerifyCallbacks>();
 
 function load(): RewardVerification[] {
@@ -51,15 +53,49 @@ function backoffMs(retryCount: number): number {
   return Math.min(BASE_BACKOFF_MS * Math.pow(2, retryCount), MAX_BACKOFF_MS);
 }
 
+function dueAtOf(item: RewardVerification): number {
+  return item.lastAttemptTimestamp + (item.retryCount > 0 ? backoffMs(item.retryCount - 1) : 0);
+}
+
+/** Reconnect / unload hooks — mirrors BeaconQueue (transient failures retry on `online`). */
+function attachListeners(): void {
+  if (listenersAttached || typeof window === 'undefined') return;
+  listenersAttached = true;
+  try {
+    window.addEventListener('online', () => void processQueue());
+    window.addEventListener('pagehide', () => void processQueue());
+  } catch {
+    // Best-effort
+  }
+}
+
+/** After a pass, schedule the drain for the earliest due item — a backed-off
+ * verification must retry WITHOUT waiting for a new enqueue or page reload. */
+function scheduleNextDrain(remaining: RewardVerification[]): void {
+  if (scheduledTimer !== null) {
+    clearTimeout(scheduledTimer);
+    scheduledTimer = null;
+  }
+  if (remaining.length === 0) return;
+  const now = Date.now();
+  const nextDueAt = Math.min(...remaining.map(dueAtOf));
+  const delay = Math.max(nextDueAt - now, 0);
+  scheduledTimer = setTimeout(() => {
+    scheduledTimer = null;
+    void processQueue();
+  }, delay);
+}
+
 async function processQueue(): Promise<void> {
   if (processing) return;
   processing = true;
   try {
     const now = Date.now();
-    const queue = load();
+    const snapshot = load();
+    const snapshotIds = new Set(snapshot.map((v) => v.serveId));
     const remaining: RewardVerification[] = [];
 
-    for (const item of queue) {
+    for (const item of snapshot) {
       const dueAt = item.lastAttemptTimestamp + (item.retryCount > 0 ? backoffMs(item.retryCount - 1) : 0);
       if (now < dueAt) {
         remaining.push(item);
@@ -109,7 +145,12 @@ async function processQueue(): Promise<void> {
       remaining.push({ ...item, retryCount: item.retryCount + 1, lastAttemptTimestamp: now });
     }
 
-    save(remaining);
+    // Merge with anything enqueued WHILE the drain was awaiting — a reward
+    // must NEVER be lost to a stale-snapshot overwrite.
+    const fresh = load();
+    const merged = [...remaining, ...fresh.filter((item) => !snapshotIds.has(item.serveId))];
+    save(merged);
+    scheduleNextDrain(merged);
   } finally {
     processing = false;
   }
@@ -123,6 +164,7 @@ export const RewardVerificationQueue = {
   ): void {
     try {
       if (!params.serveId) return;
+      attachListeners();
       const queue = load();
       if (!queue.some((v) => v.serveId === params.serveId)) {
         queue.push({ ...params, retryCount: 0, lastAttemptTimestamp: 0 });
@@ -137,6 +179,7 @@ export const RewardVerificationQueue = {
 
   /** Drain persisted verifications (call at startup to recover). */
   triggerProcessQueue(): void {
+    attachListeners();
     void processQueue();
   },
 
@@ -148,5 +191,10 @@ export const RewardVerificationQueue = {
     save([]);
     processing = false;
     callbacks.clear();
+    listenersAttached = false;
+    if (scheduledTimer !== null) {
+      clearTimeout(scheduledTimer);
+      scheduledTimer = null;
+    }
   },
 };

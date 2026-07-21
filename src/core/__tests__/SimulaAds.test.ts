@@ -95,6 +95,28 @@ describe('SimulaAds', () => {
     expect(await SimulaAds.checkFrequencyCap('unit-1')).toBe(true);
     expect(await SimulaAds.checkFrequencyCap('unit-1')).toBe(true);
     expect(calls.filter((c) => c.includes('/frequency-cap/status'))).toHaveLength(1);
+
+    // Single fixed storage key — { day, entries } — never accumulates day keys
+    const stored = SimulaStorage.getJSON<{ day: string; entries: Record<string, boolean> }>('freqcap');
+    expect(stored?.entries['unit-1|']).toBe(true);
+    expect(SimulaStorage.get('freqcap:2026-1-1')).toBeNull();
+  });
+
+  it('a capped verdict expires when the local day rolls over', async () => {
+    const { calls } = stubFetch(() => ({ ok: true, json: async () => ({ capped: true }) }) as any);
+    SimulaAds.initialize({ apiKey: 'key-1' });
+    expect(await SimulaAds.checkFrequencyCap('unit-1')).toBe(true);
+
+    // Next local day → the cached verdict no longer applies
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    vi.setSystemTime(tomorrow);
+    try {
+      expect(await SimulaAds.checkFrequencyCap('unit-1')).toBe(true);
+      expect(calls.filter((c) => c.includes('/frequency-cap/status'))).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not cache an uncapped verdict', async () => {

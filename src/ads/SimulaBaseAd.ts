@@ -4,9 +4,9 @@ import { Telemetry } from '../telemetry/telemetry';
 import { adValueFromBidCpm } from '../core/adValue';
 import { CharacterTargeting, LoadedCreative } from '../utils/api';
 import { SimulaAdError } from './errors';
-import { SimulaAdEventType, SimulaRewardedAdEventType, AnyAdEventType, SimulaAdEvent, SimulaAdEventListener, SimulaUnsubscribe } from './events';
-import { AdUnitType, MAX_CLOSE_DELAY_SECONDS } from './adBehavior';
-import { presentFullscreenAd, FullscreenPresenterHandle } from './fullscreenPresenter';
+import { SimulaAdEventType, AnyAdEventType, SimulaAdEvent, SimulaAdEventListener, SimulaUnsubscribe } from './events';
+import { AdUnitType } from './adBehavior';
+import { presentFullscreenAd, isFullscreenActive, FullscreenPresenterHandle } from './fullscreenPresenter';
 import { logger } from '../utils/logger';
 
 /** Loaded ads expire after 1 hour (native parity: STALE_AFTER_MS). */
@@ -23,32 +23,21 @@ interface LoadedAd {
   targeting: SimulaAdLoadOptions;
 }
 
-interface DedupEntry {
-  state: 'loading' | 'ready';
-  atMs: number;
-}
-
-/** Process-wide dedup registry (native parity: same adUnit+char+session key is throttled 5 min). */
-const dedupRegistry = new Map<string, DedupEntry>();
-
-/** Only one fullscreen ad may be on screen at a time (native parity: AlreadyShowing). */
-let fullscreenActive = false;
-
-/** Test hook. Not public API. */
-export function _resetAdDedupForTests(): void {
-  dedupRegistry.clear();
-  fullscreenActive = false;
-}
-
-function dedupKey(adUnitId: string, targeting: SimulaAdLoadOptions, sessionId: string): string {
-  return `${adUnitId}|${targeting.charId ?? ''}|${targeting.charName ?? ''}|${sessionId}`;
-}
+/** Per-instance load state (Kotlin parity: Idle | Loading | Ready | Showing). */
+type LoadState = 'idle' | 'loading' | 'ready' | 'showing';
 
 /**
  * Shared state machine for imperative full-screen ads (interstitial/rewarded).
- * Mirrors the native ad classes: load/show lifecycle, 1h staleness, 5-min
- * dedup window, one-at-a-time presentation, and the three-signal event model
- * (DISPLAYED = shown, IMPRESSION = billable ~2s after render, PAID co-fired).
+ * Mirrors the Kotlin ad classes exactly:
+ *
+ * - **Per-instance dedup** keyed (ad unit, char id, char name, session id):
+ *   a same-key re-load within 5 minutes reports `duplicate_request`; a
+ *   **different** key supersedes the in-flight/ready ad and starts fresh.
+ * - **Staleness**: a loaded ad expires after 1 hour (`show()` → `stale`).
+ * - **No-op while showing**: `load()` on screen is silently ignored — the
+ *   next ad is preloaded automatically on close (replaying the last targeting).
+ * - **Three-signal events**: DISPLAYED = shown, IMPRESSION = billable ~2s of
+ *   foreground time after render, PAID (AdValue) co-fired with IMPRESSION.
  * All outcomes arrive as events; load/show are fire-and-forget.
  */
 export abstract class SimulaBaseAd {
@@ -60,19 +49,31 @@ export abstract class SimulaBaseAd {
     return this.adFormat === 'rewarded' ? 'SimulaRewardedAd' : 'SimulaInterstitialAd';
   }
 
+  private state: LoadState = 'idle';
+  /** The (ad unit, char, session) key of the load in flight or ready. */
+  private currentKey = '';
+  private currentKeyAtMs = 0;
+  /** Bumped on every supersede/destroy — stale async completions are dropped. */
+  private loadGeneration = 0;
+
   private loadedAd: LoadedAd | null = null;
-  private loadingPromise: Promise<void> | null = null;
   private presenter: FullscreenPresenterHandle | null = null;
   private destroyed = false;
   private typedListeners = new Map<AnyAdEventType, Set<(event: SimulaAdEvent) => void>>();
   private allListeners = new Set<(event: SimulaAdEvent) => void>();
+  /** Last load() targeting — replayed verbatim on the post-close auto-preload (Kotlin parity). */
+  private lastTargeting: SimulaAdLoadOptions = {};
 
   constructor(adUnitId: string) {
     this.adUnitId = adUnitId;
   }
 
   get loaded(): boolean {
-    return this.loadedAd !== null;
+    return this.state === 'ready' && this.loadedAd !== null;
+  }
+
+  private dedupKey(targeting: SimulaAdLoadOptions): string {
+    return `${this.adUnitId}|${targeting.charId ?? ''}|${targeting.charName ?? ''}|${SessionManager.getSessionId() ?? ''}`;
   }
 
   /** Fetch the creative (fire-and-forget — outcomes arrive as LOADED / LOAD_FAILED). */
@@ -81,13 +82,43 @@ export abstract class SimulaBaseAd {
       logger.warn(`${this.displayName}: load() called after destroy() — no-op`);
       return;
     }
-    if (this.loadingPromise) {
-      this.emit(SimulaAdEventType.LOAD_FAILED, { error: SimulaAdError.duplicateLoading() });
+    if (!SimulaAds.isInitialized()) {
+      this.emit(SimulaAdEventType.LOAD_FAILED, { error: SimulaAdError.notInitialized() });
       return;
     }
-    this.loadingPromise = this.doLoadFlow(options).finally(() => {
-      this.loadingPromise = null;
-    });
+
+    // Replay this targeting on the post-close auto-preload (Kotlin parity)
+    this.lastTargeting = options;
+    const key = this.dedupKey(options);
+
+    switch (this.state) {
+      // An ad is on screen — the next one preloads on close. Silent no-op.
+      case 'showing':
+        return;
+      // A matching ad is already loading/ready: block a same-key re-load
+      // within the dedup window; a different key falls through and supersedes.
+      case 'loading':
+      case 'ready':
+        if (this.currentKey === key && Date.now() - this.currentKeyAtMs < DEDUP_WINDOW_MS) {
+          const error =
+            this.state === 'ready'
+              ? SimulaAdError.duplicateReady(Math.ceil((DEDUP_WINDOW_MS - (Date.now() - this.currentKeyAtMs)) / 1000))
+              : SimulaAdError.duplicateLoading();
+          this.emit(SimulaAdEventType.LOAD_FAILED, { error });
+          return;
+        }
+        break;
+      case 'idle':
+        break;
+    }
+
+    // Supersede any in-flight load / discard any ready ad, then start fresh
+    const generation = ++this.loadGeneration;
+    this.currentKey = key;
+    this.currentKeyAtMs = Date.now();
+    this.loadedAd = null;
+    this.state = 'loading';
+    void this.doLoadFlow(options, generation);
   }
 
   /** Present the loaded creative (fire-and-forget — outcomes arrive as events). */
@@ -101,16 +132,17 @@ export abstract class SimulaBaseAd {
       return;
     }
     const ad = this.loadedAd;
-    if (!ad) {
+    if (this.state !== 'ready' || !ad) {
       this.emit(SimulaAdEventType.DISPLAY_FAILED, { error: SimulaAdError.notReady() });
       return;
     }
     if (Date.now() - ad.loadedAtMs > STALE_AFTER_MS) {
       this.loadedAd = null;
+      this.state = 'idle';
       this.emit(SimulaAdEventType.DISPLAY_FAILED, { error: SimulaAdError.stale() });
       return;
     }
-    if (fullscreenActive) {
+    if (isFullscreenActive()) {
       this.emit(SimulaAdEventType.DISPLAY_FAILED, { error: SimulaAdError.alreadyShowing() });
       return;
     }
@@ -121,19 +153,24 @@ export abstract class SimulaBaseAd {
       Telemetry.recordLifecycle('show_fail', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: ad.creative.impressionId, errorCode: 'no_presentation_context' });
       return;
     }
-    fullscreenActive = true;
+    this.state = 'showing';
     this.presenter = handle;
   }
 
-  /** Idempotent teardown. A showing ad is closed programmatically. */
+  /**
+   * Idempotent teardown. A showing ad is closed FIRST (so the host still
+   * receives CLOSED), then listeners are detached.
+   */
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.loadedAd = null;
-    this.removeAllListeners();
+    this.loadGeneration++; // invalidate any in-flight load
     const presenter = this.presenter;
     this.presenter = null;
-    if (presenter) presenter.close(); // CLOSED fires before listeners detach? No — listeners already removed
+    if (presenter) presenter.close(); // CLOSED fires while listeners are still attached
+    this.loadedAd = null;
+    this.state = 'idle';
+    this.removeAllListeners();
   }
 
   addAdEventListener(type: AnyAdEventType, listener: (event: SimulaAdEvent) => void): SimulaUnsubscribe {
@@ -171,70 +208,54 @@ export abstract class SimulaBaseAd {
 
   // ── Internals ────────────────────────────────────────────────────────────
 
-  private async doLoadFlow(options: SimulaAdLoadOptions): Promise<void> {
+  private async doLoadFlow(options: SimulaAdLoadOptions, generation: number): Promise<void> {
     const startedAt = Date.now();
-    if (!SimulaAds.isInitialized()) {
-      this.emit(SimulaAdEventType.LOAD_FAILED, { error: SimulaAdError.notInitialized() });
-      return;
-    }
 
     const sessionId = await SessionManager.ensureSession();
+    if (this.destroyed || generation !== this.loadGeneration) return; // superseded / torn down
     if (!sessionId) {
-      const error = SimulaAdError.noSession();
-      this.emit(SimulaAdEventType.LOAD_FAILED, { error });
-      Telemetry.recordLifecycle('load_fail', { adFormat: this.adFormat, adUnitId: this.adUnitId, durationMs: Date.now() - startedAt, errorCode: error.code });
+      this.failLoad(SimulaAdError.noSession(), startedAt);
       return;
     }
+    // The real session id is now known — refresh the dedup key (the synchronous
+    // gate may have keyed on an empty session during cold-start warm-up). The
+    // throttle timestamp intentionally stays at the original load time.
+    this.currentKey = this.dedupKey(options);
 
-    // Dedup window (native parity): same ad unit + character + session key
-    const key = dedupKey(this.adUnitId, options, sessionId);
-    const existing = dedupRegistry.get(key);
-    if (existing) {
-      if (existing.state === 'loading') {
-        this.emit(SimulaAdEventType.LOAD_FAILED, { error: SimulaAdError.duplicateLoading() });
-        return;
-      }
-      const elapsed = Date.now() - existing.atMs;
-      if (elapsed < DEDUP_WINDOW_MS) {
-        const remainingSec = Math.ceil((DEDUP_WINDOW_MS - elapsed) / 1000);
-        this.emit(SimulaAdEventType.LOAD_FAILED, { error: SimulaAdError.duplicateReady(remainingSec) });
-        return;
-      }
-    }
-
-    dedupRegistry.set(key, { state: 'loading', atMs: startedAt });
     const result = await this.fetchCreative(sessionId, options);
+    if (this.destroyed || generation !== this.loadGeneration) return; // superseded / torn down
 
     if (result.error || !result.creative) {
-      dedupRegistry.delete(key);
-      const error = result.error ?? SimulaAdError.noFill();
-      this.emit(SimulaAdEventType.LOAD_FAILED, { error });
-      Telemetry.recordLifecycle('load_fail', { adFormat: this.adFormat, adUnitId: this.adUnitId, durationMs: Date.now() - startedAt, errorCode: error.code });
+      this.failLoad(result.error ?? SimulaAdError.noFill(), startedAt);
       return;
     }
 
-    dedupRegistry.set(key, { state: 'ready', atMs: Date.now() });
     this.loadedAd = { creative: result.creative, loadedAtMs: Date.now(), sessionId, targeting: options };
+    this.state = 'ready';
     this.emit(SimulaAdEventType.LOADED);
     Telemetry.recordLifecycle('load_success', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: result.creative.impressionId, durationMs: Date.now() - startedAt, cacheSource: 'network' });
   }
 
-  /** Force-load bypassing the dedup window (used by auto-preload after close — native parity). */
-  protected preloadNext(): void {
-    const targeting = this.loadedAd?.targeting ?? {};
-    this.loadNextInternal(targeting);
+  private failLoad(error: SimulaAdError, startedAt: number): void {
+    this.state = 'idle';
+    this.emit(SimulaAdEventType.LOAD_FAILED, { error });
+    Telemetry.recordLifecycle('load_fail', { adFormat: this.adFormat, adUnitId: this.adUnitId, durationMs: Date.now() - startedAt, errorCode: error.code });
   }
 
-  private loadNextInternal(targeting: SimulaAdLoadOptions): void {
-    if (this.destroyed || !SimulaAds.isInitialized()) return;
-    void (async () => {
-      const sessionId = await SessionManager.ensureSession();
-      if (!sessionId || this.destroyed) return;
-      const result = await this.fetchCreative(sessionId, targeting);
-      if (result.creative && !this.destroyed) {
-        this.loadedAd = { creative: result.creative, loadedAtMs: Date.now(), sessionId, targeting };
-      }
-    })();
+  /**
+   * Auto-preload of the next ad after close (Kotlin parity): replays the last
+   * load() targeting, bypasses the dedup window, and refreshes the instance's
+   * dedup entry so the following manual load() deduplicates correctly.
+   */
+  protected preloadNext(): void {
+    if (this.destroyed || !SimulaAds.isInitialized() || this.state === 'showing') return;
+    const targeting = this.lastTargeting;
+    const generation = ++this.loadGeneration;
+    this.currentKey = this.dedupKey(targeting);
+    this.currentKeyAtMs = Date.now();
+    this.loadedAd = null;
+    this.state = 'loading';
+    void this.doLoadFlow(targeting, generation);
   }
 
   private present(ad: LoadedAd): FullscreenPresenterHandle | null {
@@ -268,9 +289,9 @@ export abstract class SimulaBaseAd {
           }
         },
         onClose: (elapsedSeconds) => {
-          fullscreenActive = false;
           this.presenter = null;
           this.loadedAd = null;
+          if (this.state === 'showing') this.state = 'idle';
           this.emit(SimulaAdEventType.CLOSED);
           Telemetry.recordLifecycle('closed', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: creative.impressionId, durationMs: elapsedSeconds * 1000 });
           this.onAdClosed(ad, elapsedSeconds);

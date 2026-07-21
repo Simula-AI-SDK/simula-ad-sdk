@@ -47,14 +47,11 @@ export const useSimula = (): SimulaContextValue => {
 };
 
 export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
-  // Validate props once (first render). Strict mode (devMode) throws; in
-  // production an invalid config logs and leaves the SDK inert — children
-  // always render.
-  const propsValidRef = useRef<boolean | null>(null);
-  if (propsValidRef.current === null) {
-    propsValidRef.current = validateSimulaProviderProps(props, props.devMode === true);
-  }
-  const propsValid = propsValidRef.current;
+  // Validate props on EVERY render: validation is cheap (small prop objects)
+  // and each unique failure logs only once, so a provider mounted with
+  // temporarily-invalid props recovers when they become valid (strict mode —
+  // devMode — throws during integration).
+  const propsValid = validateSimulaProviderProps(props, props.devMode === true);
 
   const {
     apiKey,

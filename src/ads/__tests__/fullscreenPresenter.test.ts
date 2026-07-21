@@ -29,15 +29,22 @@ function overlay(): HTMLElement | null {
   return document.querySelector('[data-simula-fullscreen-ad]');
 }
 
+/** jsdom's visibilityState is a getter — override per test. */
+function setVisibility(state: 'visible' | 'hidden') {
+  Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+}
+
 describe('fullscreenPresenter (DOM paths)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.documentElement.style.overflow = '';
+    setVisibility('visible');
   });
 
   afterEach(() => {
     document.body.innerHTML = '';
     document.documentElement.style.overflow = '';
+    setVisibility('visible');
     vi.useRealTimers();
   });
 
@@ -187,6 +194,68 @@ describe('fullscreenPresenter (DOM paths)', () => {
     expect(document.documentElement.style.overflow).toBe('hidden');
     (document.querySelector('button[aria-label="Close ad"]') as HTMLButtonElement).click();
     expect(document.documentElement.style.overflow).toBe('');
+  });
+
+  it('preserves a pre-existing host overflow style (never wipes it)', () => {
+    document.documentElement.style.overflow = 'auto';
+    const handlers = makeHandlers();
+    presentFullscreenAd({ creative: makeCreative(), adUnitType: 'interstitial', handlers });
+    expect(document.documentElement.style.overflow).toBe('hidden');
+    (document.querySelector('button[aria-label="Close ad"]') as HTMLButtonElement).click();
+    expect(document.documentElement.style.overflow).toBe('auto');
+  });
+
+  it('impression timer only accrues FOREGROUND time (native parity)', () => {
+    vi.useFakeTimers();
+    const handlers = makeHandlers();
+    presentFullscreenAd({ creative: makeCreative(), adUnitType: 'interstitial', handlers });
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    iframe.dispatchEvent(new Event('load'));
+
+    // 1.5s of the 2s requirement accrues, then the tab hides
+    vi.advanceTimersByTime(1500);
+    setVisibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(5000); // hidden time must NOT count
+    expect(handlers.onImpression).not.toHaveBeenCalled();
+
+    // Back to foreground — the remaining ~0.5s accrues
+    setVisibility('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(600);
+    expect(handlers.onImpression).toHaveBeenCalledTimes(1);
+  });
+
+  it('the reward gate countdown pauses while hidden', () => {
+    vi.useFakeTimers();
+    const handlers = makeHandlers();
+    const creative = makeCreative({
+      adBehavior: { close: { delaySeconds: 5, treatment: 'hidden', position: 'top_right', progressBarColor: '#FFFFFF' }, storeOpen: 'external' },
+    });
+    presentFullscreenAd({ creative, adUnitType: 'rewarded', handlers });
+
+    vi.advanceTimersByTime(2000); // 3s left
+    setVisibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(10000); // frozen — gate must not elapse while hidden
+    expect(handlers.onRewardGateElapsed).not.toHaveBeenCalled();
+
+    setVisibility('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(3000); // remaining 3s accrue
+    expect(handlers.onRewardGateElapsed).toHaveBeenCalledTimes(1);
+  });
+
+  it('onClose reports foreground dwell, not wall-clock time', () => {
+    vi.useFakeTimers();
+    const handlers = makeHandlers();
+    const handle = presentFullscreenAd({ creative: makeCreative(), adUnitType: 'interstitial', handlers });
+    vi.advanceTimersByTime(2000);
+    setVisibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(8000); // hidden — excluded from dwell
+    handle?.close();
+    expect(handlers.onClose).toHaveBeenCalledWith(2);
   });
 
   it('programmatic close via the handle reports elapsed seconds', () => {
