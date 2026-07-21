@@ -23,7 +23,8 @@
     "dev": "rollup -c -w",
     "prepublishOnly": "npm run build",
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sync-demo": "npm run build && npm pack --pack-destination . && rm -rf ../dippy-ai-mock/node_modules/@simula ../dippy-ai-mock/node_modules/.vite && npm install --prefix ../dippy-ai-mock"
   },
   "keywords": [
     "react",

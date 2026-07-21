@@ -1,6 +1,7 @@
 import { CloseBehavior, AdUnitType, defaultCloseBehavior } from './adBehavior';
 import { LoadedCreative } from '../utils/api';
 import { attachCreativeBridge, BRIDGE_CTA_CLICK } from '../bridge/creativeBridge';
+import { injectSrcdocRelay } from '../bridge/srcdocRelay';
 
 /**
  * Fullscreen ad presenter — renders a loaded creative in a fixed overlay
@@ -24,7 +25,7 @@ import { attachCreativeBridge, BRIDGE_CTA_CLICK } from '../bridge/creativeBridge
 export interface FullscreenPresenterHandlers {
   onDisplayed: () => void;
   onImpression: () => void;
-  onCtaClick: (url?: string) => void;
+  onCtaClick: (url?: string, handled?: boolean) => void;
   onClose: (elapsedSeconds: number) => void;
   onRewardGateElapsed?: () => void;
   onCreativeMoment?: (moment: string) => void;
@@ -383,7 +384,7 @@ export function presentFullscreenAd(opts: {
   // ── Creative ─────────────────────────────────────────────────────────────
   detachBridge = attachCreativeBridge(iframe, {
     onEarlyComplete: () => close(),
-    onCtaClick: (url) => opts.handlers.onCtaClick(url),
+    onCtaClick: (url, handled) => opts.handlers.onCtaClick(url, handled),
     onCreativeMoment: (moment) => opts.handlers.onCreativeMoment?.(moment),
   });
 
@@ -397,7 +398,9 @@ export function presentFullscreenAd(opts: {
 
   try {
     if (opts.creative.renderedHtml) {
-      iframe.srcdoc = opts.creative.renderedHtml;
+      // Inject the bridge relay so opaque-origin creatives can still report
+      // CTA taps (contract-aware: templates with their own relay are untouched)
+      iframe.srcdoc = injectSrcdocRelay(opts.creative.renderedHtml);
     } else if (opts.creative.iframeUrl) {
       iframe.src = opts.creative.iframeUrl;
     } else {

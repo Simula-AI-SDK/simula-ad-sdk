@@ -10,6 +10,7 @@ import { Telemetry } from '../../telemetry/telemetry';
 import { adValueFromBidCpm } from '../../core/adValue';
 import { SimulaAdError, NativeAdError } from '../../ads/errors';
 import { attachCreativeBridge, BRIDGE_AD_SIZE } from '../../bridge/creativeBridge';
+import { injectSrcdocRelay } from '../../bridge/srcdocRelay';
 import {
   getCachedNativeAd,
   cacheNativeAd,
@@ -95,13 +96,13 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
   // fallback) and the bridge CTA_CLICK path — one tap, one click event.
   const lastClickAtRef = useRef(0);
 
-  const fireClick = useCallback((c: LoadedCreative, openTarget: boolean) => {
+  const fireClick = useCallback((c: LoadedCreative, openTarget: boolean, handled = false) => {
     const now = Date.now();
     if (now - lastClickAtRef.current < 300) return;
     lastClickAtRef.current = now;
     onClickRef.current?.();
     Telemetry.recordLifecycle('click', { adFormat: 'native', adUnitId: slot, adId: c.impressionId });
-    if (openTarget) {
+    if (openTarget && !handled) {
       const target = c.trackingUrl ?? c.storeUrl;
       if (target) {
         try {
@@ -300,7 +301,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
 
     // Cross-origin creatives: CTA + sizing arrive over the bridge
     detachBridgeRef.current = attachCreativeBridge(iframe, {
-      onCtaClick: () => fireClick(creative, true),
+      onCtaClick: (_url, handled) => fireClick(creative, true, handled === true),
     });
 
     // Web sizing extension: creatives can post { type: 'SIMULA_AD_SIZE', payload: { height } }
@@ -444,12 +445,12 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
         style={{ display: 'block', width: '100%', height: '100%', border: 0, margin: 0, padding: 0, opacity: loaded ? 1 : 0, transition: 'opacity 120ms ease-in' }}
         // srcdoc creatives get an OPAQUE origin (no allow-same-origin): the
         // creative can never touch the host page's DOM/cookies/storage. Height
-        // and clicks flow over the bridge (SIMULA_AD_SIZE / CTA_CLICK); the
-        // direct-DOM paths above remain as a guarded fallback only.
+        // and clicks flow over the bridge — the SDK injects a relay script
+        // into srcdoc HTML that lacks one (see bridge/srcdocRelay).
         sandbox={isSrcdoc
           ? 'allow-scripts allow-popups allow-popups-to-escape-sandbox'
           : 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox'}
-        {...(isSrcdoc ? { srcDoc: creative.renderedHtml } : { src: creative.iframeUrl })}
+        {...(isSrcdoc ? { srcDoc: injectSrcdocRelay(creative.renderedHtml!) } : { src: creative.iframeUrl })}
       />
     </div>
   );

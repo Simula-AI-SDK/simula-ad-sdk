@@ -666,6 +666,41 @@ export interface VerifyRewardWireResult {
   token?: string;
 }
 
+/** A post-close fallback ad screen (`GET /load/fallbacks/{impressionId}`). */
+export interface FallbackAdScreen {
+  adId?: string;
+  html?: string;
+  iframeUrl?: string;
+}
+
+/**
+ * Post-close fallback ad screens (Kotlin/Swift parity): prefetches the ad
+ * screens linked to a serve — campaign creative, then the end screen — in
+ * reveal order. Side-effect-free; any failure resolves to [] (the close flow
+ * simply completes without fallbacks).
+ */
+export async function fetchFallbackAds(impressionId: string): Promise<FallbackAdScreen[]> {
+  try {
+    if (!impressionId) return [];
+    const response = await fetch(`${API_BASE_URL}/load/fallbacks/${encodeURIComponent(impressionId)}`, {
+      method: 'GET',
+      headers: buildHeaders(),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const ads = Array.isArray(data?.ads) ? data.ads : [];
+    return ads
+      .map((a: any): FallbackAdScreen => ({
+        adId: typeof a?.ad_id === 'string' && a.ad_id ? a.ad_id : undefined,
+        html: typeof a?.html === 'string' && a.html ? a.html : undefined,
+        iframeUrl: typeof a?.iframe_url === 'string' && a.iframe_url ? a.iframe_url : undefined,
+      }))
+      .filter((a: FallbackAdScreen) => !!a.html || !!a.iframeUrl);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Low-level `POST /minigames/verify-reward` for the durable queue: never throws,
  * returns the raw status so the queue can apply its semantics (409 → success,

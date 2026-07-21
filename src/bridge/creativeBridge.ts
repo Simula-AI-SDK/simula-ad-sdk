@@ -22,7 +22,8 @@ import { connectionTypeValue } from '../core/connectionType';
 
 export interface CreativeBridgeHandlers {
   onEarlyComplete?: () => void;
-  onCtaClick?: (url?: string) => void;
+  /** Creative CTA tap. `handled=true` means the creative navigated itself — fire events only, never re-open. */
+  onCtaClick?: (url?: string, handled?: boolean) => void;
   onCreativeMoment?: (moment: string) => void;
 }
 
@@ -90,7 +91,10 @@ export function attachCreativeBridge(iframe: HTMLIFrameElement, handlers: Creati
           handlers.onEarlyComplete?.();
           break;
         case 'CTA_CLICK':
-          handlers.onCtaClick?.(typeof payload?.url === 'string' ? payload.url : undefined);
+          handlers.onCtaClick?.(
+            typeof payload?.url === 'string' ? payload.url : undefined,
+            payload?.handled === true,
+          );
           break;
         case 'CREATIVE_MOMENT':
           if (typeof payload?.moment === 'string') handlers.onCreativeMoment?.(payload.moment);

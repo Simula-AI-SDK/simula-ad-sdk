@@ -26,10 +26,12 @@ describe('creativeBridge (DOM paths)', () => {
 
     send(iframe, { type: 'AD_EARLY_COMPLETE' });
     send(iframe, { type: 'CTA_CLICK', payload: { url: 'https://store.test/x' } });
+    send(iframe, { type: 'CTA_CLICK', payload: { url: 'https://store.test/y', handled: true } });
     send(iframe, { type: 'CREATIVE_MOMENT', payload: { moment: 'playable_end' } });
 
     expect(onEarlyComplete).toHaveBeenCalledTimes(1);
-    expect(onCtaClick).toHaveBeenCalledWith('https://store.test/x');
+    expect(onCtaClick).toHaveBeenNthCalledWith(1, 'https://store.test/x', false);
+    expect(onCtaClick).toHaveBeenNthCalledWith(2, 'https://store.test/y', true);
     expect(onCreativeMoment).toHaveBeenCalledWith('playable_end');
   });
 

@@ -5,12 +5,19 @@ The web SDK (`@simula/ads` ≥ 2.0) isolates ad creatives in sandboxed iframes.
 page's DOM, cookies, or storage. Everything a creative needs flows over this
 `window.postMessage` contract.
 
-**Backend requirement:** native/interstitial creative templates MUST include a
-small relay script implementing the messages below. Without it:
+**Backend requirement:** native/interstitial creative templates SHOULD include a
+small relay script implementing the messages below. To soften the rollout, the
+web SDK (≥ 2.0) **auto-injects its own relay into `srcdoc` creatives that lack
+one** — so `srcdoc` native ads self-heal (height + CTA) without template changes.
+Auto-injection is impossible for remote `iframe_url` creatives: **those templates
+MUST ship the relay themselves**. Without it:
 
 - native ads render stuck at the 250px default height (no `SIMULA_AD_SIZE`)
 - CTA taps navigate (via `allow-popups`) but never fire `onClick` / click
   telemetry (`CTA_CLICK`) — a silent revenue-tracking hole
+
+Templates that already implement this contract are detected (presence of
+`SIMULA_AD_SIZE` / `CTA_CLICK` / `data-simula-relay`) and never double-injected.
 
 ## Envelope
 
@@ -25,7 +32,7 @@ SDK → creative: `{ "type", "requestId", "payload", "__simulaSdkResponse": true
 | `type` | `payload` | SDK behavior |
 |---|---|---|
 | `SIMULA_AD_SIZE` | `{ "height": number }` | Resizes the native ad iframe (px). Fire on load and on every content height change. |
-| `CTA_CLICK` | `{ "url"?: string }` | Fires `onClick`/`CLICKED` + click telemetry, then opens `url` (or the serve's `tracking_url` fallback) in a new tab. |
+| `CTA_CLICK` | `{ "url"?: string, "handled"?: boolean }` | Fires `onClick`/`CLICKED` + click telemetry. Unless `handled: true`, the SDK then opens `url` (or the serve's `tracking_url` fallback) in a new tab. Set `handled: true` when the creative navigates itself — the SDK fires events but never re-opens (no double tabs). |
 | `AD_EARLY_COMPLETE` | — | Closes the fullscreen ad immediately (playables that finish early). |
 | `CREATIVE_MOMENT` | `{ "moment": string }` | Lifecycle moment, matched verbatim against `auto_store_redirect.trigger` (`playable_end`, `end_screen_1_open`, `end_screen_2_open`). |
 

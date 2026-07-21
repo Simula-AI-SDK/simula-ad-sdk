@@ -2,7 +2,7 @@ import { SimulaAds } from '../core/SimulaAds';
 import { SessionManager } from '../core/session';
 import { Telemetry } from '../telemetry/telemetry';
 import { adValueFromBidCpm } from '../core/adValue';
-import { CharacterTargeting, LoadedCreative } from '../utils/api';
+import { CharacterTargeting, LoadedCreative, FallbackAdScreen, fetchFallbackAds } from '../utils/api';
 import { SimulaAdError } from './errors';
 import { SimulaAdEventType, AnyAdEventType, SimulaAdEvent, SimulaAdEventListener, SimulaUnsubscribe } from './events';
 import { AdUnitType } from './adBehavior';
@@ -276,25 +276,18 @@ export abstract class SimulaBaseAd {
           Telemetry.recordLifecycle('paid', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: creative.impressionId });
           this.onBillableImpression(ad);
         },
-        onCtaClick: (url) => {
-          this.emit(SimulaAdEventType.CLICKED);
-          Telemetry.recordLifecycle('click', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: creative.impressionId });
-          const target = url ?? creative.trackingUrl ?? creative.storeUrl;
-          if (target) {
-            try {
-              window.open(target, '_blank', 'noopener');
-            } catch {
-              // Popup blocked — the click event already fired
-            }
-          }
-        },
+        onCtaClick: (url, handled) => this.handleCtaClick(ad, url, handled),
         onClose: (elapsedSeconds) => {
-          this.presenter = null;
-          this.loadedAd = null;
-          if (this.state === 'showing') this.state = 'idle';
-          this.emit(SimulaAdEventType.CLOSED);
-          Telemetry.recordLifecycle('closed', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: creative.impressionId, durationMs: elapsedSeconds * 1000 });
-          this.onAdClosed(ad, elapsedSeconds);
+          // Post-close fallback screens (Kotlin/Swift parity): the backend may
+          // serve end screens for this impression — CLOSED fires only after
+          // the last one (or immediately when there are none). A teardown
+          // (destroy / preview) completes the close flow synchronously — no
+          // fallback fetch while the host is tearing down.
+          if (ad.creative.impressionId === 'preview' || this.destroyed) {
+            this.finishClose(ad, elapsedSeconds);
+            return;
+          }
+          void this.startFallbackFlow(ad, elapsedSeconds);
         },
         onRewardGateElapsed: () => this.onRewardGateElapsed(ad),
         onCreativeMoment: (moment) => this.onCreativeMoment(ad, moment),
@@ -314,6 +307,85 @@ export abstract class SimulaBaseAd {
     } catch {
       // Popup blocked without a user gesture — nothing to do
     }
+  }
+
+  /** Shared CTA handling for the primary ad and fallback screens. */
+  private handleCtaClick(ad: LoadedAd, url?: string, handled?: boolean): void {
+    this.emit(SimulaAdEventType.CLICKED);
+    Telemetry.recordLifecycle('click', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: ad.creative.impressionId });
+    if (handled) return; // the creative navigated itself — never double-open
+    const target = url ?? ad.creative.trackingUrl ?? ad.creative.storeUrl;
+    if (target) {
+      try {
+        window.open(target, '_blank', 'noopener');
+      } catch {
+        // Popup blocked — the click event already fired
+      }
+    }
+  }
+
+  // ── Post-close fallback screens (Kotlin/Swift parity) ────────────────────
+
+  /** Fetch the serve's fallback screens and present them in reveal order. */
+  private async startFallbackFlow(ad: LoadedAd, elapsedSeconds: number): Promise<void> {
+    const screens = await fetchFallbackAds(ad.creative.impressionId);
+    if (this.destroyed || screens.length === 0) {
+      this.finishClose(ad, elapsedSeconds);
+      return;
+    }
+    this.presentFallbackScreen(ad, screens, 0, elapsedSeconds);
+  }
+
+  /**
+   * Presents fallback screens one per close, in reveal order (campaign
+   * creative, then the end screen). Each screen index maps to an
+   * `auto_store_redirect` trigger (Kotlin `endScreenTriggerForIndex`):
+   * 0 → end_screen_1_open, 1 → end_screen_2_open.
+   */
+  private presentFallbackScreen(ad: LoadedAd, screens: FallbackAdScreen[], index: number, elapsedSeconds: number): void {
+    if (this.destroyed || index >= screens.length) {
+      this.finishClose(ad, elapsedSeconds);
+      return;
+    }
+    const screen = screens[index];
+    const trigger = index === 0 ? 'end_screen_1_open' : index === 1 ? 'end_screen_2_open' : null;
+    const fallbackCreative: LoadedCreative = {
+      impressionId: screen.adId ?? ad.creative.impressionId,
+      renderedHtml: screen.html,
+      iframeUrl: screen.iframeUrl,
+      destination: ad.creative.destination,
+      trackingUrl: ad.creative.trackingUrl,
+      storeUrl: ad.creative.storeUrl,
+      bidAmt: 0,
+      adBehavior: null, // default close chrome (immediate ✕)
+    };
+    const handle = presentFullscreenAd({
+      creative: fallbackCreative,
+      adUnitType: this.adUnitType,
+      handlers: {
+        onDisplayed: () => {
+          if (trigger) this.onCreativeMoment(ad, trigger);
+        },
+        onImpression: () => {}, // fallback screens don't bill the SDK-side impression
+        onCtaClick: (url) => this.handleCtaClick(ad, url),
+        onClose: () => this.presentFallbackScreen(ad, screens, index + 1, elapsedSeconds),
+      },
+    });
+    if (!handle) {
+      this.finishClose(ad, elapsedSeconds);
+      return;
+    }
+    this.presenter = handle; // destroy() tears down the current screen
+  }
+
+  /** The full close flow completes: primary ad + every fallback screen. */
+  private finishClose(ad: LoadedAd, elapsedSeconds: number): void {
+    this.presenter = null;
+    this.loadedAd = null;
+    if (this.state === 'showing') this.state = 'idle';
+    this.emit(SimulaAdEventType.CLOSED);
+    Telemetry.recordLifecycle('closed', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: ad.creative.impressionId, durationMs: elapsedSeconds * 1000 });
+    this.onAdClosed(ad, elapsedSeconds);
   }
 
   /** Hooks for subclasses. */

@@ -133,8 +133,10 @@ describe('fullscreen lifecycle fixes (PR #12 threads #15/#16/#18/#19)', () => {
     expect(isFullscreenActive()).toBe(true);
     expect(document.documentElement.style.overflow).toBe('hidden');
 
-    // Preview takes over: the showing ad is properly CLOSED (not orphaned)
+    // Preview takes over: the showing ad is properly CLOSED (not orphaned).
+    // The close flow completes on a microtask (fallback check resolves empty).
     const preview = ad.showPreview({ closeTreatment: 'hidden', delaySeconds: 0 });
+    await new Promise((r) => setTimeout(r, 10));
     expect(events.map((e) => e.type)).toContain('CLOSED');
     expect(isFullscreenActive()).toBe(true); // preview holds the mutex
 

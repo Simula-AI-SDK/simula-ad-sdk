@@ -153,12 +153,12 @@ describe('fullscreenPresenter (DOM paths)', () => {
 
     // jsdom can't set contentWindow on srcdoc iframes reliably — simulate via the window message path
     const evt = new MessageEvent('message', {
-      data: { type: 'CTA_CLICK', payload: { url: 'https://store.test/app' } },
+      data: { type: 'CTA_CLICK', payload: { url: 'https://store.test/app', handled: true } },
       source: iframe.contentWindow,
     } as any);
     window.dispatchEvent(evt);
 
-    expect(handlers.onCtaClick).toHaveBeenCalledWith('https://store.test/app');
+    expect(handlers.onCtaClick).toHaveBeenCalledWith('https://store.test/app', true);
   });
 
   it('AD_EARLY_COMPLETE closes the ad', () => {

@@ -133,8 +133,7 @@ describe('Telemetry', () => {
     expect(posts).toHaveLength(0);
   });
 
-  it('restores events when the flush fails', async () => {
-    let fail = true;
+  it('restores events when the flush fails', async () => {    let fail = true;
     const posts: any[] = [];
     vi.stubGlobal(
       'fetch',
@@ -157,6 +156,32 @@ describe('Telemetry', () => {
     const names = posts.reduce<string[]>((acc, p) => acc.concat(p.events.map((e: any) => e.name)), []);
     expect(names).toContain('native:load');
     expect(names).toContain('native:load2');
+  });
+
+  it('4xx is permanent: the batch is DROPPED, never retried (no retry-loop spam)', async () => {
+    let posts = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: any) => {
+        if (String(input).includes('/telemetry/events')) {
+          posts++;
+          return { ok: false, status: 422, json: async () => ({}) } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({}) } as any;
+      }),
+    );
+    install();
+    Telemetry.recordError('native:load');
+    await new Promise((r) => setTimeout(r, 30));
+    expect(posts).toBe(1);
+
+    // A later flush must NOT replay the rejected batch — 4xx events are gone
+    Telemetry.recordError('native:other');
+    await new Promise((r) => setTimeout(r, 30));
+    expect(posts).toBe(2);
+    const buffer = SimulaStorage.getJSON<any[]>('telemetry_buffer') ?? [];
+    const names = buffer.map((e: any) => e.name);
+    expect(names).not.toContain('native:load');
   });
 
   it('stamps event_age_ms at flush time', async () => {

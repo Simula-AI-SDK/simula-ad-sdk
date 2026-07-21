@@ -329,10 +329,19 @@ async function flush(keepalive = false): Promise<void> {
       body: JSON.stringify(envelope),
       keepalive,
     });
-    if (!response.ok) throw new Error(`status ${response.status}`);
+    if (!response.ok) {
+      // Permanent failure (4xx — schema, auth): drop the batch, never retry.
+      // Retrying a schema rejection would spam the host console forever.
+      if (response.status >= 400 && response.status < 500) {
+        logger.debug(`Telemetry flush dropped (HTTP ${response.status})`);
+        persist(); // buffer (minus flushed) is durable
+        return;
+      }
+      throw new Error(`status ${response.status}`);
+    }
     persist(); // buffer (minus flushed) is now durable
   } catch {
-    // Restore the batch for the next attempt (cap still applies)
+    // Transient failure (5xx / connectivity): restore the batch for the next attempt
     buffer = [...stamped, ...buffer].slice(-BUFFER_CAP);
     persist();
   } finally {
