@@ -63,6 +63,8 @@ export abstract class SimulaBaseAd {
   private allListeners = new Set<(event: SimulaAdEvent) => void>();
   /** Last load() targeting — replayed verbatim on the post-close auto-preload (Kotlin parity). */
   private lastTargeting: SimulaAdLoadOptions = {};
+  /** In-flight fallback-screen prefetch, kicked off while the primary ad is on screen. */
+  private fallbackPrefetch: { impressionId: string; promise: Promise<FallbackAdScreen[]> } | null = null;
 
   constructor(adUnitId: string) {
     this.adUnitId = adUnitId;
@@ -117,6 +119,7 @@ export abstract class SimulaBaseAd {
     this.currentKey = key;
     this.currentKeyAtMs = Date.now();
     this.loadedAd = null;
+    this.fallbackPrefetch = null;
     this.state = 'loading';
     void this.doLoadFlow(options, generation);
   }
@@ -167,6 +170,7 @@ export abstract class SimulaBaseAd {
     this.loadGeneration++; // invalidate any in-flight load
     const presenter = this.presenter;
     this.presenter = null;
+    this.fallbackPrefetch = null;
     if (presenter) presenter.close(); // CLOSED fires while listeners are still attached
     this.loadedAd = null;
     this.state = 'idle';
@@ -267,6 +271,10 @@ export abstract class SimulaBaseAd {
         onDisplayed: () => {
           this.emit(SimulaAdEventType.DISPLAYED);
           Telemetry.recordLifecycle('displayed', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: creative.impressionId });
+          // Prefetch the post-close fallback screens while the ad is on screen
+          // (native parity) — the close handoff is then synchronous, with no
+          // fetch-after-close flash.
+          this.prefetchFallbacks(ad);
         },
         onImpression: () => {
           this.emit(SimulaAdEventType.IMPRESSION);
@@ -326,9 +334,29 @@ export abstract class SimulaBaseAd {
 
   // ── Post-close fallback screens (Kotlin/Swift parity) ────────────────────
 
-  /** Fetch the serve's fallback screens and present them in reveal order. */
+  /** Kick off the fallback prefetch while the primary ad shows (fire-and-forget). */
+  private prefetchFallbacks(ad: LoadedAd): void {
+    const impressionId = ad.creative.impressionId;
+    if (!impressionId || impressionId === 'preview') return;
+    if (this.fallbackPrefetch?.impressionId === impressionId) return; // already in flight
+    this.fallbackPrefetch = {
+      impressionId,
+      promise: fetchFallbackAds(impressionId).catch(() => [] as FallbackAdScreen[]),
+    };
+  }
+
+  /** Consume the prefetched screens (or fetch when no prefetch ran) and present them in reveal order. */
   private async startFallbackFlow(ad: LoadedAd, elapsedSeconds: number): Promise<void> {
-    const screens = await fetchFallbackAds(ad.creative.impressionId);
+    let screens: FallbackAdScreen[];
+    const prefetch = this.fallbackPrefetch;
+    this.fallbackPrefetch = null;
+    if (prefetch && prefetch.impressionId === ad.creative.impressionId) {
+      // The prefetch is usually already resolved by close time; awaiting an
+      // in-flight one is still far faster than a cold fetch.
+      screens = await prefetch.promise;
+    } else {
+      screens = await fetchFallbackAds(ad.creative.impressionId).catch(() => [] as FallbackAdScreen[]);
+    }
     if (this.destroyed || screens.length === 0) {
       this.finishClose(ad, elapsedSeconds);
       return;

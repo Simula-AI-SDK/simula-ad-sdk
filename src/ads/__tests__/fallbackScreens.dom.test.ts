@@ -120,6 +120,69 @@ describe('post-close fallback screens (Kotlin/Swift parity)', () => {
     expect(isFullscreenActive()).toBe(false);
   });
 
+  it('prefetches fallbacks WHILE the ad is on screen; close consumes the prefetch (no second request)', async () => {
+    const urls = stubFetch();
+    await init();
+
+    const ad = new SimulaInterstitialAd('unit-1');
+    const events: SimulaAdEvent[] = [];
+    ad.addAdEventsListener((e) => events.push(e));
+    ad.load();
+    await new Promise((r) => setTimeout(r, 10));
+    ad.show();
+    await new Promise((r) => setTimeout(r, 5));
+
+    // The prefetch fired on DISPLAYED — before any close interaction
+    const fallbackRequestsBeforeClose = urls.filter((u) => u.includes('/load/fallbacks/')).length;
+    expect(fallbackRequestsBeforeClose).toBe(1);
+
+    closeCurrentOverlay();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(currentOverlayHtml()).toContain('end screen 1'); // synchronous handoff
+
+    // Close consumed the prefetch — no second fallbacks request
+    expect(urls.filter((u) => u.includes('/load/fallbacks/')).length).toBe(1);
+  });
+
+  it('a slow prefetch still delivers the screens (awaits the in-flight request)', async () => {
+    let resolveFallbacks: ((v: any) => void) | null = null;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: any) => {
+        const url = String(input);
+        if (url.includes('/session/create')) {
+          return { ok: true, status: 200, json: async () => ({ sessionId: 'sess-1' }) } as any;
+        }
+        if (url.includes('/load/interstitial')) {
+          return { ok: true, status: 200, json: async () => CREATIVE } as any;
+        }
+        if (url.includes('/load/fallbacks/imp-1')) {
+          return new Promise((resolve) => {
+            resolveFallbacks = resolve;
+          });
+        }
+        return { ok: true, status: 200, json: async () => ({}) } as any;
+      }),
+    );
+    await init();
+
+    const ad = new SimulaInterstitialAd('unit-1');
+    ad.addAdEventsListener(() => {});
+    ad.load();
+    await new Promise((r) => setTimeout(r, 10));
+    ad.show();
+    await new Promise((r) => setTimeout(r, 5));
+
+    // Close while the prefetch is still in flight — the screen appears as soon as it lands
+    closeCurrentOverlay();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(overlayCount()).toBe(0); // waiting on the prefetch
+
+    resolveFallbacks!({ ok: true, status: 200, json: async () => FALLBACKS });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(currentOverlayHtml()).toContain('end screen 1');
+  });
+
   it('no fallbacks → CLOSED fires immediately after the primary close', async () => {
     stubFetch({ impression_id: 'imp-1', ads: [] });
     await init();
