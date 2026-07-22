@@ -1,19 +1,11 @@
-# Simula Ad SDK
+# Simula Ad SDK (Web / React)
 
-## Overview
+Monetize conversational AI and feed surfaces with contextually relevant ads. Feature-parity with the Simula native SDKs (Kotlin / Swift): same event names, error codes, wire contracts, and privacy framework.
 
-The Simula Ad SDK enables React developers to monetize conversational AI applications with contextually relevant, non-intrusive ads. The SDK provides in-chat ad placements and native banner ads that integrate naturally with chat interfaces.
-
-### Key Features
-
-- **Contextual Targeting** - AI-powered ad matching based on conversation content
-- **In-Chat Ad Slots** - Ad placements that blend seamlessly into chat UIs
-- **Native Banner Ads** - Flexible ad placements for feeds and content surfaces
-- **MRC-Compliant Viewability** - Industry-standard impression tracking
-- **Built-in A/B Testing** - Optimize ad performance automatically
-- **Mini Games** - Playable mini game experiences with ad monetization
-
----
+- **Zero third-party runtime dependencies** — peer deps are `react` / `react-dom` only
+- **Never crashes the host page** — every API degrades to a safe default instead of throwing
+- **Privacy-first** — IAB TCF v2.2 / CCPA / GPP / COPPA consent framework with CMP auto-read
+- **Durable by default** — beacons, reward verification, and telemetry survive offline tabs and page reloads
 
 ## Installation
 
@@ -21,97 +13,162 @@ The Simula Ad SDK enables React developers to monetize conversational AI applica
 npm install @simula/ads
 ```
 
----
+## Quick start
 
-## Quick Start
+### 1. Initialize
 
-### 1. Provider Setup
-
-Wrap your chat/conversation component with `SimulaProvider` to initialize the SDK:
+**Declarative (provider):**
 
 ```tsx
 import { SimulaProvider } from "@simula/ads";
 
-function ChatInterface() {
-  return (
-    <SimulaProvider
-      apiKey="SIMULA_xxx"
-      primaryUserID="user-123"       // Optional: User ID for better ad targeting
-      hasPrivacyConsent={true}       // Optional: Privacy consent flag
-      devMode={false}                // Optional: Enable dev mode for testing
-    >
-      {/* Your chat UI */}
-    </SimulaProvider>
-  );
-}
+<SimulaProvider
+  apiKey="SIMULA_xxx"
+  devMode={false}
+  primaryUserID="user-123"            // optional
+  privacy={{ tcString, gdprApplies }} // optional, granular consent
+  telemetryEnabled={true}             // optional
+>
+  {/* your app */}
+</SimulaProvider>
 ```
 
-### 2. Component Integration
+**Imperative (parity with the native `SimulaAds`):**
 
-Add components where you want ads to appear:
+```ts
+import { SimulaAds } from "@simula/ads";
 
-**In-Chat Ads:**
-```tsx
-import { InChatAdSlot } from "@simula/ads";
+SimulaAds.initialize({
+  apiKey: "SIMULA_xxx",
+  devMode: false,
+  primaryUserID: "user-123",
+  privacy: { tcString, gdprApplies: true, coppaApplies: false },
+  telemetryEnabled: true,
+  adContext: { searchTerm: "cooking", tags: ["food"] },
+});
+// first valid call wins — later calls are safe no-ops
 
-<InChatAdSlot
-  messages={messages.slice(0, i + 1)}
-  theme={{ mode: "light", accent: "blue" }}
-  onImpression={(ad) => console.log("Impression:", ad.id)}
-  onError={(err) => console.error("Ad error:", err)}
-/>
+SimulaAds.updateContext({ tags: ["news"] });
+SimulaAds.updatePrimaryUserID("user-456"); // mid-session login
+SimulaAds.updatePrimaryUserID(null);       // logout
+const capped = await SimulaAds.checkFrequencyCap("my-ad-unit"); // fails open → false
 ```
 
-**Native Banner Ads:**
+Both entry points share the same core — the provider is a thin delegate.
+
+### 2. Interstitial
+
+```ts
+import { SimulaInterstitialAd, SimulaAdEventType } from "@simula/ads";
+
+const ad = new SimulaInterstitialAd("my-ad-unit");
+
+ad.addAdEventListener(SimulaAdEventType.LOADED, () => ad.show());
+ad.addAdEventListener(SimulaAdEventType.PAID, ({ adValue }) => {
+  analytics.track("ad_paid", adValue.expectedRevenue, adValue.currencyCode);
+});
+ad.addAdEventListener(SimulaAdEventType.LOAD_FAILED, ({ error }) => {
+  if (error.code === "duplicate_request") wait(error.retryInSeconds * 1000);
+});
+
+ad.load(); // optional character targeting: { charId, charName, charImage, charDesc }
+```
+
+Behavior (native parity): loaded ads expire after **1 hour**; same-key re-loads are throttled **5 minutes**; the next ad is **auto-preloaded on close**; close chrome (countdown ring / progress bar / delay up to 45s) is fully server-driven via `ad_behavior`.
+
+### 3. Rewarded (play-to-earn)
+
+```ts
+import { SimulaRewardedAd, SimulaRewardedAdEventType } from "@simula/ads";
+
+const ad = new SimulaRewardedAd("my-rewarded-unit");
+
+ad.addAdEventListener(SimulaRewardedAdEventType.EARNED_REWARD, () => {
+  // client-side gate elapsed (ad_behavior.close.delay_seconds)
+});
+ad.addAdEventListener(SimulaRewardedAdEventType.REWARD_VERIFIED, ({ rewardToken }) => {
+  grantReward(rewardToken); // SSV-verified; token is your idempotency key
+});
+
+ad.load();
+```
+
+Verification is durable and idempotent (HTTP 409 → success, 5s→60s backoff, survives page reload) — a reward is never silently lost.
+
+### 4. Native inline ad
+
 ```tsx
 import { NativeBanner } from "@simula/ads";
 
 <NativeBanner
   slot="feed"
   position={index}
-  context={{
-    searchTerm: "cooking recipes",
-    tags: ["food", "cooking"],
-  }}
-  width="100%"
-  onImpression={(ad) => console.log("Impression:", ad.id)}
-  onError={(err) => console.error("Error:", err)}
+  theme="system"                 // "dark" | "light" | "system"
+  width="100%"                   // min 300px enforced
+  onImpression={(data) => {}}    // MRC: ≥50% visible, 1 continuous second
+  onPaid={(adValue) => {}}       // co-fired with the impression
+  onClick={() => {}}
+  onError={(err) => {}}          // { code, message }
 />
 ```
 
-**Mini Games:**
+Preload for instant feed rendering:
+
+```ts
+const preloadedAdId = await SimulaAds.preloadNativeAd({ adUnitId: "feed", position: 0, theme: "dark" });
+// …later: <NativeBanner slot="feed" position={0} preloadedAdId={preloadedAdId} />
+SimulaAds.invalidateNativeAds(); // clear cached fills
+```
+
+### 5. Privacy
+
+```ts
+import { SimulaPrivacy } from "@simula/ads";
+
+SimulaPrivacy.update({ tcString, uspString: "1YNN", gppString, gppSid, gdprApplies: true });
+SimulaPrivacy.clearConsent();
+```
+
+The SDK auto-reads the page's IAB CMP (`__tcfapi` / `__uspapi` / `__gpp`), sends `X-Simula-*` consent headers on every request, embeds the `privacy` block in session creation, re-creates the session on consent change (300ms debounce), and degrades `localStorage` to in-memory when TCF Purpose 1 is denied under GDPR. COPPA suppresses the `primaryUserID` end-to-end.
+
+### 6. Mini games
+
 ```tsx
-import { MiniGameMenu } from "@simula/ads";
+import { MiniGameMenu, MiniGameInviteKit } from "@simula/ads";
 
-<MiniGameMenu
-  isOpen={isMenuOpen}
-  onClose={() => setIsMenuOpen(false)}
-  charName="Luna"
-  charID="char-123"
-  charImage="https://example.com/luna.png"
-  messages={messages}
-  navigationType="dot"
-/>
+<MiniGameMenu isOpen={open} onClose={...} charName="Luna" charID="char-123" charImage="https://…" messages={messages} />
 ```
 
 ---
 
-## Documentation
+## Events (cross-platform contract)
 
-For complete API reference, integration guides, and examples:
+| Event | Meaning |
+|---|---|
+| `LOADED` / `LOAD_FAILED` | creative ready / failed (`error.code` + `retryInSeconds`) |
+| `DISPLAYED` | shown signal (full-screen presented) |
+| `IMPRESSION` | billable (~2s after render full-screen; MRC viewability for native) |
+| `PAID` | estimated revenue (`AdValue`), co-fired with `IMPRESSION` |
+| `CLICKED` | creative CTA tap |
+| `CLOSED` | dismissed |
+| `EARNED_REWARD` | reward gate elapsed (rewarded) |
+| `REWARD_VERIFIED` / `REWARD_VERIFICATION_FAILED` | SSV result (rewarded) |
 
-- **[InChatAdSlot Documentation](https://simula-ad.notion.site/?pvs=73)**
-- **[NativeBanner Documentation](https://simula-ad.notion.site/Komiko-Simula-Integration-2cbaf70f6f0d80338ddcd2efbbe5d3d7?source=copy_link)**
-- **[Mini Games Documentation](https://simula-ad.notion.site/Simula-x-Moescape-Mini-Games-SDK-Overview-309af70f6f0d8059908cc05be297f271?source=copy_link)**
+Error codes: `not_initialized, no_session, no_fill, not_ready, stale, duplicate_request, already_showing, no_presentation_context, network, ad_unit_not_found`.
 
----
+## Migration to 2.0 (breaking changes)
+
+- **`NativeBanner` callbacks reshaped** (native parity): `onImpression(ad)` → `onImpression(data: NativeAdData { impressionId, adFormat, adUnitId })`; `onError(Error)` → `onError({ code, message })`; `onLoad(ad)` → `onLoad(data)`; new `onPaid(AdValue)` and `onClick()`.
+- **`context` prop is now optional** — merged over the global `SimulaAds.updateContext` value.
+- **Minimum card width is now 300px** (was 130px), matching the native SDKs.
+- **`useSimula()` no longer throws** outside a provider — it returns an inert context and ad surfaces render blank.
+- **Validators no longer throw in production** (invalid props log + render blank); `devMode` keeps strict throwing for integration debugging.
+- Zero runtime dependencies: `@fingerprintjs/botd` and `uuid` were removed (bot detection is now built-in heuristics).
 
 ## Support
 
 - **Website:** [simula.ad](https://simula.ad)
 - **Email:** [admin@simula.ad](mailto:admin@simula.ad)
-
----
 
 ## License
 

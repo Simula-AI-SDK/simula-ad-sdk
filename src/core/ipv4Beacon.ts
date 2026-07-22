@@ -1,0 +1,89 @@
+/**
+ * IPv4 resolution beacon — web port of the native `Ipv4Beacon`.
+ *
+ * WHY: most client IPs the SDK sees are IPv6, but identity-resolution
+ * partners match on IPv4. A lightweight GET to a host configured with ONLY
+ * A records forces resolution over IPv4, so the backend captures the public
+ * IPv4 from that request and links it to the session that loads ads.
+ *
+ * BACKEND CONTRACT (native parity): GET https://ip4.simula.ad/px with params:
+ *   k    — apiKey
+ *   sid  — server session id   (omitted if session creation failed)
+ *   ppid — primary user id     (omitted if absent)
+ *   p    — platform ("web" from this SDK)
+ *   r    — reason ("init" | "ppid_update")
+ *   t    — client timestamp (cache-buster)
+ * (`did` — native device id — doesn't exist on the web and is omitted.)
+ *
+ * SAFETY: fire-and-forget, never throws, intentionally NOT consent-gated
+ * (parity with the native implementation). Deduped per (apiKey, sid, ppid)
+ * identity with in-flight coalescing; failures stay retryable; onLogout
+ * resets the bookkeeping so a re-login captures fresh.
+ */
+
+const DEFAULT_URL = 'https://ip4.simula.ad/px';
+export const IPV4_REASON_INIT = 'init';
+export const IPV4_REASON_PPID_UPDATE = 'ppid_update';
+
+const captured = new Set<string>();
+const inFlight = new Set<string>();
+let generation = 0;
+
+/** Pure URL construction — exported for tests. */
+export function buildIpv4BeaconUrl(
+  apiKey: string,
+  sessionId: string | undefined,
+  ppid: string | undefined,
+  reason: string,
+  timestamp: number,
+  base: string = DEFAULT_URL,
+): string {
+  const params: [string, string][] = [
+    ['k', apiKey],
+    ['p', 'web'],
+    ['r', reason],
+    ['t', String(timestamp)],
+  ];
+  if (sessionId) params.splice(1, 0, ['sid', sessionId]);
+  if (ppid) params.splice(sessionId ? 2 : 1, 0, ['ppid', ppid]);
+  const qs = params.map(([n, v]) => `${encodeURIComponent(n)}=${encodeURIComponent(v)}`).join('&');
+  return `${base}${base.includes('?') ? '&' : '?'}${qs}`;
+}
+
+/** Fire (fire-and-forget) for the given identity. Never throws. */
+export function fireIpv4Beacon(apiKey: string, sessionId: string | undefined, ppid: string | undefined, reason: string): void {
+  try {
+    if (!apiKey || !apiKey.trim()) return;
+    const key = [apiKey, sessionId ?? '', ppid ?? ''].join('\u0000');
+    if (captured.has(key) || inFlight.has(key)) return;
+    inFlight.add(key);
+    const gen = generation;
+
+    fetch(buildIpv4BeaconUrl(apiKey, sessionId, ppid, reason, Date.now()), { method: 'GET' })
+      .then((response) => {
+        if (gen !== generation) return; // a logout moved the session on mid-flight
+        inFlight.delete(key);
+        if (response.ok) captured.add(key);
+      })
+      .catch(() => {
+        if (gen !== generation) return;
+        inFlight.delete(key); // failure stays retryable
+      });
+  } catch {
+    // Fire-and-forget — never fatal
+  }
+}
+
+/** Logout ends the capture session: clear dedup state so a re-login captures fresh. */
+export function onIpv4Logout(): void {
+  generation++;
+  captured.clear();
+  inFlight.clear();
+}
+
+/** Test hook. Not public API. */
+export function _resetIpv4BeaconForTests(): void {
+  generation = 0;
+  captured.clear();
+  inFlight.clear();
+}

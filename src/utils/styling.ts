@@ -1,37 +1,11 @@
 import { InChatTheme, AccentOption, FontOption } from '../types';
-import { 
-  getColorTheme, 
-  getFontStyles, 
+import {
+  getColorTheme,
+  getFontStyles,
   getSolidBackground,
   getTextMuted,
   getShadow
 } from './colorThemes';
-
-export const getResponsiveStyles = (theme: InChatTheme = {}): React.CSSProperties => {
-  // Backward compatibility: prefer 'mode' over 'theme', but support both
-  const themeMode = theme.mode ?? (theme as any).theme ?? 'light';
-  const {
-    accent = 'blue',
-    font = 'sans-serif',
-    width = 'auto',
-  } = theme;
-
-  // If accent or font is an array, use the first value for styling
-  const effectiveAccent: AccentOption = Array.isArray(accent) ? accent[0] : accent;
-  const effectiveFont: FontOption = Array.isArray(font) ? font[0] : font;
-
-  const colors = getColorTheme(themeMode, effectiveAccent);
-  const fonts = getFontStyles(effectiveFont);
-
-  return {
-    '--simula-primary': colors.primary,
-    '--simula-border': colors.border,
-    '--simula-background': getSolidBackground(colors),
-    '--simula-text': colors.text,
-    '--simula-font-primary': fonts.primary,
-    '--simula-width': typeof width === 'number' ? `${width}px` : width,
-  } as React.CSSProperties;
-};
 
 export const createInChatAdSlotCSS = (theme: InChatTheme = {}) => {
   // Backward compatibility: prefer 'mode' over 'theme', but support both

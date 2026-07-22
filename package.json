@@ -1,16 +1,16 @@
 {
   "name": "@simula/ads",
-  "version": "1.4.2-dev.3",
+  "version": "2.0.0-dev.1",
   "description": "React SDK for integrating contextual AI ads with Simula",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "type": "module",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "files": [
@@ -22,7 +22,9 @@
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "prepublishOnly": "npm run build",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "sync-demo": "npm run build && rm -rf ../dippy-ai-mock/node_modules/@simula ../dippy-ai-mock/node_modules/.vite && npm install --prefix ../dippy-ai-mock \"./$(npm pack --pack-destination . | tail -1)\""
   },
   "keywords": [
     "react",
@@ -53,10 +55,6 @@
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"
   },
-  "dependencies": {
-    "@fingerprintjs/botd": "^1.9.1",
-    "uuid": "^13.0.0"
-  },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-image": "^3.0.3",
@@ -65,12 +63,13 @@
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
-    "@types/uuid": "^10.0.0",
+    "jsdom": "^29.1.1",
     "rollup": "^4.9.1",
     "rollup-plugin-dts": "^6.1.0",
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "tslib": "^2.6.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
   },
   "engines": {
     "node": ">=16.0.0"

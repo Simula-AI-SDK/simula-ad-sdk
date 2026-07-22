@@ -1,3 +1,5 @@
+import type { SimulaPrivacyConfig } from './privacy/SimulaPrivacy';
+
 export type AccentOption = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'pink' | 'orange' | 'neutral' | 'gray' | 'tan' | 'transparent' | 'image';
 export type FontOption = 'sans-serif' | 'serif' | 'monospace';
 
@@ -64,8 +66,12 @@ export interface SimulaProviderProps {
   children: React.ReactNode;
   devMode?: boolean;
   primaryUserID?: string;
-  /** Privacy consent flag. When false, suppresses collection of PII (primaryUserID). Defaults to true. */
+  /** Privacy consent flag. When false, suppresses collection of PII (primaryUserID). Defaults to true. `privacy` takes precedence when both are supplied. */
   hasPrivacyConsent?: boolean;
+  /** Granular consent config (GDPR/TCF/CCPA/GPP/COPPA) — takes precedence over `hasPrivacyConsent`. */
+  privacy?: SimulaPrivacyConfig;
+  /** Opt out of SDK telemetry. Defaults to true (telemetry enabled). */
+  telemetryEnabled?: boolean;
 }
 
 export interface SimulaContextValue {
@@ -150,19 +156,6 @@ export interface AditudeConfig {
   enabled: boolean;
   script_url: string;
   mappings: AditudeSlotMapping[];
-}
-
-export interface FetchNativeBannerRequest {
-  sessionId: string;
-  slot: string;
-  position: number;
-  context: NativeContext;
-  width?: number;
-}
-
-export interface FetchNativeAdResponse {
-  ad?: AdData;
-  error?: string;
 }
 
 export interface BotDetectionResult {
@@ -490,30 +483,5 @@ export const filterContextForPrivacy = (context: NativeContext, hasPrivacyConsen
   return filtered;
 };
 
-export interface NativeBannerProps {
-  slot: string; // Placement identifier (e.g., 'feed', 'explore')
-  /**
-   * Ad width. Supports multiple formats:
-   * - number < 1: percentage as decimal (e.g., 0.8 = 80%)
-   * - number >= 1: pixels (e.g., 500 = 500px)
-   * - string with %: percentage (e.g., "10%" = 10%)
-   * - string with number: pixels (e.g., "500" = 500px)
-   * - "auto" or null: fills container width (min 130px)
-   */
-  width?: number | string | null;
-  position: number;
-  context: NativeContext;
-  /**
-   * Custom loading component to display while the ad is loading.
-   * - undefined: uses the default RadialLinesSpinner
-   * - null: disables the loading indicator entirely
-   * - React.ComponentType: renders your custom component
-   */
-  loadingComponent?: React.ComponentType | null;
-  /** Called when the ad content has finished loading and is ready to display */
-  onLoad?: (ad: AdData) => void;
-  /** Called when the ad has been viewable for 1 second (MRC standard) */
-  onImpression?: (ad: AdData) => void;
-  /** Called when an error occurs fetching or loading the ad */
-  onError?: (error: Error) => void;
-}
+/** Back-compat alias — the component props now live in the native ad module. */
+export type NativeBannerProps = import('./nativeAd/types').NativeAdProps;

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { useSimula } from '../../SimulaProvider';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useBotDetection } from '../../hooks/useBotDetection';
@@ -7,6 +6,7 @@ import { useViewability } from '../../hooks/useViewability';
 import { fetchAd, trackImpression } from '../../utils/api';
 import { createInChatAdSlotCSS } from '../../utils/styling';
 import { validateInChatAdSlotProps } from '../../utils/validation';
+import { generateId } from '../../utils/id';
 import { logger } from '../../utils/logger';
 import { InChatAdSlotProps, AdData } from '../../types';
 
@@ -24,9 +24,6 @@ const hasValidMessages = (messages: any[]): boolean => {
 };
 
 export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
-  // Validate props early
-  validateInChatAdSlotProps(props);
-
   const {
     messages,
     trigger,
@@ -41,10 +38,21 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     onError,
   } = props;
 
-  const { apiKey, sessionId } = useSimula();
+  const { apiKey, sessionId, devMode } = useSimula();
+
+  // Validate props, memoized on the messages REFERENCE: the validator iterates
+  // the whole array, and a live chat re-renders per keystroke — only re-validate
+  // when the array identity (or another validated input) actually changes.
+  // A slot mounted with temporarily-invalid props still recovers once they
+  // become valid; each unique failure logs only once (devMode throws).
+  const propsValid = useMemo(
+    () => validateInChatAdSlotProps(props, devMode),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.messages, props.theme, props.debounceMs, props.charDesc, devMode]
+  );
 
   // Generate a stable slotId for this component instance
-  const slotId = useMemo(() => `slot-${uuidv4()}`, []);
+  const slotId = useMemo(() => `slot-${generateId()}`, []);
   
   const [ad, setAd] = useState<AdData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -118,6 +126,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
   }, [theme.width, elementRef]);
 
   const fetchAdData = useCallback(async () => {
+    if (!propsValid) return;
     if (!hasBeenViewed || loading || hasTriggered || error) {
       return;
     }
@@ -223,7 +232,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     } finally {
       setLoading(false);
     }
-  }, [hasBeenViewed, loading, hasTriggered, error, messages, apiKey, slotId, theme, onFill, onError, isBot, sessionId, measuredWidth]);
+  }, [hasBeenViewed, loading, hasTriggered, error, messages, apiKey, slotId, theme, onFill, onError, isBot, sessionId, measuredWidth, propsValid]);
 
   useDebounce(
     () => {
@@ -386,7 +395,7 @@ export const InChatAdSlot: React.FC<InChatAdSlotProps> = (props) => {
     <div
       ref={elementRef}
       style={{
-        display: error ? 'none' : 'block',
+        display: (error || !propsValid) ? 'none' : 'block',
         minWidth: ad && ad.id ? '320px' : '0px',
         width: !theme.width || theme.width === 'auto' ? '100%' : theme.width,
         height: ad && ad.id ? '265px' : '0px',
