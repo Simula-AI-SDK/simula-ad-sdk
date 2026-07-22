@@ -63,7 +63,7 @@ export class SimulaInterstitialAd extends SimulaBaseAd {
       position: closePositionFrom(options.closePosition ?? 'top_right'),
       progressBarColor: validatedHexColor(options.progressBarColor ?? '#FFFFFF'),
     };
-    return presentFullscreenAd({
+    const handle = presentFullscreenAd({
       creative: { impressionId: 'preview', renderedHtml: PREVIEW_HTML, destination: 'web', bidAmt: 0, adBehavior: { close: behavior, storeOpen: 'external' } },
       adUnitType: options.adUnitType === 'rewarded' ? 'rewarded' : 'interstitial',
       closeBehavior: behavior,
@@ -74,6 +74,9 @@ export class SimulaInterstitialAd extends SimulaBaseAd {
         onClose: () => this.emit(SimulaAdEventType.CLOSED),
       },
     });
+    // destroy() tears the preview down like any other presentation
+    this.adoptPresenterHandle(handle);
+    return handle;
   }
 
   protected onAdClosed(): void {

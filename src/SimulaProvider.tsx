@@ -38,7 +38,8 @@ export const useSimula = (): SimulaContextValue => {
       warnedOutsideProvider = true;
       logger.warn(
         'useSimula was used outside a <SimulaProvider> — Simula ad surfaces will render blank. ' +
-        'Wrap your app in <SimulaProvider> or call SimulaAds.initialize first.'
+        'React ad components (NativeBanner, InChatAdSlot, …) require a <SimulaProvider> ancestor; ' +
+        'SimulaAds.initialize alone only enables the imperative APIs (interstitial/rewarded).'
       );
     }
     return INERT_CONTEXT;
@@ -81,20 +82,29 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
 
   // Initialize the SDK core. First valid call wins — this is a no-op when
   // the host already called SimulaAds.initialize imperatively (both entry
-  // points share the same core, mirroring the native SDKs).
+  // points share the same core, mirroring the native SDKs). A LATER apiKey
+  // change cannot re-initialize (same contract as the native SDKs, where the
+  // key is fixed at init) — warn loudly so a desynced context is debuggable.
   useEffect(() => {
     if (!propsValid) return;
-    SimulaAds.initialize({ apiKey, devMode, primaryUserID, hasPrivacyConsent, privacy, telemetryEnabled });
+    const initialized = SimulaAds.initialize({ apiKey, devMode, primaryUserID, hasPrivacyConsent, privacy, telemetryEnabled });
+    if (!initialized && SimulaAds.isInitialized() && apiKey !== SimulaAds._getApiKey()) {
+      logger.error(
+        'SimulaProvider "apiKey" changed after initialization — the SDK keeps the first key ' +
+        '(native parity: the key is fixed at init). Remount the app to switch projects.'
+      );
+    }
     setSessionId(SessionManager.getSessionId());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, devMode, propsValid]);
 
-  // Keep runtime identity props in sync: mid-session login/logout/switch
-  // (PPID reconcile) and consent flips, serialized inside the core.
+  // Keep runtime identity + consent props in sync: mid-session login/logout/
+  // switch (PPID reconcile) and consent changes (legacy flag AND the granular
+  // `privacy` object), serialized inside the core.
   useEffect(() => {
     if (!propsValid || !SimulaAds.isInitialized()) return;
-    SimulaAds._syncIdentity(primaryUserID, hasPrivacyConsent);
-  }, [primaryUserID, hasPrivacyConsent, propsValid]);
+    SimulaAds._syncIdentity(primaryUserID, hasPrivacyConsent, privacy);
+  }, [primaryUserID, hasPrivacyConsent, privacy, propsValid]);
 
   // Subscribe to the shared session lifecycle
   useEffect(() => SessionManager.subscribe(setSessionId), []);
@@ -175,7 +185,7 @@ export const SimulaProvider: React.FC<SimulaProviderProps> = (props) => {
     markNoFill,
     aditudeConfig,
     aditudeReady,
-  }), [apiKey, devMode, sessionId, hasPrivacyConsent, getCachedAd, cacheAd, getCachedHeight, cacheHeight, hasNoFill, markNoFill]);
+  }), [apiKey, devMode, sessionId, hasPrivacyConsent, getCachedAd, cacheAd, getCachedHeight, cacheHeight, hasNoFill, markNoFill, aditudeConfig, aditudeReady]);
 
   return (
     <SimulaContext.Provider value={value}>

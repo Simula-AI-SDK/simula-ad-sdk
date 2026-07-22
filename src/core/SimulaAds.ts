@@ -21,6 +21,7 @@ import {
   preloadCapacityAvailable,
   storePreloadedAd,
   destroyPreloadedAd as removePreloadedAd,
+  clearPreloadedAds,
 } from '../nativeAd/preloadCache';
 import { invalidateNativeAd as invalidateNativeAdEntry, invalidateAllNativeAds } from '../nativeAd/nativeAdCache';
 import { resolveNativeAdTheme, SimulaNativeAdTheme } from '../nativeAd/theme';
@@ -133,10 +134,16 @@ function initialize(config: SimulaInitConfig): boolean {
       identity: () => ({ ppid: effectiveUserID() }),
     });
 
-    // ── Consent changes: re-gate PII, then re-create the session with fresh
-    // privacy signals (SimulaPrivacy already debounces 300ms — native parity) ──
+    // ── Consent changes: re-gate PII, re-create the session with fresh
+    // privacy signals (SimulaPrivacy already debounces 300ms — native parity),
+    // and drop everything derived under the OLD consent state: cached/preloaded
+    // creatives are tied to the dropped session, and the frequency-cap cache
+    // may carry PPID-scoped keys the new state disallows ──
     SimulaPrivacy.subscribe(() => {
       SessionManager.resync(effectiveUserID());
+      invalidateAllNativeAds();
+      clearPreloadedAds();
+      SimulaStorage.remove('freqcap');
     });
 
     // ── Beacons: headers built at SEND time with the live consent state and
@@ -294,13 +301,14 @@ function invalidateNativeAds(): void {
 
 /**
  * Keeps runtime identity props in sync (used by `<SimulaProvider>` when
- * `primaryUserID` / `hasPrivacyConsent` change after mount).
+ * `primaryUserID` / `hasPrivacyConsent` / `privacy` change after mount).
+ * The granular `privacy` object merges over the legacy flag (init parity).
  * @internal
  */
-function _syncIdentity(userID: string | undefined, legacyConsentFlag: boolean): void {
+function _syncIdentity(userID: string | undefined, legacyConsentFlag: boolean, privacy?: SimulaPrivacyConfig): void {
   if (!initialized) return;
   primaryUserID = typeof userID === 'string' && userID.trim() ? userID : undefined;
-  SimulaPrivacy.update({ hasPrivacyConsent: legacyConsentFlag });
+  SimulaPrivacy.update({ hasPrivacyConsent: legacyConsentFlag, ...privacy });
   SessionManager.updatePrimaryUserID(primaryUserID ?? null, allowsPrimaryUserID(SimulaPrivacy.current));
 }
 

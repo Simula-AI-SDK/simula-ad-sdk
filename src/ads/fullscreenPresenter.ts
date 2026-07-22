@@ -181,18 +181,27 @@ export function presentFullscreenAd(opts: {
     impressionRemainingMs = Math.max(0, impressionRemainingMs - (Date.now() - impressionStartedAt));
   };
 
-  // Pausable reward/close gate (1s ticks)
+  // Pausable reward/close gate. The interval ticks the countdown once per
+  // second; between ticks a 1s LINEAR CSS transition sweeps the ring/bar
+  // continuously (native parity: the Kotlin ring animates every frame, never
+  // in whole-second jumps). Honors prefers-reduced-motion (discrete steps).
   let gateRemaining = delaySeconds;
   const startGateInterval = () => {
     if (gateInterval !== null || gateRemaining <= 0 || closed) return;
+    // (Re)sync to the current tick boundary, then sweep toward the next —
+    // also snaps back any drift from a transition that ran on while hidden.
+    syncGateChrome();
     gateInterval = setInterval(() => {
       gateRemaining -= 1;
       if (gateRemaining <= 0) {
         finishGate();
       } else {
-        renderGateChrome(gateRemaining);
+        syncGateChrome();
+        armGateSweep();
       }
     }, 1000);
+    // First sweep arms after the chrome has painted (see armGateSweepAfterPaint)
+    armGateSweepAfterPaint();
   };
   const pauseGateInterval = () => {
     if (gateInterval === null) return;
@@ -268,15 +277,90 @@ export function presentFullscreenAd(opts: {
     chromeWrap.appendChild(btn);
   };
 
-  const renderGateChrome = (remaining: number) => {
+  // ── Gate chrome — built ONCE; ticks update the changing parts in place ────
+  let gateArcEl: SVGCircleElement | null = null;
+  let gateTextEl: SVGTextElement | null = null;
+  let gateBarEl: HTMLDivElement | null = null;
+  let gatePillEl: HTMLDivElement | null = null;
+  const GATE_CIRCUMFERENCE = 2 * Math.PI * 15;
+
+  const prefersReducedMotion = (() => {
+    try {
+      return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  })();
+
+  const arcOffsetFor = (remaining: number): string =>
+    String(GATE_CIRCUMFERENCE * (1 - (delaySeconds > 0 ? Math.max(remaining, 0) / delaySeconds : 0)));
+
+  const barWidthFor = (remaining: number): string =>
+    `${delaySeconds > 0 ? Math.min(100, ((delaySeconds - Math.max(remaining, 0)) / delaySeconds) * 100) : 100}%`;
+
+  /** Both the presentation attribute (test observability / fallback) and the
+   * CSS property (what transitions reliably animate cross-browser). */
+  const setArcOffset = (value: string) => {
+    if (!gateArcEl) return;
+    gateArcEl.setAttribute('stroke-dashoffset', value);
+    gateArcEl.style.setProperty('stroke-dashoffset', value);
+  };
+
+  /** Snap text + ring/bar to the current tick boundary with NO animation. */
+  const syncGateChrome = () => {
+    if (gateTextEl) gateTextEl.textContent = String(gateRemaining);
+    if (gatePillEl) {
+      gatePillEl.textContent =
+        opts.adUnitType === 'rewarded' ? `Reward in ${gateRemaining}s` : `Close in ${gateRemaining}s`;
+    }
+    if (gateArcEl) {
+      gateArcEl.style.transition = 'none';
+      setArcOffset(arcOffsetFor(gateRemaining));
+      void gateArcEl.getBoundingClientRect(); // commit, so the next sweep animates from here
+    }
+    if (gateBarEl) {
+      gateBarEl.style.transition = 'none';
+      gateBarEl.style.width = barWidthFor(gateRemaining);
+      void gateBarEl.getBoundingClientRect();
+    }
+  };
+
+  /** Sweep the ring/bar toward the NEXT tick boundary over 1s (linear). */
+  const armGateSweep = () => {
+    if (prefersReducedMotion) return; // discrete per-second steps instead
+    const target = gateRemaining - 1;
+    if (gateArcEl) {
+      gateArcEl.style.transition = 'stroke-dashoffset 1s linear';
+      setArcOffset(arcOffsetFor(target));
+    }
+    if (gateBarEl) {
+      gateBarEl.style.transition = 'width 1s linear';
+      gateBarEl.style.width = barWidthFor(target);
+    }
+  };
+
+  /**
+   * The very first sweep must be armed AFTER the chrome's first paint — a
+   * transition on a never-painted element is applied instantly (the ring
+   * would jump a full second ahead). Double rAF lands one frame after paint.
+   */
+  const armGateSweepAfterPaint = () => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (gateInterval !== null && !closed) armGateSweep();
+      }),
+    );
+  };
+
+  const buildGateChrome = () => {
     chromeWrap.innerHTML = '';
     if (behavior.treatment === 'hidden') return;
 
     if (behavior.treatment === 'progress_bar') {
       const bar = document.createElement('div');
-      const pct = delaySeconds > 0 ? Math.min(100, ((delaySeconds - remaining) / delaySeconds) * 100) : 100;
-      bar.style.cssText = `position:absolute;top:0;left:0;height:4px;width:${pct}%;background:${behavior.progressBarColor};transition:width 1s linear;`;
+      bar.style.cssText = `position:absolute;top:0;left:0;height:4px;width:${barWidthFor(gateRemaining)};background:${behavior.progressBarColor};`;
       chromeWrap.appendChild(bar);
+      gateBarEl = bar;
       return;
     }
 
@@ -284,8 +368,6 @@ export function presentFullscreenAd(opts: {
       const size = 36;
       const radius = 15;
       const center = size / 2;
-      const circumference = 2 * Math.PI * radius;
-      const frac = delaySeconds > 0 ? remaining / delaySeconds : 0;
 
       // Built via DOM APIs (never innerHTML) — no markup injection vector
       const svgNS = 'http://www.w3.org/2000/svg';
@@ -309,8 +391,8 @@ export function presentFullscreenAd(opts: {
       arc.setAttribute('fill', 'none');
       arc.setAttribute('stroke', behavior.progressBarColor);
       arc.setAttribute('stroke-width', '3');
-      arc.setAttribute('stroke-dasharray', String(circumference));
-      arc.setAttribute('stroke-dashoffset', String(circumference * (1 - frac)));
+      arc.setAttribute('stroke-dasharray', String(GATE_CIRCUMFERENCE));
+      arc.setAttribute('stroke-dashoffset', arcOffsetFor(gateRemaining));
       arc.setAttribute('stroke-linecap', 'round');
       arc.setAttribute('transform', `rotate(-90 ${center} ${center})`);
 
@@ -321,12 +403,14 @@ export function presentFullscreenAd(opts: {
       label.setAttribute('fill', '#fff');
       label.setAttribute('font-size', '13');
       label.setAttribute('font-family', 'sans-serif');
-      label.textContent = String(remaining);
+      label.textContent = String(gateRemaining);
 
       svg.appendChild(track);
       svg.appendChild(arc);
       svg.appendChild(label);
       chromeWrap.appendChild(svg);
+      gateArcEl = arc;
+      gateTextEl = label;
       return;
     }
 
@@ -341,8 +425,9 @@ export function presentFullscreenAd(opts: {
       'color:#fff',
       'font:13px sans-serif',
     ].join(';');
-    pill.textContent = opts.adUnitType === 'rewarded' ? `Reward in ${remaining}s` : `Close in ${remaining}s`;
+    pill.textContent = opts.adUnitType === 'rewarded' ? `Reward in ${gateRemaining}s` : `Close in ${gateRemaining}s`;
     chromeWrap.appendChild(pill);
+    gatePillEl = pill;
   };
 
   // ── Gate ─────────────────────────────────────────────────────────────────
@@ -351,6 +436,10 @@ export function presentFullscreenAd(opts: {
       clearInterval(gateInterval);
       gateInterval = null;
     }
+    gateArcEl = null;
+    gateTextEl = null;
+    gateBarEl = null;
+    gatePillEl = null;
     renderCloseButton();
     if (!gateFired) {
       gateFired = true;
@@ -362,7 +451,7 @@ export function presentFullscreenAd(opts: {
   if (delaySeconds <= 0) {
     finishGate();
   } else {
-    renderGateChrome(gateRemaining);
+    buildGateChrome();
     if (isVisible()) startGateInterval();
   }
 
@@ -396,6 +485,21 @@ export function presentFullscreenAd(opts: {
     if (isVisible()) startImpressionCountdown();
   });
 
+  // Display-failure bail-out: everything attached so far (listeners, bridge,
+  // gate interval) must detach — a leaked handler from an aborted presentation
+  // would stack onto the next one. Same teardown as close(), minus onClose
+  // (the caller reports DISPLAY_FAILED instead).
+  const abort = (): null => {
+    closed = true;
+    if (impressionTimer !== null) clearTimeout(impressionTimer);
+    if (gateInterval !== null) clearInterval(gateInterval);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    document.removeEventListener('keydown', onKeyDown, true);
+    detachBridge?.();
+    restoreScroll();
+    return null;
+  };
+
   try {
     if (opts.creative.renderedHtml) {
       // Inject the bridge relay so opaque-origin creatives can still report
@@ -404,13 +508,11 @@ export function presentFullscreenAd(opts: {
     } else if (opts.creative.iframeUrl) {
       iframe.src = opts.creative.iframeUrl;
     } else {
-      // No renderable creative — treat as display failure via close-less path
-      restoreScroll();
-      return null;
+      // No renderable creative — treat as display failure
+      return abort();
     }
   } catch {
-    restoreScroll();
-    return null;
+    return abort();
   }
 
   document.body.appendChild(overlay);

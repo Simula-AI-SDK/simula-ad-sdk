@@ -48,6 +48,42 @@ describe('SessionManager', () => {
     expect(calls.filter((c) => c.url.includes('/session/create'))).toHaveLength(1);
   });
 
+  it('resync during an in-flight create starts a FRESH create (stale one never satisfies it)', async () => {
+    // First create hangs until released; the post-resync create resolves fast
+    let releaseFirst: ((v: any) => void) | null = null;
+    let createCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: any) => {
+        const url = String(input);
+        if (url.includes('/session/create')) {
+          createCount += 1;
+          if (createCount === 1) {
+            return new Promise((resolve) => {
+              releaseFirst = resolve;
+            });
+          }
+          return { ok: true, json: async () => ({ sessionId: `sess-${createCount}` }) } as any;
+        }
+        return { ok: true, json: async () => ({}) } as any;
+      }),
+    );
+    SessionManager.configure('key-1', false, 'user-1');
+
+    const stale = SessionManager.ensureSession(); // in flight, hanging
+    SessionManager.resync('user-2'); // consent changed mid-create
+
+    // The new generation's create resolves and installs its session
+    await new Promise((r) => setTimeout(r, 10));
+    expect(SessionManager.getSessionId()).toBe('sess-2');
+    expect(createCount).toBe(2);
+
+    // The stale create finally lands — discarded, never installed
+    releaseFirst!({ ok: true, json: async () => ({ sessionId: 'sess-stale' }) });
+    await expect(stale).resolves.toBeUndefined();
+    expect(SessionManager.getSessionId()).toBe('sess-2');
+  });
+
   it('carries the ppid on session/create', async () => {
     const { calls } = stubSessionFetch();
     SessionManager.configure('key-1', false, 'user-1');

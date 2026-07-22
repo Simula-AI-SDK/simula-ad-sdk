@@ -354,23 +354,44 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
       Telemetry.recordLifecycle('viewability', { adFormat: 'native', adUnitId: slot, adId: currentCreative.impressionId, durationMs: Date.now() - viewabilityStartedAtRef.current });
     };
 
+    // MRC continuous-second guard: the timer only STARTS the measurement —
+    // at expiry the element must STILL be ≥50% viewable in a visible tab.
+    // Observer callbacks can lag a fast scroll-away, and IntersectionObserver
+    // does not fire on tab switches at all (the element stays "intersecting"
+    // in a hidden tab), so both are re-checked at fire time.
+    let isViewable = false;
+
+    const cancelPending = () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      hasMetDurationRef.current = false;
+    };
+
+    const startPending = () => {
+      if (timer !== null || hasMetDurationRef.current) return;
+      timer = setTimeout(() => {
+        timer = null;
+        if (!isViewable || document.visibilityState === 'hidden') return; // no longer counts
+        hasMetDurationRef.current = true;
+        fireImpression();
+      }, durationMs);
+    };
+
+    const onVisibility = () => {
+      // Hidden time never counts toward the continuous second
+      if (document.visibilityState === 'hidden') cancelPending();
+      else if (isViewable) startPending();
+    };
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        const viewable = entry.intersectionRatio >= threshold;
-        if (viewable) {
-          if (timer === null && !hasMetDurationRef.current) {
-            timer = setTimeout(() => {
-              timer = null;
-              hasMetDurationRef.current = true;
-              fireImpression();
-            }, durationMs);
-          }
+        isViewable = entry.intersectionRatio >= threshold;
+        if (isViewable && document.visibilityState !== 'hidden') {
+          startPending();
         } else {
-          if (timer !== null) {
-            clearTimeout(timer);
-            timer = null;
-          }
-          hasMetDurationRef.current = false;
+          cancelPending();
         }
       },
       { threshold, rootMargin: '0px' }
@@ -378,9 +399,11 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
 
     viewabilityStartedAtRef.current = Date.now();
     observer.observe(elementRef.current);
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       observer.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
       if (timer !== null) clearTimeout(timer);
     };
   }, [creative, isBot, apiKey, slot, position, previewHtml, propsValid, nativeAdData]);

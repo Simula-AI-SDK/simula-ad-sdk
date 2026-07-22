@@ -44,8 +44,11 @@ class SessionManagerImpl {
 
   configure(apiKey: string, devMode: boolean, primaryUserID?: string, hooks: SessionHooks = {}): void {
     if (this.apiKey && this.apiKey !== apiKey) {
-      // apiKey change — everything about the old session is stale
+      // apiKey change — everything about the old session is stale, including
+      // an in-flight create (its result will be discarded by the generation
+      // check; dropping the handle lets ensureSession start a FRESH create)
       this.generation++;
+      this.inflight = null;
       this.setSession(undefined, undefined);
     }
     this.apiKey = apiKey;
@@ -96,6 +99,11 @@ class SessionManagerImpl {
   resync(newPrimaryUserID?: string): void {
     this.pendingUserID = newPrimaryUserID;
     this.generation++;
+    // Drop a stale in-flight create: its response is discarded by the
+    // generation check, and if it stayed cached here ensureSession would
+    // keep returning it — sessionId would never resolve for the new consent
+    // state until a full page reload.
+    this.inflight = null;
     this.setSession(undefined, undefined);
     void this.ensureSession();
   }

@@ -24,7 +24,7 @@
     "prepublishOnly": "npm run build",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "sync-demo": "npm run build && npm pack --pack-destination . && rm -rf ../dippy-ai-mock/node_modules/@simula ../dippy-ai-mock/node_modules/.vite && npm install --prefix ../dippy-ai-mock"
+    "sync-demo": "npm run build && rm -rf ../dippy-ai-mock/node_modules/@simula ../dippy-ai-mock/node_modules/.vite && npm install --prefix ../dippy-ai-mock \"./$(npm pack --pack-destination . | tail -1)\""
   },
   "keywords": [
     "react",

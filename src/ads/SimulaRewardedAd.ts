@@ -122,7 +122,7 @@ export class SimulaRewardedAd extends SimulaBaseAd {
       position: 'top_right',
       progressBarColor: validatedHexColor('#FFFFFF'),
     };
-    return presentFullscreenAd({
+    const handle = presentFullscreenAd({
       creative: { impressionId: 'preview', renderedHtml: PREVIEW_HTML, destination: 'web', bidAmt: 0, adBehavior: { close: behavior, storeOpen: 'external' } },
       adUnitType: 'rewarded',
       closeBehavior: behavior,
@@ -134,6 +134,9 @@ export class SimulaRewardedAd extends SimulaBaseAd {
         onClose: () => this.emit(SimulaAdEventType.CLOSED),
       },
     });
+    // destroy() tears the preview down like any other presentation
+    this.adoptPresenterHandle(handle);
+    return handle;
   }
 }
 

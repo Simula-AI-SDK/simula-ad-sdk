@@ -101,6 +101,50 @@ describe('fullscreenPresenter (DOM paths)', () => {
     expect(document.querySelector('button[aria-label="Close ad"]')).not.toBeNull();
   });
 
+  it('the countdown ring sweeps continuously: chrome is built once and the arc is armed with a 1s linear transition', () => {
+    vi.useFakeTimers();
+    const handlers = makeHandlers();
+    const creative = makeCreative({
+      adBehavior: { close: { delaySeconds: 5, treatment: 'countdown_circle', position: 'top_right', progressBarColor: '#FFFFFF' }, storeOpen: 'external' },
+    });
+    presentFullscreenAd({ creative, adUnitType: 'rewarded', handlers });
+
+    const svg = document.querySelector('svg')!;
+    const arc = svg.querySelectorAll('circle')[1]; // track, then the sweeping arc
+    const circumference = 2 * Math.PI * 15;
+
+    // The first sweep arms one frame after paint (double rAF), then via CSS transition
+    vi.advanceTimersByTime(40);
+    expect(arc.style.transition).toContain('stroke-dashoffset 1s linear');
+    expect(parseFloat(arc.getAttribute('stroke-dashoffset')!)).toBeCloseTo(circumference * (1 / 5), 3);
+
+    vi.advanceTimersByTime(960);
+    // Same elements updated in place (no rebuild) — text ticks, next sweep armed
+    expect(document.querySelector('svg')).toBe(svg);
+    expect(svg.querySelector('text')!.textContent).toBe('4');
+    expect(parseFloat(arc.getAttribute('stroke-dashoffset')!)).toBeCloseTo(circumference * (2 / 5), 3);
+
+    vi.advanceTimersByTime(4000);
+    expect(document.querySelector('button[aria-label="Close ad"]')).not.toBeNull();
+  });
+
+  it('the progress_bar sweeps continuously toward the next boundary', () => {
+    vi.useFakeTimers();
+    const handlers = makeHandlers();
+    const creative = makeCreative({
+      adBehavior: { close: { delaySeconds: 10, treatment: 'progress_bar', position: 'top_right', progressBarColor: '#00FF00' }, storeOpen: 'external' },
+    });
+    presentFullscreenAd({ creative, adUnitType: 'interstitial', handlers });
+
+    const bar = document.querySelector('div[style*="height: 4px"], div[style*="height:4px"]') as HTMLDivElement;
+    expect(bar).not.toBeNull();
+    vi.advanceTimersByTime(40); // first sweep arms one frame after paint
+    expect(bar.style.transition).toContain('width 1s linear');
+    expect(bar.style.width).toBe('10%'); // armed toward the 1st boundary
+    vi.advanceTimersByTime(960);
+    expect(bar.style.width).toBe('20%'); // same element, next sweep armed
+  });
+
   it('renders the progress_bar treatment tinted with progressBarColor', () => {
     vi.useFakeTimers();
     const handlers = makeHandlers();

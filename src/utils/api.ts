@@ -1,7 +1,7 @@
 import { Message, AdData, InChatTheme, GameData, NativeContext, FetchAdRequest, FetchAdResponse, CatalogResponse, InitMinigameRequest, MinigameResponse, AditudeConfig, InitRewardedResponse, VerifyRewardResponse } from '../types';
 import { SDK_HEADER_VALUE } from '../core/version';
 import { logger } from './logger';
-import { SimulaPrivacy, consentHeaders, privacyJson } from '../privacy/SimulaPrivacy';
+import { SimulaPrivacy, consentHeaders, privacyJson, allowsPrimaryUserID } from '../privacy/SimulaPrivacy';
 import { deviceSignalHeaders } from '../core/deviceSignals';
 import { connectionTypeValue } from '../core/connectionType';
 import { BeaconQueue } from '../core/beaconQueue';
@@ -505,17 +505,24 @@ export interface CharacterTargeting {
   charDesc?: string;
 }
 
-/** The wire `NativeContext` object — camelCase keys (native parity: NativeContextBody). */
+/**
+ * The wire `NativeContext` object — camelCase keys (native parity:
+ * NativeContextBody). PII fields (`userEmail`, `userProfile`) are gated on
+ * the LIVE consent snapshot at request time — this is the single chokepoint
+ * every load endpoint (native/interstitial/rewarded) flows through, so no
+ * caller can forget the filter.
+ */
 function contextBody(context?: NativeContext | null): Record<string, unknown> | undefined {
   if (!context) return undefined;
+  const allowsPii = allowsPrimaryUserID(SimulaPrivacy.current);
   return {
     searchTerm: context.searchTerm,
     tags: context.tags,
     category: context.category,
     title: context.title,
     description: context.description,
-    userProfile: context.userProfile,
-    userEmail: context.userEmail,
+    userProfile: allowsPii ? context.userProfile : undefined,
+    userEmail: allowsPii ? context.userEmail : undefined,
     customContext: context.customContext,
     nsfw: context.nsfw === true,
   };

@@ -49,3 +49,64 @@ describe('injectSrcdocRelay', () => {
     expect(hasBridgeRelay(injectSrcdocRelay('<div>ad</div>'))).toBe(true);
   });
 });
+
+describe('injectSrcdocRelay — nested srcdoc creatives (backend wrapper templates)', () => {
+  /** Mirrors the real character_ad payload: wrapper doc + inner card in an
+   * escaped srcdoc iframe, self-sized via (sandbox-dead) contentDocument. */
+  const INNER =
+    '<!DOCTYPE html><html><head><style>html,body{height:100%;overflow:hidden}</style></head>' +
+    '<body><div class="media">card</div></body></html>';
+  const escapeAttr = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const OUTER =
+    '<!DOCTYPE html><html><head></head><body>' +
+    `<iframe srcdoc="${escapeAttr(INNER)}" style="width:100%" ` +
+    `onload="this.style.height=this.contentDocument.body.scrollHeight+'px';"></iframe>` +
+    '</body></html>';
+
+  it('injects the relay into BOTH the wrapper and the (escaped) inner document', () => {
+    const out = injectSrcdocRelay(OUTER);
+    // Outer level: raw relay before the real </body>
+    expect(out).toContain('<script data-simula-relay="1">');
+    expect(out.toLowerCase().lastIndexOf('</body>')).toBeGreaterThan(out.indexOf('data-simula-relay'));
+    // Inner level: relay present in ESCAPED form inside the srcdoc attribute
+    expect(out).toContain('&lt;script data-simula-relay=&quot;1&quot;&gt;');
+  });
+
+  it('round-trips the inner document content losslessly', () => {
+    const out = injectSrcdocRelay(OUTER);
+    expect(out).toContain(escapeAttr('<div class="media">card</div>'));
+    expect(out).toContain('this.contentDocument.body.scrollHeight'); // outer attrs untouched
+  });
+
+  it('is idempotent on nested creatives', () => {
+    const once = injectSrcdocRelay(OUTER);
+    expect(injectSrcdocRelay(once)).toBe(once);
+  });
+
+  it('a bridge-aware INNER does not suppress the wrapper relay (forwarder still needed)', () => {
+    const bridgeAwareInner = INNER.replace(
+      '</body>',
+      '<script>window.parent.postMessage({type:"SIMULA_AD_SIZE",payload:{height:1}},"*")</script></body>',
+    );
+    const outer = OUTER.replace(escapeAttr(INNER), escapeAttr(bridgeAwareInner));
+    const out = injectSrcdocRelay(outer);
+    // Outer gets the relay (it must forward/resize) …
+    expect(out).toContain('<script data-simula-relay="1">');
+    // … but the already-aware inner is left untouched (no injected marker inside)
+    expect(out).not.toContain('&lt;script data-simula-relay=');
+  });
+
+  it('the relay bridges across levels: child sizing, upward forwarding, downward replies', () => {
+    const out = injectSrcdocRelay(OUTER);
+    expect(out).toContain("from.style.height = Math.ceil(hh) + 'px'");
+    expect(out).toContain('__simulaSdkResponse');
+    expect(out).toContain("window.parent.postMessage(d, '*')");
+  });
+
+  it('reports pointer-cursor click-throughs as handled CTA clicks', () => {
+    const out = injectSrcdocRelay('<div>ad</div>');
+    expect(out).toContain("cursor === 'pointer'");
+    expect(out).toContain('handled: true');
+  });
+});

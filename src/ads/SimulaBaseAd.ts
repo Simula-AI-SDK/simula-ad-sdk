@@ -107,9 +107,12 @@ export abstract class SimulaBaseAd {
   /**
    * The close flow in progress: set when the primary presentation closes,
    * consumed exactly once by finishClose. Lets destroy() complete a flow
-   * stranded mid-fallback-wait so the host never misses CLOSED.
+   * stranded mid-fallback-wait so the host never misses CLOSED. `handle`
+   * tracks the presentation the flow currently owns, so finishClose never
+   * clobbers a presenter adopted AFTER the flow began (e.g. a QA preview
+   * that took over mid-flow).
    */
-  private pendingClose: { ad: LoadedAd; elapsedSeconds: number } | null = null;
+  private pendingClose: { ad: LoadedAd; elapsedSeconds: number; handle: FullscreenPresenterHandle | null } | null = null;
 
   constructor(adUnitId: string) {
     this.adUnitId = adUnitId;
@@ -340,7 +343,7 @@ export abstract class SimulaBaseAd {
           // the last one (or immediately when there are none). A teardown
           // (destroy / preview) completes the close flow synchronously — no
           // fallback fetch while the host is tearing down.
-          this.pendingClose = { ad, elapsedSeconds };
+          this.pendingClose = { ad, elapsedSeconds, handle: this.presenter };
           if (ad.creative.impressionId === 'preview' || this.destroyed) {
             this.finishClose();
             return;
@@ -465,6 +468,7 @@ export abstract class SimulaBaseAd {
       return;
     }
     this.presenter = handle; // destroy() tears down the current screen
+    if (this.pendingClose) this.pendingClose.handle = handle; // the flow now owns this screen
   }
 
   /**
@@ -476,13 +480,26 @@ export abstract class SimulaBaseAd {
     const pending = this.pendingClose;
     if (!pending) return;
     this.pendingClose = null;
-    const { ad, elapsedSeconds } = pending;
-    this.presenter = null;
+    // Only release a presenter the flow owns — never one adopted after the
+    // flow began (e.g. a preview that took over and is still on screen).
+    if (this.presenter === pending.handle) this.presenter = null;
     this.loadedAd = null;
     if (this.state === 'showing') this.state = 'idle';
     this.emit(SimulaAdEventType.CLOSED);
-    Telemetry.recordLifecycle('closed', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: ad.creative.impressionId, durationMs: elapsedSeconds * 1000 });
-    this.onAdClosed(ad, elapsedSeconds);
+    Telemetry.recordLifecycle('closed', { adFormat: this.adFormat, adUnitId: this.adUnitId, adId: pending.ad.creative.impressionId, durationMs: pending.elapsedSeconds * 1000 });
+    this.onAdClosed(pending.ad, pending.elapsedSeconds);
+  }
+
+  /**
+   * Track a QA preview's presenter handle so destroy() tears the preview
+   * down like any other presentation (subclasses call this from showPreview).
+   */
+  protected adoptPresenterHandle(handle: FullscreenPresenterHandle | null): void {
+    if (this.destroyed) {
+      handle?.close();
+      return;
+    }
+    this.presenter = handle;
   }
 
   /** Hooks for subclasses. */
