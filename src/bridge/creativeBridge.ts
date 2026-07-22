@@ -9,7 +9,8 @@ import { connectionTypeValue } from '../core/connectionType';
  * outbound echoes).
  *
  * Inbound contract (native parity + the documented web CTA extension):
- * - `AD_EARLY_COMPLETE`   → the creative asks to be closed early
+ * - `AD_EARLY_COMPLETE`   → the creative finished early: grants the reward /
+ *                           unlocks the close gate (never closes the ad)
  * - `CTA_CLICK`           → creative CTA tap (payload: `{ url? }`) — web's
  *                           click-through channel, since cross-origin iframe
  *                           taps are not visible to the parent page

@@ -83,8 +83,12 @@ async function sendOne(beacon: PendingBeacon): Promise<'ok' | 'retry' | 'drop'> 
       keepalive: true,
     });
     if (response.ok) return 'ok';
-    // Permanent failure (4xx) — drop rather than retry forever (native parity)
-    if (response.status >= 400 && response.status < 500) return 'drop';
+    // Permanent failure (4xx) — drop rather than retry forever. 408 (request
+    // timeout) and 429 (rate limited) are transient and retry (native parity:
+    // AdBeaconQueue excludes both from the permanent-drop range).
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+      return 'drop';
+    }
     return 'retry';
   } catch {
     return 'retry';

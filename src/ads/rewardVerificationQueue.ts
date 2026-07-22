@@ -130,8 +130,10 @@ async function processQueue(): Promise<void> {
         continue;
       }
 
-      // Other 4xx — permanent, report failure and drop
-      if (result.status >= 400 && result.status < 500) {
+      // Other 4xx — permanent, report failure and drop. 408/429 are transient
+      // and fall through to retry (native parity: isPermanentVerificationError
+      // excludes both).
+      if (result.status >= 400 && result.status < 500 && result.status !== 408 && result.status !== 429) {
         try {
           cb?.onFailed(new Error(`Reward verification failed (HTTP ${result.status})`));
         } catch {
@@ -141,7 +143,7 @@ async function processQueue(): Promise<void> {
         continue;
       }
 
-      // 5xx / connectivity — retry with backoff
+      // 5xx / 408 / 429 / connectivity — retry with backoff
       remaining.push({ ...item, retryCount: item.retryCount + 1, lastAttemptTimestamp: now });
     }
 

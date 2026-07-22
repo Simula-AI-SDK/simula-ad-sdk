@@ -205,19 +205,49 @@ describe('fullscreenPresenter (DOM paths)', () => {
     expect(handlers.onCtaClick).toHaveBeenCalledWith('https://store.test/app', true);
   });
 
-  it('AD_EARLY_COMPLETE closes the ad', () => {
+  it('AD_EARLY_COMPLETE finishes the gate — reward granted, close unlocked, ad STAYS OPEN (native parity)', () => {
+    vi.useFakeTimers();
+    const handlers = makeHandlers();
+    const creative = makeCreative({
+      adBehavior: { close: { delaySeconds: 30, treatment: 'reward_or_close_label', position: 'top_right', progressBarColor: '#FFFFFF' }, storeOpen: 'external' },
+    });
+    presentFullscreenAd({ creative, adUnitType: 'rewarded', handlers });
+    expect(document.querySelector('button[aria-label="Close ad"]')).toBeNull(); // gate active
+
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'AD_EARLY_COMPLETE' }, source: iframe.contentWindow } as any));
+
+    // The gate finished: reward granted + playable_end moment, close revealed
+    expect(handlers.onRewardGateElapsed).toHaveBeenCalledTimes(1);
+    expect(handlers.onCreativeMoment).toHaveBeenCalledWith('playable_end');
+    expect(document.querySelector('button[aria-label="Close ad"]')).not.toBeNull();
+    // …but the ad is NOT closed — closing would deny reward verification
+    expect(overlay()).not.toBeNull();
+    expect(handlers.onClose).not.toHaveBeenCalled();
+
+    // The user closes normally afterwards
+    (document.querySelector('button[aria-label="Close ad"]') as HTMLButtonElement).click();
+    expect(handlers.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('AD_EARLY_COMPLETE never double-fires the gate handlers', () => {
     const handlers = makeHandlers();
     presentFullscreenAd({ creative: makeCreative(), adUnitType: 'interstitial', handlers });
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    // Gate delay 0 → already finished at present time
     window.dispatchEvent(new MessageEvent('message', { data: { type: 'AD_EARLY_COMPLETE' }, source: iframe.contentWindow } as any));
-    expect(overlay()).toBeNull();
-    expect(handlers.onClose).toHaveBeenCalledTimes(1);
+    expect(handlers.onRewardGateElapsed).toHaveBeenCalledTimes(1); // from the delay-0 finish only
+    expect(overlay()).not.toBeNull();
   });
 
   it('ignores bridge messages from other sources', () => {
     const handlers = makeHandlers();
-    presentFullscreenAd({ creative: makeCreative(), adUnitType: 'interstitial', handlers });
+    const creative = makeCreative({
+      adBehavior: { close: { delaySeconds: 30, treatment: 'hidden', position: 'top_right', progressBarColor: '#FFFFFF' }, storeOpen: 'external' },
+    });
+    presentFullscreenAd({ creative, adUnitType: 'interstitial', handlers });
     window.dispatchEvent(new MessageEvent('message', { data: { type: 'AD_EARLY_COMPLETE' }, source: window } as any));
+    expect(handlers.onRewardGateElapsed).not.toHaveBeenCalled();
     expect(overlay()).not.toBeNull();
   });
 

@@ -729,6 +729,9 @@ export async function postVerifyReward(params: {
         elapsed_play_time: params.elapsedPlayTime,
         ad_unit_id: params.adUnitId ?? '',
       }),
+      // The queue drains on pagehide — without keepalive the browser aborts
+      // this POST on unload and verification stalls until the next visit
+      keepalive: true,
     });
     if (!response.ok) {
       return { status: response.status };

@@ -57,6 +57,13 @@ describe('BeaconQueue', () => {
     expect(BeaconQueue.size()).toBe(1);
   });
 
+  it.each([408, 429])('treats %i as transient and retries (native parity)', async (status) => {
+    stubFetchWith(() => ({ ok: false, status }));
+    BeaconQueue.enqueue({ url: 'https://api.test/beacon/1', method: 'POST', body: '{}' });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(BeaconQueue.size()).toBe(1); // still queued, not dropped
+  });
+
   it('keeps network failures queued', async () => {
     stubFetchWith(() => {
       throw new Error('offline');

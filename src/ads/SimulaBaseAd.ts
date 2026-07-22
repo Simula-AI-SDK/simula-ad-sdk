@@ -193,6 +193,15 @@ export abstract class SimulaBaseAd {
       this.emit(SimulaAdEventType.DISPLAY_FAILED, { error: SimulaAdError.stale() });
       return;
     }
+    // The session the creative was served under was dropped (consent resync /
+    // apiKey change) — the ad is invalid regardless of age: its impression and
+    // reward verification would carry a session the backend discarded.
+    if (ad.sessionId !== SessionManager.getSessionId()) {
+      this.loadedAd = null;
+      this.state = 'idle';
+      this.emit(SimulaAdEventType.DISPLAY_FAILED, { error: SimulaAdError.stale() });
+      return;
+    }
     if (isFullscreenActive()) {
       this.emit(SimulaAdEventType.DISPLAY_FAILED, { error: SimulaAdError.alreadyShowing() });
       return;
@@ -451,7 +460,7 @@ export abstract class SimulaBaseAd {
           if (trigger) this.onCreativeMoment(ad, trigger);
         },
         onImpression: () => {}, // fallback screens don't bill the SDK-side impression
-        onCtaClick: (url) => this.handleCtaClick(ad, url),
+        onCtaClick: (url, handled) => this.handleCtaClick(ad, url, handled),
         // Deferred one microtask: when this close came from a TAKEOVER (a new
         // presentation force-closing us), the mutex is transiently free while
         // the takeover is mid-mount — advancing synchronously would mount a

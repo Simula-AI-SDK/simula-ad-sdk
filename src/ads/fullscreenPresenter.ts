@@ -472,7 +472,12 @@ export function presentFullscreenAd(opts: {
 
   // ── Creative ─────────────────────────────────────────────────────────────
   detachBridge = attachCreativeBridge(iframe, {
-    onEarlyComplete: () => close(),
+    // Native parity: AD_EARLY_COMPLETE (e.g. survey/playable finished early)
+    // GRANTS the reward (rewarded) / unlocks the close button (interstitial)
+    // and leaves the ad open — it never closes the ad. Closing here would
+    // deny EARNED_REWARD + verification, and could skip the billable
+    // impression when it lands within 2s of render.
+    onEarlyComplete: () => finishGate(),
     onCtaClick: (url, handled) => opts.handlers.onCtaClick(url, handled),
     onCreativeMoment: (moment) => opts.handlers.onCreativeMoment?.(moment),
   });

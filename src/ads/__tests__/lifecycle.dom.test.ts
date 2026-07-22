@@ -175,6 +175,43 @@ describe('fullscreen lifecycle fixes (PR #12 threads #15/#16/#18/#19)', () => {
     expect(events1.map((e) => e.type)).not.toContain('CLOSED');
   });
 
+  it('a ready ad tied to a DROPPED session (consent resync) fails show() with stale', async () => {
+    // Distinct session id per create — a resync must install a NEW identity
+    let sessionCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: any) => {
+        const url = String(input);
+        if (url.includes('/session/create')) {
+          sessionCount += 1;
+          return { ok: true, status: 200, json: async () => ({ sessionId: `sess-${sessionCount}` }) } as any;
+        }
+        if (url.includes('/load/interstitial')) {
+          return { ok: true, status: 200, json: async () => CREATIVE } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({}) } as any;
+      }),
+    );
+    SimulaAds.initialize({ apiKey: 'key-1' });
+    await new Promise((r) => setTimeout(r, 5));
+
+    const ad = new SimulaInterstitialAd('unit-1');
+    const events: SimulaAdEvent[] = [];
+    ad.addAdEventsListener((e) => events.push(e));
+    ad.load();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(ad.loaded).toBe(true);
+
+    // Consent change → the session the creative was served under is dropped
+    SessionManager.resync(undefined);
+    await new Promise((r) => setTimeout(r, 10));
+
+    ad.show();
+    expect(events.some((e) => e.type === 'DISPLAY_FAILED' && e.error?.code === 'stale')).toBe(true);
+    expect(isFullscreenActive()).toBe(false);
+    expect(ad.loaded).toBe(false); // the invalid creative was discarded
+  });
+
   it('#8: load() while showing is a silent no-op (Kotlin parity)', async () => {
     await init();
     const ad = new SimulaInterstitialAd('unit-1');

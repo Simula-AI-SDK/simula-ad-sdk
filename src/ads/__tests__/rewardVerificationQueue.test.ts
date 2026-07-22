@@ -87,6 +87,15 @@ describe('RewardVerificationQueue (native parity: durable idempotent SSV)', () =
     expect(RewardVerificationQueue.size()).toBe(1);
   });
 
+  it.each([408, 429])('%i is transient: stays queued, never reports permanent failure (native parity)', async (status) => {
+    stubVerifyFetch(() => ({ status }));
+    const seen: string[] = [];
+    RewardVerificationQueue.enqueue(params, { onVerified: () => seen.push('verified'), onFailed: () => seen.push('failed') });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(seen).toEqual([]); // no permanent-failure callback
+    expect(RewardVerificationQueue.size()).toBe(1); // queued for retry
+  });
+
   it('retries backed-off items automatically when due (PR #12 thread #17)', async () => {
     vi.useFakeTimers(); // fakes Date + timers; microtasks still flush between advances
     try {
