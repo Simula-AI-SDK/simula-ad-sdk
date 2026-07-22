@@ -76,6 +76,7 @@ describe('post-close fallback screens (Kotlin/Swift parity)', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
     document.body.innerHTML = '';
     document.documentElement.style.overflow = '';
   });
@@ -94,27 +95,34 @@ describe('post-close fallback screens (Kotlin/Swift parity)', () => {
     ad.addAdEventsListener((e) => events.push(e));
     ad.load();
     await new Promise((r) => setTimeout(r, 10));
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'setInterval'] });
     ad.show();
-    await new Promise((r) => setTimeout(r, 5));
+    await vi.advanceTimersByTimeAsync(5);
     expect(overlayCount()).toBe(1);
 
     // Close the primary → fallback screen 1 appears (no CLOSED yet)
     closeCurrentOverlay();
-    await new Promise((r) => setTimeout(r, 10));
+    await vi.advanceTimersByTimeAsync(10);
     expect(urls.some((u) => u.includes('/load/fallbacks/imp-1'))).toBe(true);
     expect(overlayCount()).toBe(1); // fallback screen 1
     expect(currentOverlayHtml()).toContain('end screen 1');
     expect(events.map((e) => e.type)).not.toContain('CLOSED');
 
+    // Kotlin parity: the fallback close is GATED 5s (countdown ring) — no
+    // close button until the gate elapses
+    expect(document.querySelector('button[aria-label="Close ad"]')).toBeNull();
+    await vi.advanceTimersByTimeAsync(5000);
+
     // Close fallback 1 → fallback screen 2 (still no CLOSED)
     closeCurrentOverlay();
-    await new Promise((r) => setTimeout(r, 10));
+    await vi.advanceTimersByTimeAsync(10);
     expect(currentOverlayHtml()).toContain('end screen 2');
     expect(events.map((e) => e.type)).not.toContain('CLOSED');
 
-    // Close fallback 2 → the flow completes: CLOSED fires, overlay gone
+    // Close fallback 2 (after its gate) → the flow completes: CLOSED fires
+    await vi.advanceTimersByTimeAsync(5000);
     closeCurrentOverlay();
-    await new Promise((r) => setTimeout(r, 10));
+    await vi.advanceTimersByTimeAsync(10);
     expect(events.map((e) => e.type)).toContain('CLOSED');
     expect(overlayCount()).toBe(0);
     expect(isFullscreenActive()).toBe(false);
@@ -231,6 +239,117 @@ describe('post-close fallback screens (Kotlin/Swift parity)', () => {
     closeCurrentOverlay();
     await new Promise((r) => setTimeout(r, 10));
     expect(events.map((e) => e.type)).toContain('CLOSED');
+    expect(overlayCount()).toBe(0);
+  });
+
+  /** Fetch stub whose /load/fallbacks hangs until manually resolved. */
+  function stubHangingFallbacks(): { urls: string[]; resolveFallbacks: () => void } {
+    let resolver: ((v: any) => void) | null = null;
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: any) => {
+        const url = String(input);
+        urls.push(url);
+        if (url.includes('/session/create')) {
+          return { ok: true, status: 200, json: async () => ({ sessionId: 'sess-1' }) } as any;
+        }
+        if (url.includes('/load/interstitial')) {
+          return { ok: true, status: 200, json: async () => CREATIVE } as any;
+        }
+        if (url.includes('/load/fallbacks/')) {
+          return new Promise((resolve) => {
+            resolver = resolve;
+          });
+        }
+        return { ok: true, status: 200, json: async () => ({}) } as any;
+      }),
+    );
+    return {
+      urls,
+      resolveFallbacks: () => resolver?.({ ok: true, status: 200, json: async () => FALLBACKS }),
+    };
+  }
+
+  async function loadAndShowWithEvents(): Promise<{ ad: SimulaInterstitialAd; events: SimulaAdEvent[] }> {
+    const ad = new SimulaInterstitialAd('unit-1');
+    const events: SimulaAdEvent[] = [];
+    ad.addAdEventsListener((e) => events.push(e));
+    ad.load();
+    await new Promise((r) => setTimeout(r, 10));
+    ad.show();
+    await new Promise((r) => setTimeout(r, 5));
+    return { ad, events };
+  }
+
+  it('a fetch stalled beyond the wait cap → CLOSED fires; no surprise overlay later', async () => {
+    const { resolveFallbacks } = stubHangingFallbacks();
+    await init();
+
+    const ad = new SimulaInterstitialAd('unit-1');
+    const events: SimulaAdEvent[] = [];
+    ad.addAdEventsListener((e) => events.push(e));
+    ad.load();
+    await new Promise((r) => setTimeout(r, 10));
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'setInterval'] });
+    ad.show();
+    await vi.advanceTimersByTimeAsync(5);
+
+    closeCurrentOverlay();
+    // Past the 1.5s cap the flow gives up on fallbacks and completes
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(events.map((e) => e.type)).toContain('CLOSED');
+    expect(overlayCount()).toBe(0);
+
+    // The fetch finally lands — nothing pops up out of nowhere
+    resolveFallbacks();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(overlayCount()).toBe(0);
+    expect(events.filter((e) => e.type === 'CLOSED')).toHaveLength(1);
+  });
+
+  it('a new presentation during the fallback wait is never hijacked', async () => {
+    const { resolveFallbacks } = stubHangingFallbacks();
+    await init();
+    const { ad, events } = await loadAndShowWithEvents();
+
+    // Primary closed; the flow is awaiting the fallback fetch — page interactive
+    closeCurrentOverlay();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(overlayCount()).toBe(0);
+
+    // Another presentation takes the mutex during the wait
+    const other = new SimulaInterstitialAd('unit-2');
+    const preview = other.showPreview({ closeTreatment: 'hidden', delaySeconds: 0 });
+    expect(overlayCount()).toBe(1);
+
+    // The fetch lands — the flow must NOT displace the newer presentation
+    resolveFallbacks();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(currentOverlayHtml()).toContain('Simula Ad Preview'); // untouched
+    expect(events.map((e) => e.type)).toContain('CLOSED'); // flow completed without fallbacks
+
+    preview?.close();
+    ad.destroy();
+    other.destroy();
+  });
+
+  it('destroy() during the fallback wait still delivers CLOSED, exactly once', async () => {
+    const { resolveFallbacks } = stubHangingFallbacks();
+    await init();
+    const { ad, events } = await loadAndShowWithEvents();
+
+    closeCurrentOverlay();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(events.map((e) => e.type)).not.toContain('CLOSED'); // flow waiting
+
+    ad.destroy();
+    expect(events.map((e) => e.type)).toContain('CLOSED'); // delivered before listeners detach
+
+    // The late fetch resolution neither double-fires nor mounts anything
+    resolveFallbacks();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(events.filter((e) => e.type === 'CLOSED')).toHaveLength(1);
     expect(overlayCount()).toBe(0);
   });
 

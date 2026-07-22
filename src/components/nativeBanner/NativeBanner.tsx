@@ -96,14 +96,16 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
   // fallback) and the bridge CTA_CLICK path — one tap, one click event.
   const lastClickAtRef = useRef(0);
 
-  const fireClick = useCallback((c: LoadedCreative, openTarget: boolean, handled = false) => {
+  const fireClick = useCallback((c: LoadedCreative, openTarget: boolean, handled = false, url?: string) => {
     const now = Date.now();
     if (now - lastClickAtRef.current < 300) return;
     lastClickAtRef.current = now;
     onClickRef.current?.();
     Telemetry.recordLifecycle('click', { adFormat: 'native', adUnitId: slot, adId: c.impressionId });
     if (openTarget && !handled) {
-      const target = c.trackingUrl ?? c.storeUrl;
+      // Same precedence as the fullscreen path: the creative's own CTA url
+      // (e.g. an anchor href the relay captured) wins over the tracking URL.
+      const target = url ?? c.trackingUrl ?? c.storeUrl;
       if (target) {
         try {
           window.open(target, '_blank', 'noopener');
@@ -301,7 +303,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
 
     // Cross-origin creatives: CTA + sizing arrive over the bridge
     detachBridgeRef.current = attachCreativeBridge(iframe, {
-      onCtaClick: (_url, handled) => fireClick(creative, true, handled === true),
+      onCtaClick: (url, handled) => fireClick(creative, true, handled === true, url),
     });
 
     // Web sizing extension: creatives can post { type: 'SIMULA_AD_SIZE', payload: { height } }

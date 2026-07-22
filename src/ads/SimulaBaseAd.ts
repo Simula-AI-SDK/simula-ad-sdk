@@ -5,9 +5,48 @@ import { adValueFromBidCpm } from '../core/adValue';
 import { CharacterTargeting, LoadedCreative, FallbackAdScreen, fetchFallbackAds } from '../utils/api';
 import { SimulaAdError } from './errors';
 import { SimulaAdEventType, AnyAdEventType, SimulaAdEvent, SimulaAdEventListener, SimulaUnsubscribe } from './events';
-import { AdUnitType } from './adBehavior';
+import { AdUnitType, CloseBehavior } from './adBehavior';
 import { presentFullscreenAd, isFullscreenActive, FullscreenPresenterHandle } from './fullscreenPresenter';
 import { logger } from '../utils/logger';
+
+/**
+ * Cap on how long the close flow waits for the fallback-screens fetch. The
+ * prefetch (kicked off at DISPLAYED) is virtually always resolved by close
+ * time; this bound only matters when the user closes within one RTT of the
+ * display. Past it the flow completes without fallbacks — the page is
+ * interactive during the wait, and a fallback overlay popping up seconds
+ * later would hijack the user mid-interaction.
+ */
+const FALLBACK_WAIT_CAP_MS = 1_500;
+
+/**
+ * Close chrome for fallback screens (Kotlin parity: FallbackAdOverlay's 5s
+ * countdown ring resolving to a top-right close button). The presenter's
+ * visibility-gated countdown gives the same foreground-only dwell.
+ */
+const FALLBACK_CLOSE_BEHAVIOR: CloseBehavior = {
+  delaySeconds: 5,
+  treatment: 'countdown_circle',
+  position: 'top_right',
+  progressBarColor: '#FFFFFF',
+};
+
+/** Resolve with `fallback` when `promise` hasn't settled within `ms`. Never rejects. */
+function raceWithTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
 
 /** Loaded ads expire after 1 hour (native parity: STALE_AFTER_MS). */
 const STALE_AFTER_MS = 60 * 60 * 1000;
@@ -65,6 +104,12 @@ export abstract class SimulaBaseAd {
   private lastTargeting: SimulaAdLoadOptions = {};
   /** In-flight fallback-screen prefetch, kicked off while the primary ad is on screen. */
   private fallbackPrefetch: { impressionId: string; promise: Promise<FallbackAdScreen[]> } | null = null;
+  /**
+   * The close flow in progress: set when the primary presentation closes,
+   * consumed exactly once by finishClose. Lets destroy() complete a flow
+   * stranded mid-fallback-wait so the host never misses CLOSED.
+   */
+  private pendingClose: { ad: LoadedAd; elapsedSeconds: number } | null = null;
 
   constructor(adUnitId: string) {
     this.adUnitId = adUnitId;
@@ -172,6 +217,10 @@ export abstract class SimulaBaseAd {
     this.presenter = null;
     this.fallbackPrefetch = null;
     if (presenter) presenter.close(); // CLOSED fires while listeners are still attached
+    // A close flow stranded mid-fallback-wait (presenter already torn down,
+    // fetch still pending) still owes the host its CLOSED — complete it now,
+    // while listeners are attached. No-op when nothing is pending.
+    this.finishClose();
     this.loadedAd = null;
     this.state = 'idle';
     this.removeAllListeners();
@@ -291,8 +340,9 @@ export abstract class SimulaBaseAd {
           // the last one (or immediately when there are none). A teardown
           // (destroy / preview) completes the close flow synchronously — no
           // fallback fetch while the host is tearing down.
+          this.pendingClose = { ad, elapsedSeconds };
           if (ad.creative.impressionId === 'preview' || this.destroyed) {
-            this.finishClose(ad, elapsedSeconds);
+            this.finishClose();
             return;
           }
           void this.startFallbackFlow(ad, elapsedSeconds);
@@ -347,18 +397,17 @@ export abstract class SimulaBaseAd {
 
   /** Consume the prefetched screens (or fetch when no prefetch ran) and present them in reveal order. */
   private async startFallbackFlow(ad: LoadedAd, elapsedSeconds: number): Promise<void> {
-    let screens: FallbackAdScreen[];
     const prefetch = this.fallbackPrefetch;
     this.fallbackPrefetch = null;
-    if (prefetch && prefetch.impressionId === ad.creative.impressionId) {
-      // The prefetch is usually already resolved by close time; awaiting an
-      // in-flight one is still far faster than a cold fetch.
-      screens = await prefetch.promise;
-    } else {
-      screens = await fetchFallbackAds(ad.creative.impressionId).catch(() => [] as FallbackAdScreen[]);
-    }
+    // The prefetch is usually already resolved by close time; awaiting an
+    // in-flight one is still far faster than a cold fetch.
+    const source =
+      prefetch && prefetch.impressionId === ad.creative.impressionId
+        ? prefetch.promise
+        : fetchFallbackAds(ad.creative.impressionId).catch(() => [] as FallbackAdScreen[]);
+    const screens = await raceWithTimeout(source, FALLBACK_WAIT_CAP_MS, [] as FallbackAdScreen[]);
     if (this.destroyed || screens.length === 0) {
-      this.finishClose(ad, elapsedSeconds);
+      this.finishClose();
       return;
     }
     this.presentFallbackScreen(ad, screens, 0, elapsedSeconds);
@@ -371,8 +420,10 @@ export abstract class SimulaBaseAd {
    * 0 → end_screen_1_open, 1 → end_screen_2_open.
    */
   private presentFallbackScreen(ad: LoadedAd, screens: FallbackAdScreen[], index: number, elapsedSeconds: number): void {
-    if (this.destroyed || index >= screens.length) {
-      this.finishClose(ad, elapsedSeconds);
+    // Never hijack a newer presentation: if another fullscreen ad/preview took
+    // over while this flow was waiting, complete the close without fallbacks.
+    if (this.destroyed || index >= screens.length || isFullscreenActive()) {
+      this.finishClose();
       return;
     }
     const screen = screens[index];
@@ -385,29 +436,47 @@ export abstract class SimulaBaseAd {
       trackingUrl: ad.creative.trackingUrl,
       storeUrl: ad.creative.storeUrl,
       bidAmt: 0,
-      adBehavior: null, // default close chrome (immediate ✕)
+      adBehavior: null, // close chrome comes from FALLBACK_CLOSE_BEHAVIOR below
     };
     const handle = presentFullscreenAd({
       creative: fallbackCreative,
       adUnitType: this.adUnitType,
+      // Kotlin parity: 5s countdown ring (foreground-gated) → close button
+      closeBehavior: { ...FALLBACK_CLOSE_BEHAVIOR },
       handlers: {
         onDisplayed: () => {
           if (trigger) this.onCreativeMoment(ad, trigger);
         },
         onImpression: () => {}, // fallback screens don't bill the SDK-side impression
         onCtaClick: (url) => this.handleCtaClick(ad, url),
-        onClose: () => this.presentFallbackScreen(ad, screens, index + 1, elapsedSeconds),
+        // Deferred one microtask: when this close came from a TAKEOVER (a new
+        // presentation force-closing us), the mutex is transiently free while
+        // the takeover is mid-mount — advancing synchronously would mount a
+        // re-entrant overlay. After the microtask the takeover holds the mutex
+        // and the guard above bails to finishClose. A user close advances
+        // before the next paint — no flash between screens.
+        onClose: () => {
+          void Promise.resolve().then(() => this.presentFallbackScreen(ad, screens, index + 1, elapsedSeconds));
+        },
       },
     });
     if (!handle) {
-      this.finishClose(ad, elapsedSeconds);
+      this.finishClose();
       return;
     }
     this.presenter = handle; // destroy() tears down the current screen
   }
 
-  /** The full close flow completes: primary ad + every fallback screen. */
-  private finishClose(ad: LoadedAd, elapsedSeconds: number): void {
+  /**
+   * The full close flow completes: primary ad + every fallback screen.
+   * Consumes pendingClose exactly once — late async completions (a fallback
+   * fetch landing after destroy() already finished the flow) are no-ops.
+   */
+  private finishClose(): void {
+    const pending = this.pendingClose;
+    if (!pending) return;
+    this.pendingClose = null;
+    const { ad, elapsedSeconds } = pending;
     this.presenter = null;
     this.loadedAd = null;
     if (this.state === 'showing') this.state = 'idle';
