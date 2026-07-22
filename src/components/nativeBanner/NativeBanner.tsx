@@ -423,7 +423,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
   }
 
   const isSrcdoc = !!creative.renderedHtml;
-  const height = iframeHeight ?? getCachedHeight(slot, position) ?? DEFAULT_IFRAME_HEIGHT;
+  const height = `${iframeHeight ?? getCachedHeight(slot, position) ?? DEFAULT_IFRAME_HEIGHT}px`;
 
   return (
     <div
@@ -433,7 +433,7 @@ export const NativeBanner: React.FC<NativeAdProps> = React.memo((props) => {
         display: 'block',
         width: containerWidth,
         minWidth: `${MIN_WIDTH_PX}px`,
-        height: `${height}px`,
+        height: height,
         overflow: 'hidden',
         transition: 'height 120ms ease-out',
       }}

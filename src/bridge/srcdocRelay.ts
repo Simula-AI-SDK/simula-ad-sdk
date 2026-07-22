@@ -17,8 +17,15 @@
 
 const RELAY_MARKER = 'data-simula-relay';
 
-/** Strings indicating the template already implements the bridge contract. */
-const CONTRACT_HINTS = ['SIMULA_AD_SIZE', 'CTA_CLICK', RELAY_MARKER];
+/**
+ * Strings indicating the template ALREADY reports its height (the relay's
+ * primary job). Note `CTA_CLICK` is deliberately NOT a skip hint: a template
+ * can report clicks yet have no size reporting (e.g. character_ad.html) —
+ * injecting the relay then adds sizing without duplicating anything (the
+ * relay's click capture only fires for a[href]/[data-simula-cta] elements,
+ * which such templates don't use).
+ */
+const CONTRACT_HINTS = ['SIMULA_AD_SIZE', RELAY_MARKER];
 
 const RELAY_SCRIPT = `<script ${RELAY_MARKER}="1">(function () {
   if (window.__simulaRelayInstalled) return;
@@ -84,7 +91,8 @@ const RELAY_SCRIPT = `<script ${RELAY_MARKER}="1">(function () {
 /**
  * Returns the creative HTML with the relay script appended (before `</body>`
  * when present, else at the end). Idempotent and contract-aware: HTML that
- * already carries a relay (ours or the backend's) is returned unchanged.
+ * already reports its height (`SIMULA_AD_SIZE`) or carries our relay marker
+ * is returned unchanged.
  */
 export function injectSrcdocRelay(html: string): string {
   if (!html) return html;
@@ -96,7 +104,7 @@ export function injectSrcdocRelay(html: string): string {
   return html + RELAY_SCRIPT;
 }
 
-/** Test/diagnostics: does this HTML already carry a bridge implementation? */
+/** Test/diagnostics: does this HTML already report its height / carry a relay? */
 export function hasBridgeRelay(html: string): boolean {
   return CONTRACT_HINTS.some((hint) => html.includes(hint));
 }

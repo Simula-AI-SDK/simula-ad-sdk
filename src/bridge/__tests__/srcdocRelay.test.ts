@@ -20,11 +20,16 @@ describe('injectSrcdocRelay', () => {
     expect(injectSrcdocRelay(once)).toBe(once);
   });
 
-  it('leaves backend bridge-aware templates untouched', () => {
+  it('injects into templates that report CTA_CLICK but NOT height (character_ad.html case)', () => {
+    const backendCtaOnly = '<div>ad</div><script>window.parent.postMessage({type:"CTA_CLICK",payload:{handled:true}},"*")</script>';
+    const out = injectSrcdocRelay(backendCtaOnly);
+    expect(out).not.toBe(backendCtaOnly);
+    expect(out).toContain('SIMULA_AD_SIZE'); // sizing added
+  });
+
+  it('leaves backend height-aware templates untouched', () => {
     const backendRelay = '<div>ad</div><script>send("SIMULA_AD_SIZE", {})</script>';
     expect(injectSrcdocRelay(backendRelay)).toBe(backendRelay);
-    const backendCta = '<div>ad</div><script>send("CTA_CLICK", {})</script>';
-    expect(injectSrcdocRelay(backendCta)).toBe(backendCta);
   });
 
   it('handles empty input safely', () => {
